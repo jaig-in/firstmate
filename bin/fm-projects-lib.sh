@@ -286,10 +286,15 @@ fm_project_sync_candidates() {
 # fm_project_discover <projects-root>: print the basename of every direct
 # child that is the root of its own git work tree - the discoverable sibling
 # repos of an org root. Discovery is not authority: these names are intake and
-# registry-rebuild input, never a mutation list.
+# registry-rebuild input, never a mutation list. A projects root that is not a
+# directory fails loudly, because callers rebuild a registry from this list and
+# an empty success would read as "this org has no siblings".
 fm_project_discover() {
   local root=$1 child top
-  [ -d "$root" ] || return 0
+  [ -d "$root" ] || {
+    echo "error: projects root is not a directory: $root" >&2
+    return 1
+  }
   for child in "$root"/*; do
     [ -d "$child" ] || continue
     top=$(git -C "$child" rev-parse --show-toplevel 2>/dev/null) || continue
@@ -307,6 +312,7 @@ fm_project_alias_for_path() {
   while IFS= read -r alias; do
     [ -n "$alias" ] || continue
     resolved=$(fm_project_resolve "$home" "$config" "$data" "$alias") || return 1
+    [ "$resolved" != "$alias" ] || continue
     resolved=$(cd "$resolved" 2>/dev/null && pwd -P) || continue
     if [ "$resolved" = "$target" ]; then
       printf '%s\n' "$alias"

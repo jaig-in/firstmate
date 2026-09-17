@@ -793,6 +793,31 @@ test_fleet_sync_timeout_empty_override_uses_default() {
   pass "bootstrap treats a blank timeout override as unset"
 }
 
+test_fleet_sync_failure_is_reported() {
+  local case_dir home fakebin fake_root out
+  case_dir="$TMP_ROOT/fleet-sync-failure"
+  home="$case_dir/home"
+  mkdir -p "$home/config"
+  printf '%s\n' manual > "$home/config/backlog-backend"
+  add_origin_backed_projects "$home" 1
+  fakebin=$(make_fake_toolchain "$case_dir")
+  fake_root="$case_dir/fake-root"
+  mkdir -p "$fake_root/bin"
+  cat > "$fake_root/bin/fm-fleet-sync.sh" <<'SH'
+#!/usr/bin/env bash
+echo "error: project registry is unreadable" >&2
+exit 1
+SH
+  chmod +x "$fake_root/bin/fm-fleet-sync.sh"
+
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$fake_root" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
+
+  assert_contains "$out" "FLEET_SYNC: fleet: skipped: project registry is unreadable" \
+    "a refresh that refused to run must not read as a clean fleet"
+  pass "bootstrap reports a fleet refresh that failed instead of showing nothing"
+}
+
 test_fleet_sync_timeout_is_computed_before_launch() {
   local case_dir home fakebin fake_root out started_marker git_record
   case_dir="$TMP_ROOT/fleet-timeout-launch-order"
@@ -1258,6 +1283,7 @@ test_fleet_sync_timeout_scales_with_origin_backed_project_count
 test_fleet_sync_timeout_floor_preserves_small_fleets
 test_fleet_sync_timeout_explicit_override_wins
 test_fleet_sync_timeout_empty_override_uses_default
+test_fleet_sync_failure_is_reported
 test_fleet_sync_timeout_is_computed_before_launch
 test_routine_bootstrap_confirmations_are_silent
 test_routine_bootstrap_contract_runs_under_system_bash

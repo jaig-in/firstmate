@@ -341,11 +341,12 @@ fleet_sync() {
   [ -d "$PROJECTS" ] || return 0
 
   tmp=$(mktemp "${TMPDIR:-/tmp}/fm-fleet-sync.XXXXXX" 2>/dev/null) || return 0
+  err="$tmp.err"
   timeout=$(fleet_sync_bootstrap_timeout)
   monitor_was_on=0
   case $- in *m*) monitor_was_on=1 ;; esac
   set -m 2>/dev/null || true
-  "$FM_ROOT/bin/fm-fleet-sync.sh" >"$tmp" 2>/dev/null &
+  "$FM_ROOT/bin/fm-fleet-sync.sh" >"$tmp" 2>"$err" &
   pid=$!
 
   start=$SECONDS
@@ -357,16 +358,23 @@ fleet_sync() {
       [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
       fleet_sync_relay_all_output "$tmp"
       echo "FLEET_SYNC: fleet: skipped: bootstrap refresh timed out (timeout=${timeout}s elapsed=${elapsed}s)"
-      rm -f "$tmp"
+      rm -f "$tmp" "$err"
       return 0
     fi
     sleep 1
   done
-  wait "$pid" 2>/dev/null || true
+  rc=0
+  wait "$pid" 2>/dev/null || rc=$?
   [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
 
   fleet_sync_relay_filtered_output "$tmp"
-  rm -f "$tmp"
+  if [ "$rc" -ne 0 ]; then
+    # A refresh that refused to run (an unreadable registry or projects root)
+    # must not read as a clean fleet in the digest.
+    reason=$(sed -n 's/^error: //;/./{p;q;}' "$err" 2>/dev/null || true)
+    echo "FLEET_SYNC: fleet: skipped: ${reason:-refresh failed (exit $rc)}"
+  fi
+  rm -f "$tmp" "$err"
 }
 
 secondmate_sync() {

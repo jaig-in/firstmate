@@ -515,7 +515,37 @@ test_resolver_fails_closed() {
   assert_grep "exactly one path line" "$base/err-disc" "discover did not name the malformed root"
   [ ! -s "$base/out-disc" ] || fail "discover listed siblings from a malformed projects root"
 
-  pass "resolver failures fail closed: fleet refresh, registry lookup, spawn, manifest paths, discover"
+  # A well-formed root naming a directory that no longer exists is an error
+  # too: an empty success reads as "this org has no siblings".
+  local home5="$base/org5/.firstmate"
+  mkdir -p "$home5/config" "$home5/data" "$home5/state"
+  printf 'missing-root\n' > "$home5/config/projects-root"
+  if FM_HOME="$home5" "$ROOT/bin/fm-projects.sh" discover >"$base/out-miss" 2>"$base/err-miss"; then
+    fail "discover succeeded with a projects root that does not exist"
+  fi
+  assert_grep "not a directory" "$base/err-miss" "discover did not name the missing projects root"
+
+  # A registered alias that resolves nowhere must not be matched against a
+  # same-named directory in whatever cwd the caller happens to have.
+  local home6="$base/org6/.firstmate" cwd6="$base/cwd6"
+  mkdir -p "$home6/config" "$home6/data" "$home6/state" "$base/org6/sibling"
+  printf '..\n' > "$home6/config/projects-root"
+  printf -- '- ghostproj [direct-PR] - stale registration (added 2026-09-17)\n' > "$home6/data/projects.md"
+  fm_git_init_commit "$cwd6/ghostproj"
+  if (cd "$cwd6" && FM_HOME="$home6" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" ghostproj) \
+      >/dev/null 2>"$base/err-ghost"; then
+    fail "single-arg refresh accepted a cwd directory as a registered project"
+  fi
+  assert_grep "not a registered project" "$base/err-ghost" "stale-registration refusal did not name registration"
+  if (cd "$cwd6" && FM_HOME="$home6" "$ROOT/bin/fm-spawn.sh" t1 ghostproj --mode direct-PR --yolo off) \
+      >/dev/null 2>"$base/err-ghost-spawn"; then
+    fail "spawn accepted a cwd directory as a registered project"
+  fi
+  case "$(cat "$base/err-ghost-spawn")" in
+    *"has no brief"*) fail "spawn matched a stale registration against its own cwd" ;;
+  esac
+
+  pass "resolver failures fail closed: fleet refresh, registry lookup, spawn, manifest paths, discover, stale aliases"
 }
 
 # --- spawn refuses unregistered siblings -------------------------------------
