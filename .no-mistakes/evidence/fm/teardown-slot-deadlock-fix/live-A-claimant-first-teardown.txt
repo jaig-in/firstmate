@@ -1,0 +1,48 @@
+### Scenario A - claimant tears down first (the 2026-09-16 operator order)
+$ bin/fm-teardown.sh live-task --force
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  8 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: task stale-task's record also names worktree /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/project, but that pool slot's claim names live-task, which took it after stale-task's record was written, and stale-task's endpoint reads missing; stale-task's record is stale and does not block this teardown (bin/fm-crew-state.sh stale-task).
+A new version of treehouse is available: v2.1.0 → v2.3.0
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown live-task complete (window fmlive:fm-live-task, worktree /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/project)
+Backlog: live-task just finished (this home keeps no markdown backlog at /tmp/fm-live-YAoz/home/data/backlog.md). Update /tmp/fm-live-YAoz/home/data/backlog.md - move live-task to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+
+$ ls $POOL/1/.fm-slot-owner        # claimant's claim released
+ls: cannot access '/tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/.fm-slot-owner': No such file or directory
+$ cat state/stale-task.meta        # mark left on the stale record
+window=fmlive:fm-stale-task
+endpoint_task_id=stale-task
+worktree=/tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/project
+project=/tmp/fm-live-YAoz/project
+kind=scout
+slot_reassigned_to=live-task
+$ ls state/
+home-summary.json
+live2.meta
+mate4.meta
+mine3.meta
+other3.meta
+stale-task.meta
+stale2.meta
+stale4.meta
+terminal-outcomes
+$ treehouse status
+1     available    /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/project
+2     leased       /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project  (held by stale-task)
+3     leased       /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/3/project  (held by mine3)
+4     leased       /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/4/project  (held by stale4)
+$ tmux list-windows
+control
+fm-stale2
+fm-mine3
+fm-other3
+fm-stale4

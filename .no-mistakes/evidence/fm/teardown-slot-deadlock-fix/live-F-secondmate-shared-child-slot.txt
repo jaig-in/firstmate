@@ -1,0 +1,21 @@
+### Scenario F - forced secondmate teardown, two child records sharing one pool slot
+children: a-claimant (holds the slot claim) and b-stale, both naming /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/project
+$ bin/fm-teardown.sh mate-task --force
+warning: task b-stale's record also names worktree /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/project, but that pool slot's claim names a-claimant, which took it after b-stale's record was written, and b-stale's endpoint reads missing; b-stale's record is stale and does not block this teardown (bin/fm-crew-state.sh b-stale).
+warning: task b-stale's recorded worktree /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/project was reassigned to task a-claimant (home /tmp/fm-live-YAoz/mate), which claimed that pool slot after this record was written; that slot is no longer b-stale's, so its processes, copy, and claim are left untouched and only b-stale's own cleanup runs.
+
+🌳 Worktree returned to pool.
+teardown mate-task complete (window fmlive:fm-mate-task, worktree /tmp/fm-live-YAoz/mate)
+
+$ grep -c 'treehouse return' treehouse-calls.log    # the shared slot returned exactly once
+1
+treehouse return --force /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/project
+$ ls $POOL/1/project    # the returned slot's checkout was NOT rm -rf'd by the stale child
+treehouse.toml
+$ git -C $POOL/1/project status --short && git -C $POOL/1/project rev-parse --abbrev-ref HEAD
+still a valid worktree
+$ treehouse status | sed -n 1p
+1     available    /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/project
+$ ls $MATE/state ; ls state/mate-task.meta
+ls: cannot access '/tmp/fm-live-YAoz/mate/state': No such file or directory
+ls: cannot access '/tmp/fm-live-YAoz/home/state/mate-task.meta': No such file or directory

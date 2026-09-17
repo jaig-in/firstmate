@@ -1,0 +1,28 @@
+### Scenario B - relaunching the stale task into the slot the claimant already returned
+$ bin/fm-spawn.sh stale-task --relaunch
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task stale-task's endpoint reads 'missing'; a relaunch requires a positively agent-free endpoint (stop the agent first with bin/fm-control.sh stale-task exit)
+exit=
+
+### Scenario C - the stale task's own teardown after the claimant returned the slot
+$ bin/fm-teardown.sh stale-task --force
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: task stale-task's recorded worktree /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/project was reassigned to task live-task, which claimed that pool slot after this record was written; that slot is no longer stale-task's, so its processes, copy, and claim are left untouched and only stale-task's own cleanup runs.
+teardown stale-task complete (window fmlive:fm-stale-task; pool slot /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/project left to task live-task, which it was reassigned to)
+Backlog: stale-task just finished (this home keeps no markdown backlog at /tmp/fm-live-YAoz/home/data/backlog.md). Update /tmp/fm-live-YAoz/home/data/backlog.md - move stale-task to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=
+
+$ treehouse status    # slot 1 still simply available - not returned twice, not reclaimed
+1     available    /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/1/project
+2     leased       /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project  (held by stale-task)
+3     leased       /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/3/project  (held by mine3)
+4     leased       /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/4/project  (held by stale4)
+$ ls $POOL/1/project | head -5   # the slot's checkout is intact
+treehouse.toml
+$ ls state/*.meta
+/tmp/fm-live-YAoz/home/state/live2.meta
+/tmp/fm-live-YAoz/home/state/mate4.meta
+/tmp/fm-live-YAoz/home/state/mine3.meta
+/tmp/fm-live-YAoz/home/state/other3.meta
+/tmp/fm-live-YAoz/home/state/stale2.meta
+/tmp/fm-live-YAoz/home/state/stale4.meta

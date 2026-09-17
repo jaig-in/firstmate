@@ -1,0 +1,17 @@
+### Scenario B - fm-spawn --relaunch into a pool slot another task claimed since
+$ cat $POOL/2/.fm-slot-owner
+task=live2
+home=/tmp/fm-live-YAoz/home
+$ bin/fm-spawn.sh rl-stale --relaunch
+error: task rl-stale's recorded worktree '/tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project' was reassigned to task live2 (home /tmp/fm-live-YAoz/home); refusing to relaunch into a pool slot that is no longer rl-stale's (tear down rl-stale and respawn it instead)
+
+### Scenario B2 - same relaunch after the claimant's teardown released the claim, leaving only the mark
+$ ls $POOL/2/.fm-slot-owner
+ls: cannot access '/tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/.fm-slot-owner': No such file or directory
+$ tail -1 state/rl-stale.meta
+slot_reassigned_to=live2
+$ bin/fm-spawn.sh rl-stale --relaunch
+error: task rl-stale's recorded worktree '/tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project' was reassigned to task live2; refusing to relaunch into a pool slot that is no longer rl-stale's (tear down rl-stale and respawn it instead)
+
+$ tmux list-panes -t '=fmlive:fm-rl-stale' -F '#{pane_current_command}'   # nothing was launched into the endpoint
+bash

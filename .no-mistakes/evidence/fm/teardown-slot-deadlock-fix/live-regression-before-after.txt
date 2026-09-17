@@ -1,0 +1,34 @@
+### Regression: the 2026-09-16 deadlock, same fixture, base commit vs this branch
+Two records name pool slot 2; the slot's claim names base-live; base-stale's endpoint is gone.
+
+--- BEFORE (base 3eb5b63) : $ bin/fm-teardown.sh base-live --force
+REFUSED: task base-live's recorded worktree /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project is also task base-stale's recorded worktree.
+Returning that pool slot would kill base-stale's processes and reset its copy, so nothing was changed - not even with --force.
+Reconcile whichever record is wrong (bin/fm-crew-state.sh base-live; bin/fm-crew-state.sh base-stale), then re-run teardown.
+exit=
+--- BEFORE : $ bin/fm-teardown.sh base-stale --force   (the other order)
+REFUSED: task base-stale's recorded worktree /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project is also task base-live's recorded worktree.
+Returning that pool slot would kill base-live's processes and reset its copy, so nothing was changed - not even with --force.
+Reconcile whichever record is wrong (bin/fm-crew-state.sh base-stale; bin/fm-crew-state.sh base-live), then re-run teardown.
+exit=
+  => neither task can be torn down: the deadlock
+
+--- AFTER (this branch) : $ bin/fm-teardown.sh base-live --force
+warning: task base-stale's record also names worktree /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project, but that pool slot's claim names base-live, which took it after base-stale's record was written, and base-stale's endpoint reads missing; base-stale's record is stale and does not block this teardown (bin/fm-crew-state.sh base-stale).
+warning: task live2's record also names worktree /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project, but that pool slot's claim names base-live, which took it after live2's record was written, and live2's endpoint reads missing; live2's record is stale and does not block this teardown (bin/fm-crew-state.sh live2).
+warning: task stale2's record also names worktree /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project, but that pool slot's claim names base-live, which took it after stale2's record was written, and stale2's endpoint reads dead; stale2's record is stale and does not block this teardown (bin/fm-crew-state.sh stale2).
+A new version of treehouse is available: v2.1.0 → v2.3.0
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown base-live complete (window fmlive:fm-base-live, worktree /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project)
+Backlog: base-live just finished (this home keeps no markdown backlog at /tmp/fm-live-YAoz/home/data/backlog.md). Update /tmp/fm-live-YAoz/home/data/backlog.md - move base-live to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=
+$ treehouse status | sed -n 2p
+2     available    /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project
+--- AFTER : $ bin/fm-teardown.sh base-stale --force
+warning: task base-stale's recorded worktree /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project was reassigned to task base-live, which claimed that pool slot after this record was written; that slot is no longer base-stale's, so its processes, copy, and claim are left untouched and only base-stale's own cleanup runs.
+teardown base-stale complete (window fmlive:fm-base-stale; pool slot /tmp/fm-live-YAoz/trees/.treehouse/project-497a14/2/project left to task base-live, which it was reassigned to)
+Backlog: base-stale just finished (this home keeps no markdown backlog at /tmp/fm-live-YAoz/home/data/backlog.md). Update /tmp/fm-live-YAoz/home/data/backlog.md - move base-stale to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=
+$ ls state/base-*.meta
