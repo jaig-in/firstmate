@@ -73,12 +73,13 @@ die() { echo "firstmate: $*" >&2; exit 1; }
 # config/primary-harness or .tasks.toml into any launch under that repo.
 HOME_MARKER=".fm-home"
 
-# The verified harness adapters minus the crew-only ones (AGENTS.md section 4);
-# config/primary-harness is restricted to this list so a home config cannot name
-# an arbitrary binary. It is a name check, not a support claim: kimi passes it
-# with no primary supervision protocol, and README's requirements own the set
-# supported for a primary session.
-VERIFIED_PRIMARY_HARNESSES="claude codex opencode pi pi-signed grok kimi cursor omp"
+# The verified harness adapters minus the crew-only ones (AGENTS.md section 4)
+# and minus kimi, which is verified as a crewmate harness but sits outside the
+# primary turn-end guard scope (references/harness/kimi.md); config/primary-harness
+# is restricted to this list so a home config cannot name an arbitrary binary or
+# a harness with no primary supervision protocol. README's Requirements own the
+# supported primary set.
+VERIFIED_PRIMARY_HARNESSES="claude codex opencode pi pi-signed grok cursor omp"
 
 # nearest_firstmate_home <dir>: print the nearest .firstmate/ ancestor, or
 # nothing. The walk stops below $HOME: $HOME/.firstmate is the global home,

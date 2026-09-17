@@ -212,6 +212,12 @@ SH
     fail "crew-only primary-harness was accepted"
   fi
   assert_grep "unverified primary harness" "$base/err2" "adapter refusal did not fail loudly"
+  printf 'kimi\n' > "$repo/.firstmate/config/primary-harness"
+  if (cd "$repo/sub" && env -u FM_HOME \
+      PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err2k"); then
+    fail "crew-scope kimi primary-harness was accepted"
+  fi
+  assert_grep "unverified primary harness" "$base/err2k" "kimi refusal did not fail loudly"
   printf 'definitely-not-a-harness\n' > "$repo/.firstmate/config/primary-harness"
   if (cd "$repo/sub" && env -u FM_HOME \
       PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err3"); then
