@@ -42,9 +42,11 @@
 #     their existing not-a-directory handling.
 #
 # data/project-paths.json is a flat JSON object {"<alias>": "<absolute-path>"}
-# for projects that live outside the projects root. jq is used when present;
-# the fallback reader accepts only the flat object form and refuses aliases or
-# paths containing a double quote or backslash, which the format forbids.
+# for projects that live outside the projects root. Both readers refuse a value
+# that is not an absolute path, because a relative one would resolve against
+# whatever directory the caller happens to be in. jq is used when present; the
+# fallback reader accepts only the flat object form and refuses aliases or paths
+# containing a double quote or backslash, which the format forbids.
 
 # fm_projects_root <home> <config>: print the effective projects root.
 fm_projects_root() {
@@ -115,8 +117,8 @@ fm_project_manifest_pairs() {
   manifest=$(fm_project_manifest_path "$data")
   [ -f "$manifest" ] || return 0
   if command -v jq >/dev/null 2>&1; then
-    jq -e 'type == "object" and (all(.[]; type == "string"))' "$manifest" >/dev/null 2>&1 || {
-      echo "error: $manifest must be a flat JSON object of alias -> path" >&2
+    jq -e 'type == "object" and (all(.[]; type == "string" and startswith("/")))' "$manifest" >/dev/null 2>&1 || {
+      echo "error: $manifest must be a flat JSON object of alias -> absolute path" >&2
       return 1
     }
     jq -r 'to_entries[] | .key + "\t" + .value' "$manifest"
@@ -127,9 +129,9 @@ fm_project_manifest_pairs() {
       line = $0
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
       if (line == "{" || line == "}" || line == "") next
-      # one "alias": "path" pair per line, optional trailing comma
-      if (line !~ /^"[^"\\]+"[[:space:]]*:[[:space:]]*"[^"\\]*"[[:space:]]*,?$/) {
-        printf "error: %s must be a flat JSON object of alias -> path\n", file > "/dev/stderr"
+      # one "alias": "/absolute/path" pair per line, optional trailing comma
+      if (line !~ /^"[^"\\]+"[[:space:]]*:[[:space:]]*"\/[^"\\]*"[[:space:]]*,?$/) {
+        printf "error: %s must be a flat JSON object of alias -> absolute path\n", file > "/dev/stderr"
         exit 1
       }
       sub(/^"/, "", line)
