@@ -491,7 +491,7 @@ seed_project_source() {
 # is cloned, created, or initialized - registration in the child's
 # data/projects.md (sync_project_registry) is the whole operation.
 register_org_project() {
-  local project=$1 src top
+  local project=$1 src top parent_path
   fm_project_registered_aliases "$DATA" | grep -Fxq -- "$project" || {
     echo "error: project $project is not registered in $DATA/projects.md or project-paths.json; register it before seeding" >&2
     return 1
@@ -506,6 +506,17 @@ register_org_project() {
     echo "error: project $project at $src is not the root of its own git work tree" >&2
     return 1
   }
+  # Authorization is by location, not only by name: when this home pins the
+  # alias to a place (an org-shaped home or a project-paths.json entry), the
+  # child's sibling must be that same repository.
+  if fm_projects_root_is_custom "$CONFIG" || [ -n "$(fm_project_manifest_lookup "$DATA" "$project")" ]; then
+    parent_path=$(fm_project_resolve "$FM_HOME" "$CONFIG" "$DATA" "$project") || return 1
+    parent_path=$(cd "$parent_path" 2>/dev/null && pwd -P) || parent_path=
+    [ "$parent_path" = "$top" ] || {
+      echo "error: project $project is registered in this home at ${parent_path:-no directory}, not at $src; seed only the registered repository" >&2
+      return 1
+    }
+  fi
 }
 
 clone_project() {
@@ -912,17 +923,20 @@ seed_home() {
   # config/projects-root records the resulting absolute path.
   SEED_PROJECTS_ROOT=
   if [ -n "$projects_root_arg" ]; then
-    case "$projects_root_arg" in
-      /*) SEED_PROJECTS_ROOT=$projects_root_arg ;;
-      *) SEED_PROJECTS_ROOT=$(cd "$projects_root_arg" 2>/dev/null && pwd -P) || {
-           echo "error: --projects-root directory cannot be resolved: $projects_root_arg" >&2
-           return 1
-         } ;;
-    esac
-    [ -d "$SEED_PROJECTS_ROOT" ] || {
+    [ -d "$projects_root_arg" ] || {
       echo "error: --projects-root is not a directory: $projects_root_arg" >&2
       return 1
     }
+    SEED_PROJECTS_ROOT=$(cd "$projects_root_arg" 2>/dev/null && pwd -P) || {
+      echo "error: --projects-root directory cannot be resolved: $projects_root_arg" >&2
+      return 1
+    }
+    case "$SEED_PROJECTS_ROOT" in
+      *[[:space:]]* | *[![:print:]]*)
+        echo "error: --projects-root resolves to a path with whitespace or a non-printable byte, which config/projects-root cannot hold: $SEED_PROJECTS_ROOT" >&2
+        return 1
+        ;;
+    esac
   elif [ "$requested_home" != "-" ] && [ -f "$requested_home/config/projects-root" ]; then
     SEED_PROJECTS_ROOT=$(fm_projects_root "$requested_home" "$requested_home/config") || return 1
     [ -d "$SEED_PROJECTS_ROOT" ] || {

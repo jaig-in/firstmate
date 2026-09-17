@@ -32,10 +32,12 @@
 #   - projects/<name> prefers the legacy <home>/projects/<name> clone, then
 #     resolves <name> as an alias;
 #   - a bare alias resolves through data/project-paths.json (non-sibling
-#     registrations), then <projects-root>/<alias>, then - in a
-#     config/projects-root home - the projects root itself when it is a git
-#     work-tree root named <alias> (the repo a per-project `firstmate init`
-#     registers), then the legacy <home>/projects/<alias>;
+#     registrations), then - in a config/projects-root home - the projects
+#     root itself when it is a git work-tree root named <alias> (the repo a
+#     per-project `firstmate init` registers), then <projects-root>/<alias>
+#     (in a config/projects-root home only when it is its own git work-tree
+#     root, so a same-named package directory inside a per-project repo never
+#     shadows the repo), then the legacy <home>/projects/<alias>;
 #   - an alias that resolves nowhere passes through unchanged so callers keep
 #     their existing not-a-directory handling.
 #
@@ -177,6 +179,15 @@ fm_project_registered_aliases() {
   } | sort -u
 }
 
+# fm_project_is_git_root <dir>: true when <dir> is the root of its own git
+# work tree, not merely a directory nested inside one.
+fm_project_is_git_root() {
+  local dir=$1 top
+  [ -d "$dir" ] || return 1
+  top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || return 1
+  [ "$top" = "$(cd "$dir" && pwd -P)" ]
+}
+
 # fm_project_resolve <home> <config> <data> <arg>: resolve a project argument
 # to a directory path per the contract in this file's header. Prints the
 # resolved path (or the argument unchanged when nothing resolves it).
@@ -208,14 +219,17 @@ fm_project_resolve() {
     return 0
   fi
   projects=$(fm_projects_root "$home" "$config") || return 1
-  if [ -d "$projects/$arg" ]; then
+  if fm_projects_root_is_custom "$config"; then
+    if [ "$(basename "$projects")" = "$arg" ] && fm_project_is_git_root "$projects"; then
+      printf '%s\n' "$projects"
+      return 0
+    fi
+    if fm_project_is_git_root "$projects/$arg"; then
+      printf '%s\n' "$projects/$arg"
+      return 0
+    fi
+  elif [ -d "$projects/$arg" ]; then
     printf '%s\n' "$projects/$arg"
-    return 0
-  fi
-  if fm_projects_root_is_custom "$config" && [ -d "$projects" ] \
-      && [ "$(basename "$projects")" = "$arg" ] \
-      && [ "$(git -C "$projects" rev-parse --show-toplevel 2>/dev/null)" = "$(cd "$projects" && pwd -P)" ]; then
-    printf '%s\n' "$projects"
     return 0
   fi
   if [ -d "$home/projects/$arg" ]; then
@@ -225,13 +239,13 @@ fm_project_resolve() {
   printf '%s\n' "$arg"
 }
 
-# fm_project_sync_candidates <home> <config> <data>: print the project paths a
-# whole-fleet refresh may touch. A config/projects-root home enumerates only
-# REGISTERED aliases (discovery is not authority), skipping any alias that
-# resolves to no directory rather than emitting it as a cwd-relative name;
-# every other home keeps the
-# legacy direct-children glob, including unregistered clones.
-fm_project_sync_candidates() {
+# fm_project_sync_candidate_pairs <home> <config> <data>: print the projects a
+# whole-fleet refresh may touch as "alias<TAB>path" lines. A
+# config/projects-root home enumerates only REGISTERED aliases (discovery is
+# not authority), skipping any alias that resolves to no directory rather than
+# emitting it as a cwd-relative name; every other home keeps the legacy
+# direct-children glob, including unregistered clones, with an empty alias.
+fm_project_sync_candidate_pairs() {
   local home=$1 config=$2 data=$3 projects alias resolved aliases proj
   if fm_projects_root_is_custom "$config"; then
     aliases=$(fm_project_registered_aliases "$data") || return 1
@@ -242,7 +256,7 @@ fm_project_sync_candidates() {
         echo "warning: registered project $alias resolves to no directory; skipped" >&2
         continue
       fi
-      printf '%s\n' "$resolved"
+      printf '%s\t%s\n' "$alias" "$resolved"
     done <<< "$aliases"
     return 0
   fi
@@ -251,8 +265,17 @@ fm_project_sync_candidates() {
   for proj in "$projects"/*; do
     [ -e "$proj" ] || continue
     [ -d "$proj" ] || continue
-    printf '%s\n' "$proj"
+    printf '\t%s\n' "$proj"
   done
+}
+
+# fm_project_sync_candidates <home> <config> <data>: print only the paths of
+# fm_project_sync_candidate_pairs, one per line.
+fm_project_sync_candidates() {
+  local pairs
+  pairs=$(fm_project_sync_candidate_pairs "$@") || return 1
+  [ -n "$pairs" ] || return 0
+  printf '%s\n' "$pairs" | cut -f2-
 }
 
 # fm_project_discover <projects-root>: print the basename of every direct
