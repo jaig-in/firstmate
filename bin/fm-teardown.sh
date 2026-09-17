@@ -2260,11 +2260,12 @@ require_exclusive_task_worktree_slot() {
 # Positive slot ownership, read from the claim the task that took the slot wrote
 # into the slot itself (bin/fm-wake-lib.sh owns the claim and its states).
 #
-# The record scan above proves that no OTHER task record names this slot. It
-# cannot prove that THIS record is not the stale one, because the task that took
-# the slot next may leave no record this scan can reach: its own worker may have
-# exited and its record been cleaned up, or it may belong to a home this machine
-# does not register. The claim closes that gap from the other side - it names the
+# The record scan above proves that no OTHER task record names this slot, beyond
+# a crewmate record this task's own claim already marks stale. It cannot prove
+# that THIS record is not the stale one, because the task that took the slot next
+# may leave no record this scan can reach: its own worker may have exited and its
+# record been cleaned up, or it may belong to a home this machine does not
+# register. The claim closes that gap from the other side - it names the
 # task that actually took the slot, and it is written under the same project lock
 # that allocates it - so a claim naming another task is proof the slot was
 # reassigned after this record was written.
