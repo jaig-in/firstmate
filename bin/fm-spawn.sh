@@ -1498,6 +1498,23 @@ if [ "$RELAUNCH" -eq 1 ]; then
     echo "error: task $ID's recorded worktree '${RELAUNCH_WT:-none}' is missing; refusing to relaunch without the local copy its work lives in" >&2
     exit 1
   }
+  # A relaunch reuses the recorded slot without claiming it, so it must never
+  # put an agent back into a slot another task has claimed since: that task's
+  # teardown treats this record as stale and would return the slot under it.
+  if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
+    fm_treehouse_slot_owner_state "$RELAUNCH_WT" "$ID"
+    case "$FM_TREEHOUSE_SLOT_OWNER" in
+      mine|absent) ;;
+      other)
+        echo "error: task $ID's recorded worktree '$RELAUNCH_WT' was reassigned to task $FM_TREEHOUSE_SLOT_OWNER_ID${FM_TREEHOUSE_SLOT_OWNER_HOME:+ (home $FM_TREEHOUSE_SLOT_OWNER_HOME)}; refusing to relaunch into a pool slot that is no longer $ID's (tear down $ID and respawn it instead)" >&2
+        exit 1
+        ;;
+      *)
+        echo "error: task $ID's recorded worktree '$RELAUNCH_WT' carries a slot-owner claim that cannot be read, so the slot cannot be proved to still be $ID's; refusing to relaunch" >&2
+        exit 1
+        ;;
+    esac
+  fi
   if [ "$KIND" = secondmate ]; then
     FIRSTMATE_HOME=$(fm_meta_get "$RELAUNCH_META" home)
     [ -n "$FIRSTMATE_HOME" ] || FIRSTMATE_HOME=$RELAUNCH_WT

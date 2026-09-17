@@ -2220,9 +2220,10 @@ require_exclusive_worktree_slot_record() {
   slot=$(canonical_existing_dir "$worktree") || return 0
   collect_local_firstmate_states "$record_state" || return 1
   # A claim naming this task was written under the project lock when it took
-  # the slot, and every later crewmate spawn into the slot would have replaced
-  # it. So another crewmate record naming the slot predates this task's claim
-  # and is stale. Secondmate homes and Orca worktrees take no claim, so a
+  # the slot, every later crewmate spawn into the slot would have replaced it,
+  # and a relaunch refuses a slot claimed by another task (bin/fm-spawn.sh). So
+  # another crewmate record naming the slot predates this task's claim and is
+  # stale. Secondmate homes and Orca worktrees take no claim, so a
   # record of either kind still refuses.
   fm_treehouse_slot_owner_state "$slot" "$record_id"
   [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || claimed=1
