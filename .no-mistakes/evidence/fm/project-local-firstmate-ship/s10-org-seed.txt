@@ -1,0 +1,69 @@
+# Scenario 10: org-shaped secondmate seeding registers siblings, and refuses what the registry does not authorize
+
+$ cat org/.firstmate/data/projects.md
+- alpha [direct-PR] - registered sibling clone
+- notes [direct-PR] - registered, but a plain directory
+- gone [direct-PR] - registered, but the directory was renamed away
+$ cat org/.firstmate/data/project-paths.json   # 'mo' is manifest-only: no delivery mode
+{"mo": "/tmp/fmlive.GvqNMw/outside/mo"}
+
+## seeding a registered sibling: the child REGISTERS it, it never clones it
+$ env FM_HOME=/tmp/fmlive.GvqNMw/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66/bin/fm-home-seed.sh mate /tmp/fmlive.GvqNMw/child-alpha alpha
+home=/tmp/fmlive.GvqNMw/child-alpha
+[exit 0]
+$ cat child-alpha/config/projects-root
+cat: /tmp/fmlive.GvqNMw/child-alpha/config/projects-root: No such file or directory
+$ cat child-alpha/data/projects.md
+- alpha [direct-PR] - registered sibling clone
+$ ls -A child-alpha | tr '\n' ' '; echo
+.agents .claude .codex .cursor .fm-secondmate-home .fm-secondmate-parent .git .gitattributes .github .gitignore .greptile .grok .no-mistakes.yaml .omp .opencode .pi .tasks.toml AGENTS.md CLAUDE.md CONTRIBUTING.md GROK_BOT.md LICENSE README.md VISION.md assets bin config data docs projects skills state tests 
+$ test -e child-alpha/projects && echo 'projects/ EXISTS' || echo 'no projects/ dir - nothing was cloned'
+projects/ EXISTS
+
+## (adversarial) an UNREGISTERED sibling of the org root is refused
+$ env FM_HOME=/tmp/fmlive.GvqNMw/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66/bin/fm-home-seed.sh mate-beta /tmp/fmlive.GvqNMw/child-beta beta
+error: project beta is not registered in /tmp/fmlive.GvqNMw/org/.firstmate/data/projects.md or project-paths.json; register it before seeding
+[exit 1]
+$ test -e child-beta && echo 'home LEFT BEHIND' || echo 'no child home was left behind'
+no child home was left behind
+
+## (adversarial) a MANIFEST-ONLY alias is refused loudly instead of being seeded with a guessed posture
+$ env FM_HOME=/tmp/fmlive.GvqNMw/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66/bin/fm-home-seed.sh mate-mo /tmp/fmlive.GvqNMw/child-mo mo
+error: project mo is registered only in data/project-paths.json; manifest aliases are not seedable - register it in /tmp/fmlive.GvqNMw/org/.firstmate/data/projects.md with a delivery mode first
+[exit 1]
+$ test -e child-mo && echo 'home LEFT BEHIND' || echo 'no child home was left behind'
+no child home was left behind
+
+## the ordinary seed above cloned from the path the REGISTRY names:
+$ git -C child-alpha/projects/alpha remote get-url origin
+/tmp/fmlive.GvqNMw/origins/alpha.git
+
+## the ORG-SHAPED seed (--projects-root) registers the sibling instead of cloning it
+$ env FM_HOME=/tmp/fmlive.GvqNMw/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66/bin/fm-home-seed.sh mate-org /tmp/fmlive.GvqNMw/child-org alpha --projects-root /tmp/fmlive.GvqNMw/org
+home=/tmp/fmlive.GvqNMw/child-org
+[exit 0]
+$ cat child-org/config/projects-root
+/tmp/fmlive.GvqNMw/org
+$ cat child-org/data/projects.md
+- alpha [direct-PR] - registered sibling clone
+$ test -e child-org/projects && echo 'projects/ EXISTS' || echo 'no projects/ dir - the sibling was registered, not cloned'
+no projects/ dir - the sibling was registered, not cloned
+$ git -C org/alpha status --short | wc -l   # the sibling itself was not touched
+0
+
+## (adversarial) a DIFFERENT repo of the same name under another root is refused:
+##   an org parent authorizes by location, so a name collision is not authority
+$ git -C other-org/alpha remote get-url origin   # a stranger's repo that happens to be named alpha
+/tmp/fmlive.GvqNMw/origins/beta.git
+$ env FM_HOME=/tmp/fmlive.GvqNMw/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66/bin/fm-home-seed.sh mate-other /tmp/fmlive.GvqNMw/child-other alpha --projects-root /tmp/fmlive.GvqNMw/other-org
+error: project alpha is registered in this home at /tmp/fmlive.GvqNMw/org/alpha, not at /tmp/fmlive.GvqNMw/other-org/alpha; seed only the registered repository
+[exit 1]
+$ test -e child-other && echo 'home LEFT BEHIND' || echo 'no child home was left behind'
+no child home was left behind
+
+## (adversarial) a projects root whose path holds whitespace is refused before anything is written
+$ env FM_HOME=/tmp/fmlive.GvqNMw/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66/bin/fm-home-seed.sh mate-space /tmp/fmlive.GvqNMw/child-space alpha --projects-root /tmp/fmlive.GvqNMw/org space
+error: --projects-root resolves to a path with whitespace or a non-printable byte, which config/projects-root cannot hold: /tmp/fmlive.GvqNMw/org space
+[exit 1]
+$ test -e child-space && echo 'home LEFT BEHIND' || echo 'no child home was left behind'
+no child home was left behind

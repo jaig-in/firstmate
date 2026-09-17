@@ -1,0 +1,7 @@
+ok - bootstrap reports treehouse lease + tasks-axi/quota-axi bootstrap contracts
+ok - bootstrap computes a fleet-size-aware default timeout and preserves partial fleet-sync output
+ok - bootstrap keeps the quick 20s default for small fleets
+ok - bootstrap reports a fleet refresh that failed instead of showing nothing
+ok - bootstrap refreshes an org home whose projects root does not exist
+ok - bootstrap computes the timeout before launching fleet sync
+ok - bootstrap: every deferred mutating sweep rechecks fleet-lock ownership

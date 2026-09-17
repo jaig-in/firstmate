@@ -1,0 +1,35 @@
+# Scenario 4: per-project 'firstmate init' scopes a home at the repo root, registers the repo, leaves the repo clean
+
+$ cd solo/pkg && firstmate init   # run from a subdirectory
+firstmate: created /tmp/fmlive.GvqNMw/solo/.firstmate
+firstmate: projects root is /tmp/fmlive.GvqNMw/solo (config/projects-root=..)
+firstmate: registered solo in /tmp/fmlive.GvqNMw/solo/.firstmate/data/projects.md
+firstmate: run `firstmate` from anywhere under /tmp/fmlive.GvqNMw/solo to launch against this home
+
+$ cat ../.firstmate/data/projects.md
+- solo [no-mistakes-prod-only] - this repository (added 2026-09-17)
+
+$ git -C solo status --short   # the enclosing repository stays clean
+[git status exit 0]
+$ git -C solo status --porcelain --ignored=no | wc -l
+0
+
+$ firstmate   # launches against the per-project home from the subdirectory
+claude harness started
+  FM_HOME=/tmp/fmlive.GvqNMw/solo/.firstmate
+  FM_LAUNCH_DIR=/tmp/fmlive.GvqNMw/solo/pkg
+  cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66
+  args=
+
+$ FM_HOME=.firstmate firstmate   # a relative FM_HOME is canonicalized before export
+claude harness started
+  FM_HOME=/tmp/fmlive.GvqNMw/solo/.firstmate
+  FM_LAUNCH_DIR=/tmp/fmlive.GvqNMw/solo
+  cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66
+  args=
+
+# the registered alias resolves to the repo itself, not to the same-named subdirectory
+$ FM_HOME=/tmp/fmlive.GvqNMw/solo/.firstmate bin/fm-projects.sh resolve solo
+/tmp/fmlive.GvqNMw/solo
+$ FM_HOME=/tmp/fmlive.GvqNMw/solo/.firstmate bin/fm-projects.sh resolve pkg   # a plain subdirectory is not a project
+pkg

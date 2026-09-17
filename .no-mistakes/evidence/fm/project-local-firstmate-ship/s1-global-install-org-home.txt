@@ -1,0 +1,44 @@
+# Scenario 1: global install - firstmate reached through a PATH symlink, org home created and launched
+
+$ which firstmate && readlink $(which firstmate)
+/tmp/fmlive.GvqNMw/bin/firstmate
+/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66/bin/firstmate
+
+$ cd ~/../org  # org root holding sibling repos: alpha, beta, notes
+$ ls
+alpha
+beta
+notes
+
+$ firstmate init --org
+firstmate: created /tmp/fmlive.GvqNMw/org/.firstmate
+firstmate: projects root is /tmp/fmlive.GvqNMw/org (config/projects-root=..)
+firstmate: discoverable sibling repos: alpha beta
+firstmate: discovery is not authority - register each project in /tmp/fmlive.GvqNMw/org/.firstmate/data/projects.md before firstmate may refresh, spawn, seed, or land it
+firstmate: run `firstmate` from anywhere under /tmp/fmlive.GvqNMw/org to launch against this home
+
+$ find .firstmate -maxdepth 2 | sort
+.firstmate
+.firstmate/.fm-home
+.firstmate/.gitignore
+.firstmate/.tasks.toml
+.firstmate/config
+.firstmate/config/projects-root
+.firstmate/data
+.firstmate/state
+
+$ cat .firstmate/config/projects-root
+..
+
+$ cat .firstmate/.gitignore
+# .firstmate/ is private operational state and stays uncommitted by default.
+# To share a config item with the team, append a negation for its exact path
+# below the config/* line, e.g.:
+#   !config/crew-harness
+# This file ignores itself so an uncommitted home leaves the repository clean;
+# a team that shares config commits it once with `git add -f`.
+# Keep data/, state/, and every non-whitelisted config item private.
+*
+!config/
+config/*
+# Whitelist shared config items below this line, one exact path per line.

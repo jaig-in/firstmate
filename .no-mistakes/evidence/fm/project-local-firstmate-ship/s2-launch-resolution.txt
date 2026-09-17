@@ -1,0 +1,31 @@
+# Scenario 2: launch resolution - org home found by ancestor walk, refusal inside an unrelated repo, --global fallback
+
+$ cd /tmp/fmlive.GvqNMw/org/alpha/src && firstmate --model sonnet
+claude harness started
+  FM_HOME=/tmp/fmlive.GvqNMw/org/.firstmate
+  FM_LAUNCH_DIR=/tmp/fmlive.GvqNMw/org/alpha/src
+  cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66
+  args=--model sonnet
+
+# a repo with no .firstmate/ ancestor refuses to guess
+$ cd /tmp/fmlive.GvqNMw/loose-repo && firstmate
+firstmate: no .firstmate/ home found above /tmp/fmlive.GvqNMw/loose-repo.
+  Run 'firstmate init' at a repo root for a per-project home,
+       'firstmate init --org' at an org root, or 'firstmate --global' for the global home.
+[exit 1]
+
+# --global from the same repo falls back to $HOME/.firstmate once it exists
+$ firstmate --global
+claude harness started
+  FM_HOME=/tmp/fmlive.GvqNMw/fakehome/.firstmate
+  FM_LAUNCH_DIR=/tmp/fmlive.GvqNMw/loose-repo
+  cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66
+  args=
+
+# outside any git repo, no flag needed
+$ cd /tmp/fmlive.GvqNMw && firstmate
+claude harness started
+  FM_HOME=/tmp/fmlive.GvqNMw/fakehome/.firstmate
+  FM_LAUNCH_DIR=/tmp/fmlive.GvqNMw
+  cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66
+  args=

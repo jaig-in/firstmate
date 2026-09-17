@@ -1,0 +1,21 @@
+# Scenario 12: the org home's own backlog and captain preferences are the ones the session reads
+
+$ cat org/.firstmate/.tasks.toml   # written by 'firstmate init --org'
+backend = "markdown"
+
+[markdown]
+path = "data/backlog.md"
+archive = "data/done-archive.md"
+done_keep = 10
+
+# a backlog item and a captain note that exist ONLY in this org home
+$ cd org/alpha && firstmate   # the digest sections that read this home's own data
+3:SESSION START - /tmp/fmlive.GvqNMw/org/.firstmate
+5:Launched from: /tmp/fmlive.GvqNMw/org/alpha
+20:SUPERVISION OPERATING INSTRUCTIONS - primary harness: claude
+90:- [ ] org-release-notes - Wire alpha release notes (repo: alpha)
+132:Captain preference: never touch beta without asking.
+
+# the install root's own backlog was never involved
+$ grep -c org-release-notes <install-root>/data/backlog.md
+0 (no such item; the install root's backlog is untouched)

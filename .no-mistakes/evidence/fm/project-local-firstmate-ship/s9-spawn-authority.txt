@@ -1,0 +1,25 @@
+# Scenario 9 (adversarial): spawning crew into a merely DISCOVERABLE sibling is refused
+# (run from outside the gate worktree, with NO_MISTAKES_GATE unset for these calls only;
+#  the org home driven here is the disposable sandbox one, not a real fleet)
+
+$ cat org/.firstmate/data/projects.md   # beta is a real sibling clone, unregistered
+- alpha [direct-PR] - registered sibling clone
+- notes [direct-PR] - registered, but a plain directory
+- gone [direct-PR] - registered, but the directory was renamed away
+
+$ FM_HOME=org/.firstmate bin/fm-spawn.sh live1 beta --mode direct-PR --yolo off
+error: /tmp/fmlive.GvqNMw/org/beta is not a registered project of this home; register it in /tmp/fmlive.GvqNMw/org/.firstmate/data/projects.md (or data/project-paths.json) before spawning
+[exit 1]
+
+$ FM_HOME=org/.firstmate bin/fm-spawn.sh live2 /tmp/fmlive.GvqNMw/org/beta --mode direct-PR --yolo off
+error: /tmp/fmlive.GvqNMw/org/beta is not a registered project of this home; register it in /tmp/fmlive.GvqNMw/org/.firstmate/data/projects.md (or data/project-paths.json) before spawning
+[exit 1]
+
+# the registered sibling passes the authority gate and stops later, on its missing brief
+$ FM_HOME=org/.firstmate bin/fm-spawn.sh live3 alpha --mode direct-PR --yolo off
+error: task live3 has no brief at inaccessible data path /tmp/fmlive.GvqNMw/org/.firstmate/data/live3/brief.md
+[exit 1]
+
+$ ls org/.firstmate/state | head   # nothing was spawned
+$ git -C org/alpha worktree list
+/tmp/fmlive.GvqNMw/org/alpha  022a3b9 [master]

@@ -1,0 +1,27 @@
+# Scenario 11: the session-start digest names the home it resolved and the directory the captain launched from
+
+$ cd org/alpha/src && firstmate    # the launcher execs the harness, which runs the digest
+
+================================================================================
+SESSION START - /tmp/fmlive.GvqNMw/org/.firstmate
+================================================================================
+Launched from: /tmp/fmlive.GvqNMw/org/alpha/src
+
+LOCK
+--------------------------------------------------------------------------------
+lock acquired: harness pid 3720587
+
+BOOTSTRAP
+--------------------------------------------------------------------------------
+(silent - all good)
+
+WAKE QUEUE
+--------------------------------------------------------------------------------
+(no queued wakes)
+================================================================================
+SUPERVISION OPERATING INSTRUCTIONS - primary harness: claude
+================================================================================
+Current state:
+- Lock: held by this session; this session owns normal supervision unless away mode says otherwise.
+- Away/quiet mode: inactive.
+- X mode: inactive; use the default watcher cadence.

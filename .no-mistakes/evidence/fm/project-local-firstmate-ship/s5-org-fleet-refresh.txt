@@ -1,0 +1,40 @@
+# Scenario 5: org-home refresh - discovery is not authority, and a registered-but-unusable project reports why
+
+$ cat org/.firstmate/data/projects.md
+- alpha [direct-PR] - registered sibling clone
+- notes [direct-PR] - registered, but a plain directory
+- gone [direct-PR] - registered, but the directory was renamed away
+$ ls org   # beta is a real clone but is NOT registered
+alpha
+beta
+notes
+
+$ FM_HOME=org/.firstmate bin/fm-fleet-sync.sh   # whole fleet
+gone: skipped: registered project resolves to no directory
+alpha: synced c874041..022a3b9
+notes: skipped: not a git repo
+
+$ git -C org/beta log --oneline -1   # the unregistered sibling was never touched
+ef2c13c init beta
+$ git -C org/alpha log --oneline -1   # the registered sibling fast-forwarded
+022a3b9 upstream commit
+
+# single-argument refresh of each registered-but-unusable alias
+$ FM_HOME=org/.firstmate bin/fm-fleet-sync.sh notes
+notes: skipped: not a git repo
+[exit 0]
+$ FM_HOME=org/.firstmate bin/fm-fleet-sync.sh gone
+gone: skipped: registered project resolves to no directory
+[exit 0]
+
+# an UNREGISTERED sibling is refused, by name and by path
+$ FM_HOME=org/.firstmate bin/fm-fleet-sync.sh beta
+error: /tmp/fmlive.GvqNMw/org/beta is not a registered project of this home; register it in /tmp/fmlive.GvqNMw/org/.firstmate/data/projects.md (or data/project-paths.json) before refreshing
+[exit 1]
+$ FM_HOME=org/.firstmate bin/fm-fleet-sync.sh /tmp/fmlive.GvqNMw/org/beta
+error: /tmp/fmlive.GvqNMw/org/beta is not a registered project of this home; register it in /tmp/fmlive.GvqNMw/org/.firstmate/data/projects.md (or data/project-paths.json) before refreshing
+[exit 1]
+
+$ FM_HOME=org/.firstmate bin/fm-fleet-sync.sh alpha   # registered alias refreshes by name
+alpha: already current
+[exit 0]

@@ -1,0 +1,34 @@
+# Scenario 8 (adversarial): config/projects-root is validated loudly, never half-read
+
+## trailing/leading whitespace is trimmed and the root still works
+$ cat -A config/projects-root
+   /tmp/fmlive.GvqNMw/org   $
+$ FM_HOME=ws-home bin/fm-projects.sh root
+/tmp/fmlive.GvqNMw/org
+[exit 0]
+
+## a path with INTERIOR whitespace is refused, not mangled
+$ cat config/projects-root
+/tmp/fmlive.GvqNMw/two words
+$ FM_HOME=ws-home bin/fm-projects.sh root
+error: /tmp/fmlive.GvqNMw/ws-home/config/projects-root contains whitespace inside the path
+[exit 1]
+$ FM_HOME=ws-home bin/fm-fleet-sync.sh   # the refresh refuses rather than syncing the wrong tree
+error: /tmp/fmlive.GvqNMw/ws-home/config/projects-root contains whitespace inside the path
+[exit 1]
+
+## two lines, an empty file, and a symlink are each refused
+$ FM_HOME=ws-home bin/fm-projects.sh root   # two lines
+error: /tmp/fmlive.GvqNMw/ws-home/config/projects-root must contain exactly one path line
+[exit 1]
+$ FM_HOME=ws-home bin/fm-projects.sh root   # empty
+error: /tmp/fmlive.GvqNMw/ws-home/config/projects-root must contain exactly one path line
+[exit 1]
+$ FM_HOME=ws-home bin/fm-projects.sh root   # symlink
+error: /tmp/fmlive.GvqNMw/ws-home/config/projects-root must be a regular file
+[exit 1]
+
+## a relative root resolves against the home, the way 'firstmate init' writes it
+$ FM_HOME=ws-home bin/fm-projects.sh root
+/tmp/fmlive.GvqNMw
+[exit 0]

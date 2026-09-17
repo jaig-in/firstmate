@@ -1,0 +1,59 @@
+# Scenario 3 (adversarial): a hostile .firstmate/ committed into a cloned repo must be inert
+
+$ git -C evil-repo ls-files .firstmate
+.firstmate/.fm-home
+.firstmate/config/primary-harness
+$ cat evil-repo/.firstmate/config/primary-harness
+evil-harness
+
+$ cd evil-repo && firstmate
+firstmate: untrusted home: /tmp/fmlive.GvqNMw/evil-repo/.firstmate has no local (untracked) .fm-home marker.
+  A .firstmate/ directory can carry committed config (harness, backlog
+  backend), so the launcher refuses to honor one it did not create; a
+  .fm-home committed to git does not count.
+  Bless it by running 'firstmate init' there, or knowingly: touch '/tmp/fmlive.GvqNMw/evil-repo/.firstmate/.fm-home'
+[exit 1]
+
+# re-touching a TRACKED marker still proves nothing about this machine
+$ touch .firstmate/.fm-home && firstmate
+firstmate: untrusted home: /tmp/fmlive.GvqNMw/evil-repo/.firstmate has no local (untracked) .fm-home marker.
+  A .firstmate/ directory can carry committed config (harness, backlog
+  backend), so the launcher refuses to honor one it did not create; a
+  .fm-home committed to git does not count.
+  Bless it by running 'firstmate init' there, or knowingly: touch '/tmp/fmlive.GvqNMw/evil-repo/.firstmate/.fm-home'
+[exit 1]
+
+# only an untracked (locally created) marker blesses the home - and the
+# harness whitelist then still refuses the committed harness name
+$ git rm -q --cached .firstmate/.fm-home && firstmate
+firstmate: config/primary-harness names an unverified primary harness: evil-harness (verified: claude codex opencode pi pi-signed grok kimi cursor omp)
+[exit 1]
+
+# a symlinked config/primary-harness is refused outright
+$ firstmate
+firstmate: config/primary-harness must be a regular file, not a symlink: /tmp/fmlive.GvqNMw/evil-repo/.firstmate/config/primary-harness
+[exit 1]
+
+# a verified adapter name in a trusted home is honored
+$ firstmate   # config/primary-harness = '  claude  '
+claude harness started
+  FM_HOME=/tmp/fmlive.GvqNMw/evil-repo/.firstmate
+  FM_LAUNCH_DIR=/tmp/fmlive.GvqNMw/evil-repo
+  cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RPS9Y8XTR30GE996CMHE66
+  args=
+
+## the org home also owns its secondmate roster (scoped state, not the install root's)
+$ cat org/.firstmate/data/secondmates.md
+- mate - alpha mate charter (home: /tmp/fmlive.GvqNMw/child-alpha; scope: alpha mate charter; projects: alpha; added 2026-09-17)
+- mate-org - alpha charter (home: /tmp/fmlive.GvqNMw/child-org; scope: alpha charter; projects: alpha; added 2026-09-17)
+
+## (adversarial) a SYMLINKED trust marker does not bless a home
+$ ls -l sym-org/.firstmate/.fm-home
+lrwxrwxrwx 1 jb jb 38 Sep 17 19:05 /tmp/fmlive.GvqNMw/sym-org/.firstmate/.fm-home -> /tmp/fmlive.GvqNMw/sym-org/real-marker
+$ firstmate
+firstmate: untrusted home: /tmp/fmlive.GvqNMw/sym-org/.firstmate has no local (untracked) .fm-home marker.
+  A .firstmate/ directory can carry committed config (harness, backlog
+  backend), so the launcher refuses to honor one it did not create; a
+  .fm-home committed to git does not count.
+  Bless it by running 'firstmate init' there, or knowingly: touch '/tmp/fmlive.GvqNMw/sym-org/.firstmate/.fm-home'
+[exit 1]

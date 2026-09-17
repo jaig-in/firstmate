@@ -1,0 +1,36 @@
+# Scenario 7: the session-start digest tells the truth about the org-home refresh
+
+## 7a - healthy org home: the digest carries the per-project refresh lines
+$ FM_HOME=org/.firstmate bin/fm-bootstrap.sh | grep FLEET_SYNC
+FLEET_SYNC: gone: skipped: registered project resolves to no directory
+FLEET_SYNC: notes: skipped: not a git repo
+
+## 7b - malformed data/project-paths.json: a refresh that REFUSED must not read as a clean fleet,
+##      and the reported cause must be the error, not the warning printed before it on the same stream
+$ cat org-broken-home/data/project-paths.json
+{"ext": "relative/not/absolute"}
+$ FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=abc FM_HOME=org-broken-home bin/fm-fleet-sync.sh   # stderr
+fleet-sync: invalid packed-refs lock retry wait 'abc'; using 1s
+error: /tmp/fmlive.GvqNMw/org-broken-home/data/project-paths.json must be a flat JSON object of alias -> absolute path
+$ FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=abc FM_HOME=org-broken-home bin/fm-bootstrap.sh | grep FLEET_SYNC
+FLEET_SYNC: fleet: skipped: /tmp/fmlive.GvqNMw/org-broken-home/data/project-paths.json must be a flat JSON object of alias -> absolute path
+
+## 7c - org home whose projects root does not exist: registered projects still refresh
+$ cat org-absent-home/config/projects-root; cat org-absent-home/data/projects.md
+/tmp/fmlive.GvqNMw/no-such-root
+- ext [direct-PR] - lives outside the (absent) projects root
+$ FM_HOME=org-absent-home bin/fm-bootstrap.sh | grep FLEET_SYNC
+[no FLEET_SYNC line]
+
+## 7c (continued) - proof the absent-root org home actually refreshed: put its registered
+##   project one commit behind origin and re-run; the digest reports the fast-forward
+$ git -C outside/ext log --oneline -1
+e763f8d upstream ext commit
+$ FM_HOME=org-absent-home bin/fm-bootstrap.sh | grep FLEET_SYNC
+[no FLEET_SYNC line]
+$ git -C outside/ext log --oneline -1
+10b4c72 second upstream ext commit
+
+## 7c note: "synced" lines are deliberately not relayed into the digest
+##   (fleet_sync_relay_filtered_output relays skipped/STUCK/recovered only),
+##   so the fast-forward above is the proof the refresh ran.

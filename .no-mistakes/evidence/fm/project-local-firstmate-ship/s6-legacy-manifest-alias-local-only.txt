@@ -1,0 +1,25 @@
+# Scenario 6: legacy home, manifest-registered alias - a bare-name refresh keeps its registry posture
+
+$ ls legacy-home/config   # no config/projects-root: this is a legacy (non-org) home
+$ cat legacy-home/data/projects.md
+- ext [local-only] - external project
+$ cat legacy-home/data/project-paths.json
+{"ext": "/tmp/fmlive.GvqNMw/outside/ext"}
+$ git -C outside/ext log --oneline -1   # one commit behind origin/master
+9fa7e9b init
+$ git -C outside/ext rev-parse --short origin/master
+9fa7e9b
+
+$ FM_HOME=legacy-home bin/fm-fleet-sync.sh ext
+ext: skipped: local-only project
+[exit 0]
+
+$ git -C outside/ext log --oneline -1   # untouched: local-only was honored, not fetched+ff
+9fa7e9b init
+
+# flipping the registry posture to direct-PR makes the same alias refresh
+$ FM_HOME=legacy-home bin/fm-fleet-sync.sh ext
+ext: synced 9fa7e9b..e763f8d
+[exit 0]
+$ git -C outside/ext log --oneline -1
+e763f8d upstream ext commit
