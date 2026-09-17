@@ -175,7 +175,8 @@ EOF
   # clone this home happens to have is only a convenience for the already-cloned
   # case; it is never a reason to create one.
   if [ -z "$ORIGIN" ]; then
-    PROJECT_DIR=$(fm_project_resolve "$FM_HOME" "$CONFIG" "$DATA" "$project" || true)
+    PROJECT_DIR=$(fm_project_resolve "$FM_HOME" "$CONFIG" "$DATA" "$project") \
+      || die "could not read this home's project registry while resolving $project"
     # The resolver echoes the argument back when nothing resolved it; that bare
     # name would probe the caller's current directory, not a project of this home.
     [ "$PROJECT_DIR" != "$project" ] || PROJECT_DIR=
