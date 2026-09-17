@@ -35,6 +35,8 @@ set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=bin/fm-projects-lib.sh
+. "$SCRIPT_DIR/fm-projects-lib.sh"
 
 usage() {
   cat >&2 <<'EOF'
@@ -176,14 +178,11 @@ cmd_init() {
   fi
   if [ "$org" -eq 1 ]; then
     local discovered=()
-    local child top_name
-    for child in "$target"/*; do
-      [ -d "$child" ] || continue
-      [ "$child" = "$home" ] && continue
-      top_name=$(repo_top "$child" 2>/dev/null || true)
-      [ "$top_name" = "$(cd "$child" && pwd -P)" ] || continue
-      discovered+=("$(basename "$child")")
-    done
+    local name
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      discovered+=("$name")
+    done < <(fm_project_discover "$target")
     if [ "${#discovered[@]}" -gt 0 ]; then
       echo "firstmate: discoverable sibling repos: ${discovered[*]}"
       echo "firstmate: discovery is not authority - register each project in $home/data/projects.md before firstmate may refresh, spawn, seed, or land it"
