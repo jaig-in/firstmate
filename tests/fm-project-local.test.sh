@@ -85,6 +85,17 @@ test_launcher_resolution() {
   assert_grep "FM_LAUNCH_DIR=$nested/sub/dir" "$base/out1" "FM_LAUNCH_DIR did not record the caller cwd"
   assert_grep "PWD=$ROOT" "$base/out1" "harness did not exec from the install root"
 
+  # The documented install is a symlink on PATH: the launcher must still find
+  # its own install root, not the symlink's directory.
+  local linkbin="$base/linkbin"
+  mkdir -p "$linkbin"
+  ln -s "$ROOT/bin/firstmate" "$linkbin/firstmate"
+  (cd "$nested/sub/dir" && env -u FM_HOME \
+    FM_FAKE_HARNESS_OUT="$base/out-link" PATH="$linkbin:$fakebin:$PATH" firstmate) \
+    || fail "launcher invoked through a PATH symlink failed"
+  assert_grep "PWD=$ROOT" "$base/out-link" "symlinked launcher did not exec from the install root"
+  assert_grep "FM_HOME=$nested/.firstmate" "$base/out-link" "symlinked launcher resolved the wrong home"
+
   # Explicit FM_HOME beats the nearest ancestor.
   local explicit="$base/explicit-home"
   mkdir -p "$explicit"
@@ -582,6 +593,19 @@ test_resolver_fails_closed() {
   assert_contains "$out7" "gone: skipped: registered project resolves to no directory" \
     "a stale registration was not reported in the refresh output"
 
+  # A registered sibling that exists but is not a clone gets the accurate
+  # story, not the "resolves to no directory" one.
+  mkdir -p "$base/org7/notes"
+  printf -- '- notes [direct-PR] - registered too early (added 2026-09-17)\n' >> "$home7/data/projects.md"
+  out7=$(FM_HOME="$home7" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" 2>/dev/null) \
+    || fail "whole-fleet refresh failed on a non-repo sibling"
+  assert_contains "$out7" "notes: skipped: not a git repo" \
+    "a registered plain directory was not reported as a non-repo"
+  case "$out7" in
+    *"notes: skipped: registered project resolves to no directory"*)
+      fail "an existing sibling was reported as resolving to no directory" ;;
+  esac
+
   # Remote seeding names the unreadable registry too, instead of blaming a
   # missing origin the operator would then be told to supply.
   local home8="$base/org8/.firstmate"
@@ -799,6 +823,14 @@ test_org_seed() {
   assert_equals "file://$(cd "$base/remotes/elsewhere-beta.git" && pwd)" \
     "$(git -C "$base/child7/projects/beta" remote get-url origin)" \
     "seed cloned the same-named sibling instead of the registered repository"
+
+  # Validation never needed a projects root, so a malformed config/projects-root
+  # must not abort it.
+  local badroot="$base/badroot"
+  mkdir -p "$badroot/data" "$badroot/state" "$badroot/config"
+  printf 'one\ntwo\n' > "$badroot/config/projects-root"
+  FM_HOME="$badroot" "$ROOT/bin/fm-home-seed.sh" validate >/dev/null 2>"$base/err-validate" \
+    || fail "registry validation refused a home with a malformed projects-root: $(cat "$base/err-validate")"
 
   pass "org seed: siblings registered not cloned, unregistered refused, registered path owns the source"
 }
