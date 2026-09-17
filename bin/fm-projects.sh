@@ -42,7 +42,8 @@ case "${1:-}" in
     ;;
   discover)
     [ $# -eq 1 ] || { usage; exit 1; }
-    fm_project_discover "$(fm_projects_root "$FM_HOME" "$CONFIG")"
+    PROJECTS_ROOT=$(fm_projects_root "$FM_HOME" "$CONFIG") || exit 1
+    fm_project_discover "$PROJECTS_ROOT"
     ;;
   aliases)
     [ $# -eq 1 ] || { usage; exit 1; }
