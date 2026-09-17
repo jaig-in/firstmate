@@ -78,7 +78,8 @@
 #   A non-Orca crewmate relaunch also refuses when its recorded worktree's
 #   slot-owner claim (bin/fm-wake-lib.sh) names another task or cannot be read,
 #   because that task's teardown treats this record as stale; no claim at all
-#   proceeds.
+#   proceeds unless the record carries the slot_reassigned_to= mark that
+#   teardown left once it returned the slot.
 #   --harness <name> is the explicit per-spawn harness/profile adapter. The old
 #   positional harness arg still works for back-compat.
 #   --model <name> and --effort <low|medium|high|xhigh|max|ultra> are concrete profile
