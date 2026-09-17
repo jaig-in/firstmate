@@ -758,7 +758,36 @@ test_org_seed() {
   fi
   assert_grep "registered in this home at" "$base/err-loc" "location refusal did not name the registered path"
 
-  pass "org seed: siblings registered not cloned, projects-root recorded, non-sibling refused"
+  # An ordinary seed from an org home refuses an unregistered sibling too:
+  # every sibling of an org root is a user working copy until it is registered.
+  fm_git_init_commit "$org/unreg"
+  fm_git_add_origin "$org/unreg" "$base/remotes/unreg.git"
+  scaffold_secondmate_charter "$oparent" mate6 'mate6 charter' unreg \
+    || fail "charter scaffold failed"
+  if FM_HOME="$oparent" "$ROOT/bin/fm-home-seed.sh" mate6 "$base/child6" unreg \
+      >/dev/null 2>"$base/err-unreg-seed"; then
+    fail "ordinary seed cloned an unregistered sibling of an org home"
+  fi
+  assert_grep "not registered" "$base/err-unreg-seed" "seed refusal did not name registration"
+  assert_absent "$base/child6" "refused seed left a home behind"
+
+  # A registered project is seeded from the path the registry names, not from
+  # a same-named directory that happens to sit under the projects root.
+  fm_git_init_commit "$base/elsewhere/beta"
+  fm_git_add_origin "$base/elsewhere/beta" "$base/remotes/elsewhere-beta.git"
+  fm_git_init_commit "$org/beta"
+  fm_git_add_origin "$org/beta" "$base/remotes/org-beta.git"
+  printf -- '- beta [direct-PR] - beta project (added 2026-09-17)\n' >> "$oparent/data/projects.md"
+  printf '{"beta": "%s"}\n' "$base/elsewhere/beta" > "$oparent/data/project-paths.json"
+  scaffold_secondmate_charter "$oparent" mate7 'mate7 charter' beta \
+    || fail "charter scaffold failed"
+  FM_HOME="$oparent" "$ROOT/bin/fm-home-seed.sh" mate7 "$base/child7" beta >/dev/null \
+    || fail "seed of a manifest-registered project failed"
+  assert_equals "file://$(cd "$base/remotes/elsewhere-beta.git" && pwd)" \
+    "$(git -C "$base/child7/projects/beta" remote get-url origin)" \
+    "seed cloned the same-named sibling instead of the registered repository"
+
+  pass "org seed: siblings registered not cloned, unregistered refused, registered path owns the source"
 }
 
 test_launcher_resolution
