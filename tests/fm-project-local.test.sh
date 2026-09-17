@@ -431,6 +431,61 @@ test_discovery_authority() {
   pass "discovery=authority: discover lists siblings, refresh touches registered only, resolver precedence"
 }
 
+# --- an unresolvable project argument fails closed ---------------------------
+
+test_resolver_fails_closed() {
+  local base org home reg out
+  base=$(new_dir)
+  org="$base/org"
+  home="$org/.firstmate"
+  mkdir -p "$home/config" "$home/data" "$home/state"
+  printf '..\n' > "$home/config/projects-root"
+  reg="$org/reg"
+  fm_git_init_commit "$reg"
+  fm_git_add_origin "$reg" "$base/remotes/reg.git"
+  printf -- '- reg [direct-PR] - registered sibling (added 2026-09-17)\n' > "$home/data/projects.md"
+  # Not a flat alias -> path map: every resolution through it must fail loudly.
+  printf '{"reg": ["not-a-path"]}\n' > "$home/data/project-paths.json"
+
+  # A whole-fleet refresh must report the broken manifest, not a clean no-op.
+  if out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" 2>"$base/err-fleet"); then
+    fail "whole-fleet refresh succeeded with an unreadable project manifest"
+  fi
+  assert_grep "flat JSON object" "$base/err-fleet" "fleet refresh did not name the broken manifest"
+  case "$out" in *synced*) fail "fleet refresh reported syncs it never performed" ;; esac
+
+  # A path argument in a manifest-only home must report the broken registry,
+  # not call a registered project unregistered.
+  local home2="$base/org2/.firstmate"
+  mkdir -p "$home2/config" "$home2/data" "$home2/state"
+  printf '..\n' > "$home2/config/projects-root"
+  fm_git_init_commit "$base/org2/reg"
+  printf '{"reg": ["not-a-path"]}\n' > "$home2/data/project-paths.json"
+  if FM_HOME="$home2" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" "$base/org2/reg" \
+      >/dev/null 2>"$base/err-path"; then
+    fail "single-arg refresh succeeded with an unreadable project manifest"
+  fi
+  assert_grep "registry" "$base/err-path" "broken registry was not named"
+  case "$(cat "$base/err-path")" in
+    *"not a registered project"*) fail "broken manifest was reported as an unregistered project" ;;
+  esac
+
+  # An alias the manifest cannot hold must stop the spawn at resolution, not
+  # fall through to the launcher's own working directory.
+  local plain="$base/plain"
+  mkdir -p "$plain/config" "$plain/data" "$plain/state"
+  if FM_HOME="$plain" "$ROOT/bin/fm-spawn.sh" t1 'proj\name' --mode direct-PR --yolo off \
+      >/dev/null 2>"$base/err-spawn"; then
+    fail "spawn accepted an alias the manifest cannot hold"
+  fi
+  assert_grep "manifest cannot hold" "$base/err-spawn" "spawn refusal did not name the bad alias"
+  case "$(cat "$base/err-spawn")" in
+    *"has no brief"*) fail "spawn resolved a bad alias to a directory and continued" ;;
+  esac
+
+  pass "resolver failures fail closed: fleet refresh, registry lookup, and spawn"
+}
+
 # --- spawn refuses unregistered siblings -------------------------------------
 
 test_spawn_refusal() {
@@ -544,6 +599,7 @@ test_launcher_trust
 test_init
 test_projects_root
 test_discovery_authority
+test_resolver_fails_closed
 test_spawn_refusal
 test_org_seed
 

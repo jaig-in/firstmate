@@ -477,6 +477,7 @@ fi
 
 # Materialize the candidate list before syncing: sync_project runs git, and a
 # credential prompt on a piped `while read` would eat the remaining list.
+sync_pairs=$(fm_project_sync_candidate_pairs "$FM_HOME" "$CONFIG" "$DATA") || exit 1
 sync_candidates=()
 sync_aliases=()
 while IFS= read -r pair; do
@@ -484,7 +485,7 @@ while IFS= read -r pair; do
   [ -n "$proj" ] || continue
   sync_candidates+=("$proj")
   sync_aliases+=("${pair%%$'\t'*}")
-done < <(fm_project_sync_candidate_pairs "$FM_HOME" "$CONFIG" "$DATA")
+done <<< "$sync_pairs"
 for i in ${sync_candidates[@]+"${!sync_candidates[@]}"}; do
   proj=${sync_candidates[$i]}
   # Per-clone elapsed, so a fleet refresh that runs long names WHICH clone cost

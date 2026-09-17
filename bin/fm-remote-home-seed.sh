@@ -176,6 +176,9 @@ EOF
   # case; it is never a reason to create one.
   if [ -z "$ORIGIN" ]; then
     PROJECT_DIR=$(fm_project_resolve "$FM_HOME" "$CONFIG" "$DATA" "$project" || true)
+    # The resolver echoes the argument back when nothing resolved it; that bare
+    # name would probe the caller's current directory, not a project of this home.
+    [ "$PROJECT_DIR" != "$project" ] || PROJECT_DIR=
     if [ -n "$PROJECT_DIR" ] && [ -d "$PROJECT_DIR/.git" ]; then
       ORIGIN=$(git -C "$PROJECT_DIR" remote get-url origin 2>/dev/null || true)
     fi

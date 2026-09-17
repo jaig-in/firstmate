@@ -2545,7 +2545,15 @@ if [ "$KIND" = secondmate ]; then
     BRIEF="$DATA/$ID/brief.md"
   fi
 else
-  PROJ_ABS="$(cd "$(resolve_project_dir_arg "$PROJ")" && pwd)"
+  PROJ_RESOLVED=$(resolve_project_dir_arg "$PROJ") || exit 1
+  [ -n "$PROJ_RESOLVED" ] || {
+    echo "error: could not resolve a project directory for $PROJ" >&2
+    exit 1
+  }
+  PROJ_ABS=$(cd "$PROJ_RESOLVED" && pwd) || {
+    echo "error: project directory does not exist: $PROJ_RESOLVED" >&2
+    exit 1
+  }
   WT=""
   BRIEF="$DATA/$ID/brief.md"
 fi
