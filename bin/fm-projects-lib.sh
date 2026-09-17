@@ -259,32 +259,40 @@ fm_project_resolve() {
   printf '%s\n' "$arg"
 }
 
+# fm_project_sync_candidate <home> <config> <data> <alias>: the directory a
+# refresh acts on for one REGISTERED alias. An alias the resolver does not
+# resolve still yields its sibling path when that directory exists, so the
+# refresh reports what is actually wrong with it; only a name that resolves to
+# nothing at all yields EMPTY, never the cwd-relative name the caller might
+# mistake for a directory of its own. Every caller that turns a registered
+# alias into a path to sync goes through here, so the whole-fleet and
+# single-project forms cannot drift on what "registered but unusable" means.
+fm_project_sync_candidate() {
+  local home=$1 config=$2 data=$3 alias=$4 resolved projects
+  resolved=$(fm_project_resolve "$home" "$config" "$data" "$alias") || return 1
+  if [ "$resolved" != "$alias" ]; then
+    printf '%s\n' "$resolved"
+    return 0
+  fi
+  projects=$(fm_projects_root "$home" "$config") || return 1
+  [ -d "$projects/$alias" ] || return 0
+  printf '%s\n' "$projects/$alias"
+}
+
 # fm_project_sync_candidate_pairs <home> <config> <data>: print the projects a
 # whole-fleet refresh may touch as "alias<TAB>path" lines. A
 # config/projects-root home enumerates only REGISTERED aliases (discovery is
-# not authority). An alias the resolver does not resolve still yields its
-# sibling path when that directory exists, so the refresh reports what is
-# actually wrong with it; only a name that resolves to nothing at all is
-# emitted with an EMPTY path, never as a cwd-relative name the caller might
-# mistake for a directory of its own. Every other home keeps the legacy
-# direct-children glob, including unregistered clones, with an empty alias.
+# not authority), each through fm_project_sync_candidate. Every other home
+# keeps the legacy direct-children glob, including unregistered clones, with
+# an empty alias.
 fm_project_sync_candidate_pairs() {
-  local home=$1 config=$2 data=$3 projects alias resolved aliases proj
+  local home=$1 config=$2 data=$3 projects alias candidate aliases proj
   if fm_projects_root_is_custom "$config"; then
-    projects=$(fm_projects_root "$home" "$config") || return 1
     aliases=$(fm_project_registered_aliases "$data") || return 1
     while IFS= read -r alias; do
       [ -n "$alias" ] || continue
-      resolved=$(fm_project_resolve "$home" "$config" "$data" "$alias") || return 1
-      if [ "$resolved" = "$alias" ]; then
-        if [ -d "$projects/$alias" ]; then
-          printf '%s\t%s\n' "$alias" "$projects/$alias"
-        else
-          printf '%s\t\n' "$alias"
-        fi
-        continue
-      fi
-      printf '%s\t%s\n' "$alias" "$resolved"
+      candidate=$(fm_project_sync_candidate "$home" "$config" "$data" "$alias") || return 1
+      printf '%s\t%s\n' "$alias" "$candidate"
     done <<< "$aliases"
     return 0
   fi
