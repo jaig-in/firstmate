@@ -86,17 +86,14 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
 fi
 [ $# -le 1 ] || { usage; exit 1; }
 
+# project_label [alias]: under a custom projects root every synced path came
+# from a registered alias, and the caller passes that alias through so it is
+# the label and the registry lookup key without re-resolving the whole
+# registry per project; no alias falls through to the legacy rules.
 project_label() {
-  local alias
-  # Under a custom projects root every synced path came from a registered
-  # alias, so the alias is the label and the registry lookup key; a path with
-  # no alias (a stale manifest entry, say) falls through to the legacy rules.
-  if fm_projects_root_is_custom "$CONFIG"; then
-    alias=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$PROJ" 2>/dev/null || true)
-    if [ -n "$alias" ]; then
-      printf '%s\n' "$alias"
-      return 0
-    fi
+  if [ -n "${1:-}" ]; then
+    printf '%s\n' "$1"
+    return 0
   fi
   case "$PROJ" in
     "$PROJECTS"/*) basename "$PROJ" ;;
@@ -309,7 +306,7 @@ report_stuck() {
 
 sync_project() {
   PROJ=$1
-  label=$(project_label)
+  label=$(project_label "${2:-}")
 
   if [ ! -d "$PROJ" ]; then
     echo "$label: skipped: not a directory"
@@ -478,21 +475,26 @@ if [ $# -eq 1 ]; then
       exit 1
     fi
   fi
-  sync_project "$resolved"
+  sync_project "$resolved" "${registered:-}"
   exit 0
 fi
 
 # Materialize the candidate list before syncing: sync_project runs git, and a
 # credential prompt on a piped `while read` would eat the remaining list.
 sync_candidates=()
-while IFS= read -r proj; do
-  [ -n "$proj" ] && sync_candidates+=("$proj")
-done < <(fm_project_sync_candidates "$FM_HOME" "$CONFIG" "$DATA")
-for proj in ${sync_candidates[@]+"${sync_candidates[@]}"}; do
+sync_aliases=()
+while IFS= read -r pair; do
+  proj=${pair#*$'\t'}
+  [ -n "$proj" ] || continue
+  sync_candidates+=("$proj")
+  sync_aliases+=("${pair%%$'\t'*}")
+done < <(fm_project_sync_candidate_pairs "$FM_HOME" "$CONFIG" "$DATA")
+for i in ${sync_candidates[@]+"${!sync_candidates[@]}"}; do
+  proj=${sync_candidates[$i]}
   # Per-clone elapsed, so a fleet refresh that runs long names WHICH clone cost
   # the time instead of only its total. Recording is a no-op unless the deferred
   # network stage asked for it.
   __fm_timing_stamp=$(fm_timing_now_ms)
-  sync_project "$proj"
+  sync_project "$proj" "${sync_aliases[$i]}"
   fm_timing_record clone sync "$__fm_timing_stamp" "$(basename "$proj")"
 done
