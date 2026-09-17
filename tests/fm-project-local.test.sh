@@ -483,7 +483,39 @@ test_resolver_fails_closed() {
     *"has no brief"*) fail "spawn resolved a bad alias to a directory and continued" ;;
   esac
 
-  pass "resolver failures fail closed: fleet refresh, registry lookup, and spawn"
+  # A relative manifest value would resolve against whatever directory the
+  # caller happens to be in, so it is refused rather than resolved.
+  local home3="$base/org3/.firstmate" cwd="$base/cwd"
+  mkdir -p "$home3/config" "$home3/data" "$home3/state"
+  printf '..\n' > "$home3/config/projects-root"
+  printf -- '- docs [direct-PR] - relative registration (added 2026-09-17)\n' > "$home3/data/projects.md"
+  printf '{"docs": "./docs"}\n' > "$home3/data/project-paths.json"
+  fm_git_init_commit "$cwd/docs"
+  if (cd "$cwd" && FM_HOME="$home3" "$ROOT/bin/fm-projects.sh" resolve docs) \
+      >"$base/out-rel" 2>"$base/err-rel"; then
+    fail "a relative manifest path resolved instead of failing"
+  fi
+  assert_grep "absolute path" "$base/err-rel" "relative manifest refusal did not name the format"
+  case "$(cat "$base/out-rel")" in *docs*) fail "relative manifest path was printed as a resolution" ;; esac
+  if (cd "$cwd" && FM_HOME="$home3" "$ROOT/bin/fm-spawn.sh" t1 docs --mode direct-PR --yolo off) \
+      >/dev/null 2>"$base/err-rel-spawn"; then
+    fail "spawn accepted a relative manifest path"
+  fi
+  case "$(cat "$base/err-rel-spawn")" in
+    *"has no brief"*) fail "spawn resolved a relative manifest path against its own cwd" ;;
+  esac
+
+  # A malformed projects root must fail discover, not read as "no siblings".
+  local home4="$base/org4/.firstmate"
+  mkdir -p "$home4/config" "$home4/data" "$home4/state"
+  printf '..\nextra\n' > "$home4/config/projects-root"
+  if FM_HOME="$home4" "$ROOT/bin/fm-projects.sh" discover >"$base/out-disc" 2>"$base/err-disc"; then
+    fail "discover succeeded with a malformed projects root"
+  fi
+  assert_grep "exactly one path line" "$base/err-disc" "discover did not name the malformed root"
+  [ ! -s "$base/out-disc" ] || fail "discover listed siblings from a malformed projects root"
+
+  pass "resolver failures fail closed: fleet refresh, registry lookup, spawn, manifest paths, discover"
 }
 
 # --- spawn refuses unregistered siblings -------------------------------------

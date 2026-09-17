@@ -2705,7 +2705,7 @@ validate_firstmate_operational_dirs() {
   for name in data state config projects; do
     # An org-shaped home holds no projects/ directory; its projects live as
     # siblings under its config/projects-root.
-    if [ "$name" = projects ] && [ -f "$abs_home/config/projects-root" ] && [ ! -L "$abs_home/config/projects-root" ]; then
+    if [ "$name" = projects ] && fm_projects_root_is_custom "$abs_home/config"; then
       continue
     fi
     dir="$abs_home/$name"
