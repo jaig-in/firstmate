@@ -95,13 +95,14 @@
 # name a slot a DIFFERENT live task now holds. Cleanup kills every process under
 # that path and hard-resets it before returning it, so releasing a slot that is
 # not genuinely this task's destroys another worker's live work. Before the first
-# cleanup step, teardown verifies record exclusivity: no OTHER task record in
-# this home or any locally registered Firstmate home may name the same live path
-# in its worktree= or home=. One live path with two task records is the reuse
-# collision itself, whichever record is stale. The one exception is a slot whose
-# owner claim (below) names another task: this teardown is then records-only and
-# touches nothing under the slot, so the scan is skipped rather than stranding
-# the stale record and, with it, the claimant's own teardown.
+# cleanup step, teardown verifies record exclusivity: unless the slot's claim
+# resolves it (below), no OTHER task record in this home or any locally
+# registered Firstmate home may name the same live path in its worktree= or
+# home=. One live path with two task records is the reuse collision itself,
+# whichever record is stale. A claim naming another task makes this teardown
+# records-only - it touches nothing under the slot - so the scan is skipped
+# rather than stranding the stale record and, with it, the claimant's own
+# teardown.
 # That scan alone cannot prove THIS record is the current owner, because the task
 # that took the slot next may leave no record it can reach - its own worker may
 # have exited and its record been cleaned up, or it may live in a home this
@@ -126,6 +127,15 @@
 # absent claim - a slot taken before claims existed, or already returned - keeps
 # exactly the record-scan protection it had before, because refusing it would
 # strand every task in flight across that change on no evidence at all.
+# The claim is read before the record scan, because when a slot is reassigned
+# while the old task's record survives, each task's record names the slot and a
+# scan-first teardown of either one refuses against the other - a deadlock
+# (observed 2026-09-16). So a claim naming another task skips the scan, and a
+# claim naming this task marks any other crewmate record naming the slot as
+# stale: that record predates the claim, since every later spawn into the slot
+# would have replaced it, so teardown warns and proceeds. Secondmate homes and
+# Orca worktrees take no claim, so a record of either kind still refuses. The
+# same order applies to each child's slot when a secondmate home is retired.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
