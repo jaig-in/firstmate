@@ -6,7 +6,8 @@
 #       Resolve this launch's Firstmate home, then exec the harness from the
 #       install root (the git clone this script lives in):
 #         1. explicit $FM_HOME always wins;
-#         2. the nearest .firstmate/ ancestor of the caller's cwd;
+#         2. the nearest .firstmate/ ancestor of the caller's cwd, walking no
+#            higher than below $HOME and carrying an untracked .fm-home marker;
 #         3. --global, or a cwd outside any git repository, falls back to the
 #            global home ($HOME/.firstmate when it exists, else the install
 #            root - today's unset-FM_HOME semantics);
@@ -54,11 +55,17 @@ HOME_MARKER=".fm-home"
 # restricted to this list so a home config cannot name an arbitrary binary.
 VERIFIED_PRIMARY_HARNESSES="claude codex opencode pi pi-signed grok kimi cursor omp"
 
-# nearest_firstmate_home <dir>: print the nearest .firstmate/ ancestor, or nothing.
+# nearest_firstmate_home <dir>: print the nearest .firstmate/ ancestor, or
+# nothing. The walk stops below $HOME: $HOME/.firstmate is the global home,
+# reached only through the fallback rules, never as an ancestor candidate.
 nearest_firstmate_home() {
-  local dir=$1
+  local dir=$1 home_dir=''
   dir=$(cd "$dir" 2>/dev/null && pwd -P) || return 1
+  if [ -n "${HOME:-}" ]; then
+    home_dir=$(cd "$HOME" 2>/dev/null && pwd -P) || home_dir=''
+  fi
   while :; do
+    [ -n "$home_dir" ] && [ "$dir" = "$home_dir" ] && return 1
     if [ -d "$dir/.firstmate" ]; then
       printf '%s\n' "$dir/.firstmate"
       return 0
@@ -68,9 +75,12 @@ nearest_firstmate_home() {
   done
 }
 
-# home_is_trusted <home>: true when the home carries the init-written marker.
+# home_is_trusted <home>: true when the home carries the init-written marker
+# and that marker is not tracked by git. init never commits the marker, so a
+# tracked one arrived with a clone and proves nothing about this machine.
 home_is_trusted() {
-  [ -f "$1/$HOME_MARKER" ] && [ ! -L "$1/$HOME_MARKER" ]
+  [ -f "$1/$HOME_MARKER" ] && [ ! -L "$1/$HOME_MARKER" ] || return 1
+  ! git -C "$1" ls-files --error-unmatch -- "$HOME_MARKER" >/dev/null 2>&1
 }
 
 # require_trusted_home <home>: die when an ancestor-discovered home lacks the
@@ -78,9 +88,10 @@ home_is_trusted() {
 require_trusted_home() {
   local home=$1
   home_is_trusted "$home" && return 0
-  die "untrusted home: $home has no $HOME_MARKER marker.
+  die "untrusted home: $home has no local (untracked) $HOME_MARKER marker.
   A .firstmate/ directory can carry committed config (harness, backlog
-  backend), so the launcher refuses to honor one it did not create.
+  backend), so the launcher refuses to honor one it did not create; a
+  $HOME_MARKER committed to git does not count.
   Bless it by running 'firstmate init' there, or knowingly: touch '$home/$HOME_MARKER'"
 }
 
@@ -221,8 +232,10 @@ cmd_launch() {
   home=$(cd "$home" && pwd -P) || die "cannot resolve home: $home"
 
   if [ "$harness_set" -eq 0 ]; then
-    if [ -f "$home/config/primary-harness" ] && [ ! -L "$home/config/primary-harness" ]; then
-      harness=$(sed -n '1p' "$home/config/primary-harness" | tr -d '[:space:]')
+    if [ -L "$home/config/primary-harness" ]; then
+      die "config/primary-harness must be a regular file, not a symlink: $home/config/primary-harness"
+    elif [ -f "$home/config/primary-harness" ]; then
+      harness=$(sed -n '1p' "$home/config/primary-harness" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
       case " $VERIFIED_PRIMARY_HARNESSES " in
         *" $harness "*) ;;
         *) die "config/primary-harness names an unverified primary harness: $harness (verified: $VERIFIED_PRIMARY_HARNESSES)" ;;

@@ -103,6 +103,24 @@ test_launcher_resolution() {
   fi
   assert_grep "firstmate init" "$base/err" "refusal did not name firstmate init"
 
+  # A cwd under $HOME never finds $HOME/.firstmate as an ancestor: an unmarked
+  # global home still serves a non-repo cwd, and a repo under $HOME without
+  # its own .firstmate/ still refuses to guess.
+  local underhome="$base/underhome"
+  mkdir -p "$underhome/.firstmate" "$underhome/plain/dir"
+  fm_git_init_commit "$underhome/work/repo"
+  (cd "$underhome/plain/dir" && env -u FM_HOME HOME="$underhome"     FM_FAKE_HARNESS_OUT="$base/out5" PATH="$fakebin:$PATH" "$ROOT/bin/firstmate")     || fail "cwd under HOME did not resolve the unmarked global home"
+  assert_grep "FM_HOME=$underhome/.firstmate" "$base/out5" "cwd under HOME did not resolve the global home"
+  if (cd "$underhome/work/repo" && env -u FM_HOME HOME="$underhome"       PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err5"); then
+    fail "repo under HOME resolved the global home as an ancestor"
+  fi
+  assert_grep "firstmate init" "$base/err5" "repo under HOME did not refuse to guess"
+  (cd "$underhome/work/repo" && HOME="$underhome" "$ROOT/bin/firstmate" init >"$base/init5") \
+    || fail "init under HOME failed"
+  if grep -q "shadowing" "$base/init5"; then
+    fail "init under HOME reported shadowing the global home"
+  fi
+
   pass "launcher: FM_HOME win, nested shadowing, global+install fallback, in-repo refusal"
 }
 
@@ -131,6 +149,15 @@ test_launcher_trust() {
     FM_FAKE_HARNESS_OUT="$base/out1" PATH="$fakebin:$PATH" "$ROOT/bin/firstmate")
   assert_grep "FM_HOME=$repo/.firstmate" "$base/out1" "marked home did not resolve"
 
+  # A marker tracked by git arrived with a clone and does not bless the home.
+  git -C "$repo" add -f .firstmate/.fm-home
+  if (cd "$repo/sub" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out-tracked" \
+      PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err-tracked"); then
+    fail "a git-tracked .fm-home marker blessed the home"
+  fi
+  assert_grep "untrusted" "$base/err-tracked" "tracked-marker refusal did not name the home untrusted"
+  git -C "$repo" rm -q --cached .firstmate/.fm-home
+
   # config/primary-harness accepts only verified primary adapters.
   mkdir -p "$repo/.firstmate/config"
   printf 'muse\n' > "$repo/.firstmate/config/primary-harness"
@@ -145,6 +172,24 @@ test_launcher_trust() {
     fail "unknown primary-harness was accepted"
   fi
   assert_grep "unverified primary harness" "$base/err3" "unknown adapter did not fail loudly"
+  printf 'cla ude\n' > "$repo/.firstmate/config/primary-harness"
+  if (cd "$repo/sub" && env -u FM_HOME \
+      PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err3b"); then
+    fail "interior-whitespace primary-harness was accepted"
+  fi
+  assert_grep "unverified primary harness" "$base/err3b" "interior-whitespace adapter did not fail loudly"
+  printf '  claude  \n' > "$repo/.firstmate/config/primary-harness"
+  (cd "$repo/sub" && env -u FM_HOME \
+    FM_FAKE_HARNESS_OUT="$base/out3c" PATH="$fakebin:$PATH" "$ROOT/bin/firstmate") \
+    || fail "edge-whitespace primary-harness was refused"
+  printf 'codex\n' > "$base/harness-target"
+  rm -f "$repo/.firstmate/config/primary-harness"
+  ln -s "$base/harness-target" "$repo/.firstmate/config/primary-harness"
+  if (cd "$repo/sub" && env -u FM_HOME \
+      PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err3d"); then
+    fail "symlinked primary-harness was silently ignored"
+  fi
+  assert_grep "symlink" "$base/err3d" "symlinked primary-harness did not fail loudly"
   rm -f "$repo/.firstmate/config/primary-harness"
 
   # A relative FM_HOME is canonicalized before export, not resolved against
@@ -199,6 +244,14 @@ test_init() {
   # The self-registered alias resolves to the repo itself.
   assert_equals "$(cd "$repo" && pwd -P)" "$(FM_HOME="$repo/.firstmate" "$ROOT/bin/fm-projects.sh" resolve standalone)" \
     "per-project init alias did not resolve to the repo"
+
+  # A same-named package directory inside the repo never shadows the repo.
+  local pkgrepo="$base/pkg"
+  fm_git_init_commit "$pkgrepo"
+  mkdir -p "$pkgrepo/pkg"
+  (cd "$pkgrepo" && "$ROOT/bin/firstmate" init >/dev/null) || fail "per-project init in pkg failed"
+  assert_equals "$(cd "$pkgrepo" && pwd -P)" "$(FM_HOME="$pkgrepo/.firstmate" "$ROOT/bin/fm-projects.sh" resolve pkg)" \
+    "same-named subdirectory shadowed the per-project repo"
 
   # init outside a repo and without --org refuses.
   local nowhere="$base/nowhere"
@@ -432,6 +485,39 @@ test_org_seed() {
     fail "org seed accepted a non-sibling project"
   fi
   assert_absent "$base/child2" "failed org seed left a home behind"
+
+  # --projects-root is canonicalized even when given as an absolute symlink,
+  # and a path with whitespace is refused before anything is written.
+  ln -s "$org" "$base/org-link"
+  scaffold_secondmate_charter "$parent" mate3 'mate3 charter' alpha \
+    || fail "charter scaffold failed"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate3 "$base/child3" alpha \
+    --projects-root "$base/org-link" >/dev/null || fail "org seed through a symlinked root failed"
+  assert_equals "$(cd "$org" && pwd -P)" "$(cat "$base/child3/config/projects-root")" "symlinked projects-root was not canonicalized"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate3 "$base/child3" alpha \
+    --projects-root "$org" >/dev/null || fail "reseed with the canonical root disagreed with the symlinked one"
+  mkdir -p "$base/org space"
+  if FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate4 "$base/child4" alpha \
+      --projects-root "$base/org space" >/dev/null 2>"$base/err-space"; then
+    fail "org seed accepted a projects root with whitespace"
+  fi
+  assert_grep "whitespace" "$base/err-space" "whitespace projects-root refusal did not name the cause"
+
+  # An org-shaped parent authorizes by location: its alias must name the
+  # same repository the child's projects root holds.
+  local oparent="$base/oparent" other="$base/other-org"
+  mkdir -p "$oparent/data" "$oparent/state" "$oparent/config"
+  printf '%s\n' "$org" > "$oparent/config/projects-root"
+  printf -- '- alpha [direct-PR] - alpha project (added 2026-09-17)\n' > "$oparent/data/projects.md"
+  fm_git_init_commit "$other/alpha"
+  fm_git_add_origin "$other/alpha" "$base/remotes/other-alpha.git"
+  scaffold_secondmate_charter "$oparent" mate5 'mate5 charter' alpha \
+    || fail "charter scaffold failed"
+  if FM_HOME="$oparent" "$ROOT/bin/fm-home-seed.sh" mate5 "$base/child5" alpha \
+      --projects-root "$other" >/dev/null 2>"$base/err-loc"; then
+    fail "org seed registered a same-named repo the parent does not pin"
+  fi
+  assert_grep "registered in this home at" "$base/err-loc" "location refusal did not name the registered path"
 
   pass "org seed: siblings registered not cloned, projects-root recorded, non-sibling refused"
 }
