@@ -110,8 +110,9 @@
 # repair the claim file at the printed path and re-run - never remove it, since
 # an absent claim proceeds and would return a slot that may be another task's. An
 # absent claim - a slot taken before claims existed, or already returned - keeps
-# exactly the record-scan protection it had before, because refusing it would
-# strand every task in flight across that change on no evidence at all.
+# exactly the record-scan protection it had before (unless the record carries the
+# slot_reassigned_to= mark below), because refusing it would strand every task in
+# flight across that change on no evidence at all.
 # The claim is read before the record scan, because when a slot is reassigned
 # while the old task's record survives, each task's record names the slot and a
 # scan-first teardown of either one refuses against the other - a deadlock
@@ -121,8 +122,12 @@
 # would have replaced it, so teardown warns and proceeds - but only while that
 # record's own endpoint reads dead or missing, because a claim is only as true
 # as the path the claiming spawn read, and a live agent behind the other record
-# means this task's claim may be the wrong one. Secondmate homes and Orca
-# worktrees take no claim, so a record of either kind still refuses. The same
+# means this task's claim may be the wrong one. Teardown also writes
+# slot_reassigned_to=<this task> into that stale record. Once this teardown
+# returns the slot, the claim is gone, and that mark counts as the claim: the
+# stale task's relaunch refuses and its own teardown releases nothing.
+# Secondmate homes and Orca worktrees take no claim, so a record of either kind
+# still refuses. The same
 # order applies to each child's slot when a secondmate home is retired.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
