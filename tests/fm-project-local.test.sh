@@ -574,11 +574,16 @@ test_resolver_fails_closed() {
   printf '..\n' > "$home6/config/projects-root"
   printf -- '- ghostproj [direct-PR] - stale registration (added 2026-09-17)\n' > "$home6/data/projects.md"
   fm_git_init_commit "$cwd6/ghostproj"
-  if (cd "$cwd6" && FM_HOME="$home6" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" ghostproj) \
-      >/dev/null 2>"$base/err-ghost"; then
-    fail "single-arg refresh accepted a cwd directory as a registered project"
-  fi
-  assert_grep "not a registered project" "$base/err-ghost" "stale-registration refusal did not name registration"
+  local out6
+  out6=$( (cd "$cwd6" && FM_HOME="$home6" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" ghostproj) \
+      2>"$base/err-ghost") \
+    || fail "single-arg refresh of a registered alias failed: $(cat "$base/err-ghost")"
+  assert_contains "$out6" "ghostproj: skipped: registered project resolves to no directory" \
+    "a stale registration was not reported by its own name"
+  case "$out6" in
+    *"$cwd6"*|*synced*|*"already current"*)
+      fail "single-arg refresh acted on a cwd directory as a registered project" ;;
+  esac
   if (cd "$cwd6" && FM_HOME="$home6" "$ROOT/bin/fm-spawn.sh" t1 ghostproj --mode direct-PR --yolo off) \
       >/dev/null 2>"$base/err-ghost-spawn"; then
     fail "spawn accepted a cwd directory as a registered project"
@@ -606,6 +611,10 @@ test_resolver_fails_closed() {
     || fail "whole-fleet refresh failed on a non-repo sibling"
   assert_contains "$out7" "notes: skipped: not a git repo" \
     "a registered plain directory was not reported as a non-repo"
+  out7=$(FM_HOME="$home7" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" notes 2>"$base/err-notes") \
+    || fail "single-arg refresh called a registered non-repo sibling unregistered: $(cat "$base/err-notes")"
+  assert_contains "$out7" "notes: skipped: not a git repo" \
+    "the single-project form hid the real cause behind a registration refusal"
   case "$out7" in
     *"notes: skipped: registered project resolves to no directory"*)
       fail "an existing sibling was reported as resolving to no directory" ;;

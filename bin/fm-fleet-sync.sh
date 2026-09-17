@@ -33,8 +33,10 @@
 # A home with config/projects-root (an org home) refreshes only REGISTERED
 # projects - data/projects.md and data/project-paths.json aliases - because
 # every sibling of the org root is a user working copy and discovery is not
-# authority; its single-project form likewise refuses a name or path that
-# resolves to no registered alias. Every other home keeps the legacy
+# authority; its single-project form likewise refuses a name that is not a
+# registered alias and a path that resolves to no registered alias, while a
+# registered alias whose directory is missing or is not a clone is reported
+# with that rather than refused. Every other home keeps the legacy
 # direct-children glob.
 # That refresh is external-safe: fetch, then fast-forward only a clean default
 # branch; it never prunes branches, re-attaches a detached HEAD, or reports a
@@ -468,10 +470,33 @@ if [ $# -eq 1 ]; then
   if [ "$ORG_HOME" -eq 1 ]; then
     # Discovery is not authority: in an org home a single-argument refresh may
     # touch only a registered project, never a merely discoverable sibling.
-    registered=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$resolved") || {
-      echo "error: could not read this home's project registry" >&2
-      exit 1
-    }
+    # A bare name IS a registry key, so registration is membership in the
+    # registry; what it currently resolves to is the refresh's story to tell,
+    # through the same candidate rule the whole-fleet form uses.
+    registered=
+    if [ -n "$arg_alias" ]; then
+      aliases=$(fm_project_registered_aliases "$DATA") || {
+        echo "error: could not read this home's project registry" >&2
+        exit 1
+      }
+      while IFS= read -r alias; do
+        [ "$alias" = "$arg_alias" ] || continue
+        registered=$arg_alias
+        break
+      done <<< "$aliases"
+      if [ -n "$registered" ]; then
+        resolved=$(fm_project_sync_candidate "$FM_HOME" "$CONFIG" "$DATA" "$registered") || exit 1
+        if [ -z "$resolved" ]; then
+          echo "$registered: skipped: registered project resolves to no directory"
+          exit 0
+        fi
+      fi
+    else
+      registered=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$resolved") || {
+        echo "error: could not read this home's project registry" >&2
+        exit 1
+      }
+    fi
     if [ -z "$registered" ]; then
       echo "error: $resolved is not a registered project of this home; register it in $DATA/projects.md (or data/project-paths.json) before refreshing" >&2
       exit 1
