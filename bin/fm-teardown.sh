@@ -127,8 +127,8 @@
 # returns the slot, the claim is gone, and that mark counts as the claim: the
 # stale task's relaunch refuses and its own teardown releases nothing.
 # Secondmate homes and Orca worktrees take no claim, so a record of either kind
-# still refuses. The same
-# order applies to each child's slot when a secondmate home is retired.
+# still refuses. The same order applies to each child's slot when a secondmate
+# home is retired.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
@@ -3204,7 +3204,11 @@ cleanup_firstmate_home_children() {
       # The same ownership determination as the parent's own slot: a child
       # slot reassigned to another task is not this child's to kill, reset,
       # or return, so only its records are cleaned up. The preflight above
-      # already named the reassignment on stderr under the same lock.
+      # already named the reassignment on stderr under the same lock, and its
+      # verdict is reused rather than re-read: an earlier child in this same
+      # sweep may have returned that slot and dropped its claim since, which
+      # would make a fresh read see no claim and treat the slot as this
+      # child's again.
       child_owner_rc=0
       if descendant_slot_reassigned "$child_meta"; then
         child_owner_rc=$TEARDOWN_SLOT_REASSIGNED_RC
