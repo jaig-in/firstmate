@@ -61,13 +61,19 @@ fm_projects_root() {
     return 1
   fi
   [ -r "$file" ] || { echo "error: $file is not readable" >&2; return 1; }
-  line=$(sed -n '1p' "$file" | tr -d '[:space:]')
+  # Trim leading/trailing whitespace only; a path with interior whitespace is
+  # rejected loudly rather than silently mangled into a different directory.
+  line=$(sed -n '1p' "$file" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
   if [ -z "$line" ] || [ "$(wc -l < "$file" | tr -d '[:space:]')" -gt 1 ] \
       || [ -n "$(sed -n '2p' "$file" | tr -d '[:space:]')" ]; then
     echo "error: $file must contain exactly one path line" >&2
     return 1
   fi
   case "$line" in
+    *[[:space:]]*)
+      echo "error: $file contains whitespace inside the path" >&2
+      return 1
+      ;;
     *[![:print:]]*)
       echo "error: $file contains a non-printable byte" >&2
       return 1
@@ -177,7 +183,7 @@ fm_project_registered_aliases() {
 fm_project_resolve() {
   local home=$1 config=$2 data=$3 arg=$4 projects candidate mapped
   case "$arg" in
-    projects/*)
+    projects/?*)
       candidate="$home/projects/${arg#projects/}"
       if [ -d "$candidate" ]; then
         printf '%s\n' "$candidate"
