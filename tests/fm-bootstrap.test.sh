@@ -815,6 +815,35 @@ SH
 
   assert_contains "$out" "FLEET_SYNC: fleet: skipped: project registry is unreadable" \
     "a refresh that refused to run must not read as a clean fleet"
+
+  # fm-fleet-sync.sh runs fm-guard.sh, which warns on the same stream before the
+  # refresh can refuse, so the reported cause must be the error, not whatever
+  # diagnostic happened to be printed first.
+  cat > "$fake_root/bin/fm-fleet-sync.sh" <<'SH'
+#!/usr/bin/env bash
+echo "WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else." >&2
+echo "error: project registry is unreadable" >&2
+exit 1
+SH
+  chmod +x "$fake_root/bin/fm-fleet-sync.sh"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$fake_root" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
+  assert_contains "$out" "FLEET_SYNC: fleet: skipped: project registry is unreadable" \
+    "an unrelated warning on stderr replaced the refusal's real cause"
+  assert_not_contains "$out" "FLEET_SYNC: fleet: skipped: WARNING" \
+    "the digest reported a guard warning as the reason the refresh refused"
+
+  # No error: line at all still reports the refusal rather than a clean fleet.
+  cat > "$fake_root/bin/fm-fleet-sync.sh" <<'SH'
+#!/usr/bin/env bash
+echo "WARNING: queued wakes pending." >&2
+exit 3
+SH
+  chmod +x "$fake_root/bin/fm-fleet-sync.sh"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$fake_root" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
+  assert_contains "$out" "FLEET_SYNC: fleet: skipped: refresh failed (exit 3)" \
+    "a refusal with no error: line lost its fallback reason"
   pass "bootstrap reports a fleet refresh that failed instead of showing nothing"
 }
 

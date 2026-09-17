@@ -376,7 +376,7 @@ fleet_sync() {
   if [ "$rc" -ne 0 ]; then
     # A refresh that refused to run (an unreadable registry or projects root)
     # must not read as a clean fleet in the digest.
-    reason=$(sed -n 's/^error: //;/./{p;q;}' "$err" 2>/dev/null || true)
+    reason=$(sed -n 's/^error: //p' "$err" 2>/dev/null | sed -n '/./{p;q;}')
     echo "FLEET_SYNC: fleet: skipped: ${reason:-refresh failed (exit $rc)}"
   fi
   rm -rf "$tmpdir"
