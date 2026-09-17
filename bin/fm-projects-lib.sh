@@ -167,14 +167,17 @@ fm_project_manifest_lookup() {
 # line, sorted and deduplicated: data/projects.md entries plus
 # data/project-paths.json keys.
 fm_project_registered_aliases() {
-  local data=$1 manifest
+  local data=$1 manifest pairs=''
   manifest=$(fm_project_manifest_path "$data")
+  if [ -f "$manifest" ]; then
+    pairs=$(fm_project_manifest_pairs "$data") || return 1
+  fi
   {
     if [ -f "$data/projects.md" ]; then
       awk '$1 == "-" && $2 != "" { print $2 }' "$data/projects.md"
     fi
-    if [ -f "$manifest" ]; then
-      fm_project_manifest_pairs "$data" | cut -f1
+    if [ -n "$pairs" ]; then
+      printf '%s\n' "$pairs" | cut -f1
     fi
   } | sort -u
 }
