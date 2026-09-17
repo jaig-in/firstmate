@@ -85,10 +85,11 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
 fi
 [ $# -le 1 ] || { usage; exit 1; }
 
-# project_label [alias]: under a custom projects root every synced path came
-# from a registered alias, and the caller passes that alias through so it is
-# the label and the registry lookup key without re-resolving the whole
-# registry per project; no alias falls through to the legacy rules.
+# project_label [alias]: when the caller knows the registry alias a synced path
+# came from - every project of a custom projects root, and any bare-name
+# argument - it passes that alias through so it is the label and the registry
+# lookup key without re-resolving the whole registry per project; no alias
+# falls through to the legacy rules.
 project_label() {
   if [ -n "${1:-}" ]; then
     printf '%s\n' "$1"
@@ -459,6 +460,11 @@ sync_project() {
 
 if [ $# -eq 1 ]; then
   resolved=$(resolve_project_arg "$1") || exit 1
+  arg_alias=
+  case "$1" in
+    */*) ;;
+    *) arg_alias=$1 ;;
+  esac
   if [ "$ORG_HOME" -eq 1 ]; then
     # Discovery is not authority: in an org home a single-argument refresh may
     # touch only a registered project, never a merely discoverable sibling.
@@ -470,8 +476,9 @@ if [ $# -eq 1 ]; then
       echo "error: $resolved is not a registered project of this home; register it in $DATA/projects.md (or data/project-paths.json) before refreshing" >&2
       exit 1
     fi
+    arg_alias=$registered
   fi
-  sync_project "$resolved" "${registered:-}"
+  sync_project "$resolved" "$arg_alias"
   exit 0
 fi
 

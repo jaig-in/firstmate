@@ -101,7 +101,11 @@ nearest_firstmate_home() {
 # and that marker is not tracked by git. init never commits the marker, so a
 # tracked one arrived with a clone and proves nothing about this machine.
 # Only git's "not tracked" answer (exit 1) counts as untracked; any other git
-# failure inside a work tree (dubious ownership, a corrupt index) fails closed.
+# failure inside a work tree (a corrupt index, say) fails closed. Ownership
+# checks are deliberately bypassed (safe.directory='*') so a home inside a
+# repository owned by another user can be read at all - without it every git
+# call here would fail and the "not a repo" leg would read that home as
+# trusted. What decides is the marker's tracked state, never git ownership.
 home_is_trusted() {
   local rc=0
   [ -f "$1/$HOME_MARKER" ] && [ ! -L "$1/$HOME_MARKER" ] || return 1
