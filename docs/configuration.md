@@ -36,6 +36,7 @@ Home resolution order: an explicit `FM_HOME` always wins; otherwise the nearest 
 The caller's directory is exported as `FM_LAUNCH_DIR` and printed by the session-start digest.
 The harness is `--harness <name>`, then the home's `config/primary-harness` (one token), then `claude`; remaining arguments pass through to the harness.
 `config/primary-harness` accepts only the verified primary adapter names (`claude codex opencode pi pi-signed grok kimi cursor omp`; the crew-only adapters `muse gemini rovo agy` are not valid primaries), and any other value - including a symlinked file or a value with interior whitespace - fails loudly at launch.
+That whitelist keeps a home config from naming an arbitrary binary; it is not a support claim, and [README requirements](../README.md#requirements) still own the harnesses supported for a primary session.
 
 Home trust: `firstmate init` writes an empty `.firstmate/.fm-home` marker into every scaffolded home.
 A home discovered by walking `.firstmate/` ancestors is honored only when it carries that marker and git does not track it (init never commits the marker, so a committed one proves nothing, and a git error while checking - a corrupt index, say - inside a work tree fails closed; repository ownership checks are deliberately bypassed so a home inside another user's repository can be read at all, and it is the marker's tracked state, never ownership, that decides); the launcher refuses an unmarked one and names the blessing (`firstmate init`, or a knowing `touch .firstmate/.fm-home`), so a `.firstmate/` committed into a repository cannot inject a hostile `config/primary-harness` or `.tasks.toml` into launches beneath it.
@@ -327,6 +328,7 @@ A local standalone-clone home cannot receive a primary-local commit through that
 
 `FM_HOME` selects the operational home for one firstmate instance.
 When it is unset, most scripts use the repo root as the home; when it is set, scripts still run from this repo's `bin/`, but `state/`, `data/`, `config/`, and `projects/` come from `$FM_HOME`.
+A home with `config/projects-root` takes its projects from that root instead of `$FM_HOME/projects` (see "Project-local homes, the launcher, and the projects root" above).
 `FM_ROOT_OVERRIDE` overrides the firstmate repo root used by scripts, including the primary checkout watched by the worktree-tangle guard.
 When `FM_HOME` is unset, it also behaves as the old whole-root override.
 `bin/fm-send.sh` is intentionally stricter than that general fallback: it requires `FM_HOME` to be set before resolving a target, so operator steers cannot silently resolve against the wrong home.
