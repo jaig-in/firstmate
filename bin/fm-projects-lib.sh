@@ -124,23 +124,37 @@ fm_project_manifest_pairs() {
     jq -r 'to_entries[] | .key + "\t" + .value' "$manifest"
     return 0
   fi
+  # The document is read whole and consumed pair by pair, so the one-line and
+  # the pretty-printed forms of the same flat object mean the same thing here
+  # as they do to jq.
   awk -v file="$manifest" '
-    {
-      line = $0
-      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
-      if (line == "{" || line == "}" || line == "") next
-      # one "alias": "/absolute/path" pair per line, optional trailing comma
-      if (line !~ /^"[^"\\]+"[[:space:]]*:[[:space:]]*"\/[^"\\]*"[[:space:]]*,?$/) {
-        printf "error: %s must be a flat JSON object of alias -> absolute path\n", file > "/dev/stderr"
-        exit 1
+    function bad() {
+      printf "error: %s must be a flat JSON object of alias -> absolute path\n", file > "/dev/stderr"
+      exit 1
+    }
+    { doc = doc $0 "\n" }
+    END {
+      if (!match(doc, /^[[:space:]]*[{]/)) bad()
+      doc = substr(doc, RSTART + RLENGTH)
+      if (match(doc, /^[[:space:]]*[}][[:space:]]*$/)) exit 0
+      while (1) {
+        if (!match(doc, /^[[:space:]]*"[^"\\]+"[[:space:]]*:[[:space:]]*"\/[^"\\]*"/)) bad()
+        pair = substr(doc, RSTART, RLENGTH)
+        doc = substr(doc, RSTART + RLENGTH)
+        key = pair
+        sub(/^[[:space:]]*"/, "", key)
+        sub(/"[[:space:]]*:.*/, "", key)
+        val = pair
+        sub(/^[[:space:]]*"[^"\\]*"[[:space:]]*:[[:space:]]*"/, "", val)
+        sub(/"$/, "", val)
+        print key "\t" val
+        if (match(doc, /^[[:space:]]*,/)) {
+          doc = substr(doc, RSTART + RLENGTH)
+          continue
+        }
+        if (match(doc, /^[[:space:]]*[}][[:space:]]*$/)) exit 0
+        bad()
       }
-      sub(/^"/, "", line)
-      key = line
-      sub(/"[[:space:]]*:.*/, "", key)
-      val = line
-      sub(/^[^"]*"[[:space:]]*:[[:space:]]*"/, "", val)
-      sub(/"[[:space:]]*,?$/, "", val)
-      print key "\t" val
     }
   ' "$manifest"
 }
@@ -247,9 +261,11 @@ fm_project_resolve() {
 # fm_project_sync_candidate_pairs <home> <config> <data>: print the projects a
 # whole-fleet refresh may touch as "alias<TAB>path" lines. A
 # config/projects-root home enumerates only REGISTERED aliases (discovery is
-# not authority), skipping any alias that resolves to no directory rather than
-# emitting it as a cwd-relative name; every other home keeps the legacy
-# direct-children glob, including unregistered clones, with an empty alias.
+# not authority); an alias that resolves to no directory is emitted with an
+# EMPTY path rather than as a cwd-relative name, so the caller reports it as a
+# skip instead of touching whatever that name means in its own directory. Every
+# other home keeps the legacy direct-children glob, including unregistered
+# clones, with an empty alias.
 fm_project_sync_candidate_pairs() {
   local home=$1 config=$2 data=$3 projects alias resolved aliases proj
   if fm_projects_root_is_custom "$config"; then
@@ -258,7 +274,7 @@ fm_project_sync_candidate_pairs() {
       [ -n "$alias" ] || continue
       resolved=$(fm_project_resolve "$home" "$config" "$data" "$alias") || return 1
       if [ "$resolved" = "$alias" ]; then
-        echo "warning: registered project $alias resolves to no directory; skipped" >&2
+        printf '%s\t\n' "$alias"
         continue
       fi
       printf '%s\t%s\n' "$alias" "$resolved"
