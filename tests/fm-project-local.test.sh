@@ -10,6 +10,9 @@
 #     (or the install root when that is absent); a cwd inside a git repo with
 #     no .firstmate/ ancestor refuses to guess. The harness execs from the
 #     install root with FM_LAUNCH_DIR recording the caller's directory.
+#     Ancestor-discovered homes must carry the init-written .fm-home trust
+#     marker; config/primary-harness accepts only verified primary adapters;
+#     a relative FM_HOME is canonicalized before export.
 #   - `firstmate init`: --org scaffolds .firstmate/ at the cwd with
 #     config/projects-root=.. and no projects/ dir; without --org it scaffolds
 #     at the enclosing repo's root and registers the repo itself.
@@ -49,15 +52,6 @@ SH
   printf '%s\n' "$dir"
 }
 
-run_launcher() { # <cwd> [env-assignments...] -- [args...]
-  local cwd=$1
-  shift
-  local envs=()
-  while [ "$1" != "--" ]; do envs+=("$1"); shift; done
-  shift
-  (cd "$cwd" && env -u FM_HOME "${envs[@]}" "$ROOT/bin/firstmate" "$@")
-}
-
 # --- launcher home resolution ------------------------------------------------
 
 test_launcher_resolution() {
@@ -66,6 +60,9 @@ test_launcher_resolution() {
   org="$base/org"
   nested="$org/team/repo"
   mkdir -p "$org/.firstmate" "$nested/.firstmate" "$nested/sub/dir"
+  # Ancestor-discovered homes must carry the init-written trust marker.
+  : > "$org/.firstmate/.fm-home"
+  : > "$nested/.firstmate/.fm-home"
   fakebin=$(make_fake_harness "$base/fakebin")
 
   # Nearest .firstmate/ ancestor wins from a deep cwd.
@@ -99,13 +96,66 @@ test_launcher_resolution() {
   # Inside a git repo with no .firstmate/ ancestor: refuse to guess.
   local repo="$base/lonely-repo"
   fm_git_init_commit "$repo"
-  if (cd "$repo/sub" 2>/dev/null || mkdir -p "$repo/sub" && cd "$repo/sub" && env -u FM_HOME HOME="$barehome" \
+  mkdir -p "$repo/sub"
+  if (cd "$repo/sub" && env -u FM_HOME HOME="$barehome" \
       PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err"); then
     fail "in-repo launch without .firstmate did not refuse"
   fi
   assert_grep "firstmate init" "$base/err" "refusal did not name firstmate init"
 
   pass "launcher: FM_HOME win, nested shadowing, global+install fallback, in-repo refusal"
+}
+
+# --- home trust, adapter whitelist, FM_HOME canonicalization -----------------
+
+test_launcher_trust() {
+  local base repo fakebin
+  base=$(new_dir)
+  repo="$base/repo"
+  fm_git_init_commit "$repo"
+  mkdir -p "$repo/.firstmate" "$repo/sub"
+  fakebin=$(make_fake_harness "$base/fakebin")
+
+  # A .firstmate/ without the init-written marker is untrusted: the launcher
+  # refuses it and names how to bless it, so a committed home stays inert.
+  if (cd "$repo/sub" && env -u FM_HOME \
+      PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err1"); then
+    fail "unmarked .firstmate home was honored"
+  fi
+  assert_grep "untrusted" "$base/err1" "refusal did not name the home untrusted"
+  assert_grep ".fm-home" "$base/err1" "refusal did not name the blessing"
+
+  # Blessing the marker makes the same home resolve.
+  : > "$repo/.firstmate/.fm-home"
+  (cd "$repo/sub" && env -u FM_HOME \
+    FM_FAKE_HARNESS_OUT="$base/out1" PATH="$fakebin:$PATH" "$ROOT/bin/firstmate")
+  assert_grep "FM_HOME=$repo/.firstmate" "$base/out1" "marked home did not resolve"
+
+  # config/primary-harness accepts only verified primary adapters.
+  mkdir -p "$repo/.firstmate/config"
+  printf 'muse\n' > "$repo/.firstmate/config/primary-harness"
+  if (cd "$repo/sub" && env -u FM_HOME \
+      PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err2"); then
+    fail "crew-only primary-harness was accepted"
+  fi
+  assert_grep "unverified primary harness" "$base/err2" "adapter refusal did not fail loudly"
+  printf 'definitely-not-a-harness\n' > "$repo/.firstmate/config/primary-harness"
+  if (cd "$repo/sub" && env -u FM_HOME \
+      PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err3"); then
+    fail "unknown primary-harness was accepted"
+  fi
+  assert_grep "unverified primary harness" "$base/err3" "unknown adapter did not fail loudly"
+  rm -f "$repo/.firstmate/config/primary-harness"
+
+  # A relative FM_HOME is canonicalized before export, not resolved against
+  # the install root after the launcher's cd.
+  local relhome="$base/relhome"
+  mkdir -p "$relhome"
+  (cd "$base" && env \
+    FM_HOME=relhome FM_FAKE_HARNESS_OUT="$base/out4" PATH="$fakebin:$PATH" "$ROOT/bin/firstmate")
+  assert_grep "FM_HOME=$relhome" "$base/out4" "relative FM_HOME was not canonicalized"
+
+  pass "trust: unmarked home refused, marker blesses, adapter whitelist, relative FM_HOME canonicalized"
 }
 
 # --- firstmate init ----------------------------------------------------------
@@ -121,6 +171,7 @@ test_init() {
   assert_present "$org/.firstmate/config/projects-root" "init --org wrote no projects-root"
   assert_equals ".." "$(cat "$org/.firstmate/config/projects-root")" "org projects-root is not .."
   assert_present "$org/.firstmate/.tasks.toml" "init --org wrote no .tasks.toml"
+  assert_present "$org/.firstmate/.fm-home" "init --org wrote no trust marker"
   assert_present "$org/.firstmate/.gitignore" "init --org wrote no .gitignore"
   assert_absent "$org/.firstmate/projects" "org home must not create projects/"
   assert_absent "$org/.firstmate/data/projects.md" "org home must not pre-register siblings"
@@ -194,6 +245,15 @@ test_projects_root() {
       fail "malformed projects-root ($bad) did not fail loudly"
     fi
   done
+  rm -f "$home/config/projects-root"
+  # Interior whitespace is rejected loudly, never mangled; leading/trailing
+  # whitespace is trimmed.
+  printf '%s\n' "$base/abs root" > "$home/config/projects-root"
+  if fm_projects_root "$home" "$home/config" >/dev/null 2>&1; then
+    fail "interior-whitespace projects-root did not fail loudly"
+  fi
+  printf '  %s  \n' "$base/abs-root" > "$home/config/projects-root"
+  assert_equals "$base/abs-root" "$(fm_projects_root "$home" "$home/config")" "edge whitespace was not trimmed"
   rm -f "$home/config/projects-root"
 
   pass "projects-root: override > config > legacy default; malformed fails loudly"
@@ -278,6 +338,20 @@ test_discovery_authority() {
   case "$out" in *STUCK*) fail "org-home refresh reported a user branch as STUCK" ;; esac
   [ "$(git -C "$reg" symbolic-ref --short HEAD)" = feature ] || fail "org-home refresh moved the user's branch"
 
+  # A single-argument refresh in an org home refuses unregistered siblings,
+  # by bare name and by path alike; the registered sibling still syncs.
+  if FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" unreg >/dev/null 2>"$base/err-unreg"; then
+    fail "single-arg refresh accepted an unregistered sibling name"
+  fi
+  assert_grep "not a registered project" "$base/err-unreg" "name refusal did not name registration"
+  if FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" "$unreg" >/dev/null 2>"$base/err-unreg-path"; then
+    fail "single-arg refresh accepted an unregistered sibling path"
+  fi
+  assert_grep "not a registered project" "$base/err-unreg-path" "path refusal did not name registration"
+  git -C "$reg" checkout -q main 2>/dev/null || git -C "$reg" checkout -q master
+  FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" reg >/dev/null 2>&1 \
+    || fail "single-arg refresh refused the registered sibling"
+
   # A registered alias that resolves nowhere is skipped, not treated as a cwd path.
   printf -- '- docs [direct-PR] - missing (added 2026-09-17)\n' >> "$home/data/projects.md"
   local cands
@@ -285,6 +359,41 @@ test_discovery_authority() {
   case "$cands" in *docs*) fail "unresolved registered alias leaked into sync candidates" ;; esac
 
   pass "discovery=authority: discover lists siblings, refresh touches registered only, resolver precedence"
+}
+
+# --- spawn refuses unregistered siblings -------------------------------------
+
+test_spawn_refusal() {
+  local base org home reg unreg
+  base=$(new_dir)
+  org="$base/org"
+  home="$org/.firstmate"
+  mkdir -p "$home/config" "$home/data" "$home/state"
+  printf '..\n' > "$home/config/projects-root"
+  reg="$org/reg"
+  unreg="$org/unreg"
+  fm_git_init_commit "$reg"
+  fm_git_init_commit "$unreg"
+  printf -- '- reg [direct-PR] - registered sibling (added 2026-09-17)\n' > "$home/data/projects.md"
+
+  # An unregistered sibling is refused by name and by path.
+  if FM_HOME="$home" "$ROOT/bin/fm-spawn.sh" t1 unreg --mode direct-PR --yolo off >/dev/null 2>"$base/err1"; then
+    fail "spawn accepted an unregistered sibling name"
+  fi
+  assert_grep "not a registered project" "$base/err1" "spawn refusal did not name registration"
+  if FM_HOME="$home" "$ROOT/bin/fm-spawn.sh" t1 "$unreg" --mode direct-PR --yolo off >/dev/null 2>"$base/err2"; then
+    fail "spawn accepted an unregistered sibling path"
+  fi
+  assert_grep "not a registered project" "$base/err2" "path spawn refusal did not name registration"
+
+  # The registered sibling passes the gate and fails later on its missing
+  # brief - proof the refusal above is the registration gate, not a dead end.
+  if FM_HOME="$home" "$ROOT/bin/fm-spawn.sh" t1 reg --mode direct-PR --yolo off >/dev/null 2>"$base/err3"; then
+    fail "spawn of a registered sibling unexpectedly succeeded"
+  fi
+  assert_grep "no brief" "$base/err3" "registered sibling did not reach the brief check"
+
+  pass "spawn: unregistered sibling refused by name and path, registered reaches the brief check"
 }
 
 # --- org-shaped secondmate seed ----------------------------------------------
@@ -328,9 +437,11 @@ test_org_seed() {
 }
 
 test_launcher_resolution
+test_launcher_trust
 test_init
 test_projects_root
 test_discovery_authority
+test_spawn_refusal
 test_org_seed
 
 printf 'all project-local tests passed\n'
