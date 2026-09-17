@@ -26,7 +26,7 @@ A secondmate is a crewmate with an isolated firstmate home and a charter, not a 
 Hard rules, in priority order:
 
 1. **Never write to a project.**
-   Do not edit, commit, or run state-changing commands under `projects/` or in any project worktree; firstmate reads projects and crewmates change them.
+   Do not edit, commit, or run state-changing commands under `projects/` (or, in a `config/projects-root` org home, under the projects root) or in any project worktree; firstmate reads projects and crewmates change them.
    The only exceptions are the guarded project initialization, fleet sync, secondmate sync and inherited local-material propagation, self-update, and approved `local-only` merge paths, each owned by its referenced skill or script, plus a concrete captain-approved project operation governed directly by this rule.
    Those paths never authorize forcing, stashing, discarding unlanded work, or hand-writing a project's `AGENTS.md`.
    Firstmate may directly edit, create, move, or delete project files or directories only when the captain clearly and concretely approves, in the moment, for a specific project, either a specific operation or a concrete scope whose authorized action needs no inference; firstmate performs exactly that approval with its own file tools, never infers or broadens it, and gains no standing authority, while the force, discard, unlanded-work, merge-authority, destructive, irreversible, and security-sensitive boundaries remain independently in force.
@@ -54,10 +54,12 @@ Use `gh-axi` for GitHub, `chrome-devtools-axi` for browser work, and compatible 
 
 `docs/configuration.md` is the single owner of the top-level operational-home layout and configuration schemas; each producing script's header and help own exact child fields and mutation mechanics.
 `FM_HOME` selects an instance's private `data/`, `state/`, `config/`, and `projects/`, while scripts continue to come from their tracked code root.
+The `firstmate` launcher resolves `FM_HOME` from the caller's directory (explicit `FM_HOME`, then the nearest `.firstmate/` ancestor, then the global home) and runs the harness from the install root; `docs/configuration.md` owns home discovery, `config/projects-root`, and the discovery-is-not-authority contract.
 Each secondmate has a persistent isolated `FM_HOME`, including its own state, backlog, projects, and session lock.
 `bin/fm-send.sh` fails closed unless `FM_HOME` is explicit, so a steer cannot silently resolve against another home.
 
 Tracked files hold shared instructions and tooling; `data/` holds durable private fleet records; `state/` holds runtime records and append-only status events; `config/` holds local operating choices; and `projects/` contains clones that are read-only to firstmate except under hard rule 1's concrete captain-approved project operation exception.
+In a `config/projects-root` home the projects live as siblings under that root instead of `projects/`, and only registered `data/projects.md` and `data/project-paths.json` entries are eligible for refresh, spawn, seeding, or landing - sibling discovery is intake input, never authority.
 
 Load `operational-home-layout` when locating, interpreting, or changing Firstmate home, config, data, state, project, or generated runtime paths.
 
