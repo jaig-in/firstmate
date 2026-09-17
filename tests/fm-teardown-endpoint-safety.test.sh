@@ -1070,6 +1070,52 @@ test_claimant_tears_down_first_past_a_stale_record() {
   pass "fm-teardown: the claimant tears down first past a stale record naming its slot"
 }
 
+# A claim is only as true as the path its spawn read, so a claim naming this
+# task passes over another record only while that record's endpoint is
+# agent-less. A colliding record whose window is still present keeps refusing.
+test_own_claim_still_refuses_on_a_record_with_a_present_endpoint() {
+  local dir mine=mine-task other=other-task rc
+
+  dir=$(make_case slot-claim-live-other)
+  mark_case_as_treehouse_pool "$dir"
+  cat > "$dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+printf 'tmux' >> "\${FM_RUNTIME_LOG:?}"
+printf ' <%s>' "\$@" >> "\${FM_RUNTIME_LOG:?}"
+printf '\n' >> "\${FM_RUNTIME_LOG:?}"
+if [ "\${1:-}" = list-windows ]; then
+  printf '%s\n' "fm-$other"
+  exit 0
+fi
+[ "\${1:-}" != display-message ] || exit 1
+exit 0
+SH
+  chmod +x "$dir/fakebin/tmux"
+  fm_write_meta "$dir/home/state/$mine.meta" \
+    "window=firstmate:fm-$mine" "endpoint_task_id=$mine" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  fm_write_meta "$dir/home/state/$other.meta" \
+    "window=firstmate:fm-$other" "endpoint_task_id=$other" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  claim_pool_slot "$dir" "$mine" "$dir/home"
+
+  set +e
+  run_case "$dir" "$mine" > "$dir/stdout" 2> "$dir/stderr"
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "an own claim returned a slot another record's present endpoint still names"
+  grep -Fq "$other's endpoint reads" "$dir/stderr" \
+    || fail "present-endpoint refusal missing: $(cat "$dir/stderr")"
+  assert_present "$dir/home/state/$mine.meta" "refused teardown removed the task record"
+  assert_present "$dir/pool/1/.fm-slot-owner" "refused teardown released the slot claim"
+  assert_present "$dir/worktree/sentinel" "refused teardown reset the other task's slot"
+  if grep -Fq "treehouse <return>" "$dir/runtime.log"; then
+    fail "refused teardown returned the pool slot: $(cat "$dir/runtime.log")"
+  fi
+
+  pass "fm-teardown: an own slot claim still refuses on a record whose endpoint is present"
+}
+
 # A secondmate home takes its slot through a Treehouse lease and writes no
 # claim, so a leftover claim naming a crewmate never overrides its record.
 test_leftover_claim_still_refuses_on_a_secondmate_home() {
@@ -1541,6 +1587,7 @@ test_recorded_endpoint_that_changed_directory_still_tears_down
 test_project_lock_anchors_at_the_local_root_across_home_layouts
 test_reassigned_slot_with_surviving_claimant_record_deadlocks_neither_task
 test_claimant_tears_down_first_past_a_stale_record
+test_own_claim_still_refuses_on_a_record_with_a_present_endpoint
 test_leftover_claim_still_refuses_on_a_secondmate_home
 test_forced_secondmate_keeps_a_stale_child_off_its_claimants_returned_slot
 test_remote_seeded_home_returns_its_uncontested_slot

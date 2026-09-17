@@ -118,9 +118,12 @@
 # (observed 2026-09-16). So a claim naming another task skips the scan, and a
 # claim naming this task marks any other crewmate record naming the slot as
 # stale: that record predates the claim, since every later spawn into the slot
-# would have replaced it, so teardown warns and proceeds. Secondmate homes and
-# Orca worktrees take no claim, so a record of either kind still refuses. The
-# same order applies to each child's slot when a secondmate home is retired.
+# would have replaced it, so teardown warns and proceeds - but only while that
+# record's own endpoint reads dead or missing, because a claim is only as true
+# as the path the claiming spawn read, and a live agent behind the other record
+# means this task's claim may be the wrong one. Secondmate homes and Orca
+# worktrees take no claim, so a record of either kind still refuses. The same
+# order applies to each child's slot when a secondmate home is retired.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
@@ -2214,17 +2217,26 @@ collect_local_firstmate_states() {
   done
 }
 
+stale_slot_record_endpoint_state() {  # <meta-file>
+  local target
+  target=$(fm_backend_target_of_meta "$1")
+  [ -n "$target" ] || { printf 'unreadable'; return 0; }
+  fm_backend_agent_state "$(fm_backend_of_meta "$1")" "$target" 2>/dev/null || printf 'unreadable'
+}
+
 require_exclusive_worktree_slot_record() {
   local record_meta=$1 record_id=$2 record_state=$3 worktree=$4
-  local slot state_dir other other_id field other_path other_slot claimed=0
+  local slot state_dir other other_id field other_path other_slot other_endpoint claimed=0
   slot=$(canonical_existing_dir "$worktree") || return 0
   collect_local_firstmate_states "$record_state" || return 1
   # A claim naming this task was written under the project lock when it took
   # the slot, every later crewmate spawn into the slot would have replaced it,
   # and a relaunch refuses a slot claimed by another task (bin/fm-spawn.sh). So
   # another crewmate record naming the slot predates this task's claim and is
-  # stale. Secondmate homes and Orca worktrees take no claim, so a
-  # record of either kind still refuses.
+  # stale. A claim can still name the wrong slot when a spawn misread its
+  # pane's path, so the other record is passed over only while its endpoint
+  # proves no agent is bound to it. Secondmate homes and Orca worktrees take no
+  # claim, so a record of either kind still refuses.
   fm_treehouse_slot_owner_state "$slot" "$record_id"
   [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || claimed=1
   for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
@@ -2240,8 +2252,17 @@ require_exclusive_worktree_slot_record() {
         if [ "$claimed" = 1 ] && [ "$field" = worktree ] && [ "$other_id" != "$record_id" ] \
            && [ "$(fm_meta_get "$other" kind)" != secondmate ] \
            && [ "$(fm_meta_get "$other" backend)" != orca ]; then
-          echo "warning: task $other_id's record also names worktree $slot, but that pool slot's claim names $record_id, which took it after $other_id's record was written; $other_id's record is stale and does not block this teardown (bin/fm-crew-state.sh $other_id)." >&2
-          continue
+          other_endpoint=$(stale_slot_record_endpoint_state "$other")
+          case "$other_endpoint" in
+            dead|missing)
+              echo "warning: task $other_id's record also names worktree $slot, but that pool slot's claim names $record_id, which took it after $other_id's record was written, and $other_id's endpoint reads $other_endpoint; $other_id's record is stale and does not block this teardown (bin/fm-crew-state.sh $other_id)." >&2
+              continue
+              ;;
+          esac
+          echo "REFUSED: task $record_id's recorded worktree $slot is also task $other_id's recorded $field, and although the slot's claim names $record_id, $other_id's endpoint reads '$other_endpoint', not confidently dead or agent-less." >&2
+          echo "Returning that pool slot could kill $other_id's live agent and reset its copy, so nothing was changed - not even with --force." >&2
+          echo "Reconcile whichever record is wrong (bin/fm-crew-state.sh $record_id; bin/fm-crew-state.sh $other_id), then re-run teardown." >&2
+          return 1
         fi
         echo "REFUSED: task $record_id's recorded worktree $slot is also task $other_id's recorded $field." >&2
         echo "Returning that pool slot would kill $other_id's processes and reset its copy, so nothing was changed - not even with --force." >&2
@@ -2262,11 +2283,11 @@ require_exclusive_task_worktree_slot() {
 # into the slot itself (bin/fm-wake-lib.sh owns the claim and its states).
 #
 # The record scan above proves that no OTHER task record names this slot, beyond
-# a crewmate record this task's own claim already marks stale. It cannot prove
-# that THIS record is not the stale one, because the task that took the slot next
-# may leave no record this scan can reach: its own worker may have exited and its
-# record been cleaned up, or it may belong to a home this machine does not
-# register. The claim closes that gap from the other side - it names the
+# an agent-less crewmate record this task's own claim already marks stale. It
+# cannot prove that THIS record is not the stale one, because the task that took
+# the slot next may leave no record this scan can reach: its own worker may have
+# exited and its record been cleaned up, or it may belong to a home this machine
+# does not register. The claim closes that gap from the other side - it names the
 # task that actually took the slot, and it is written under the same project lock
 # that allocates it - so a claim naming another task is proof the slot was
 # reassigned after this record was written.
