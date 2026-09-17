@@ -239,10 +239,23 @@ test_init() {
   local base org repo
   base=$(new_dir)
 
-  # --org at an org root.
+  # --org at an org root reports the siblings it can discover, and only those
+  # that are their own work-tree roots.
+  local org_out
   org="$base/org"
-  mkdir -p "$org"
-  (cd "$org" && "$ROOT/bin/firstmate" init --org >/dev/null) || fail "init --org failed"
+  mkdir -p "$org/plain-dir"
+  fm_git_init_commit "$org/alpha"
+  fm_git_init_commit "$org/beta"
+  mkdir -p "$org/alpha/nested"
+  org_out=$(cd "$org" && "$ROOT/bin/firstmate" init --org) || fail "init --org failed"
+  assert_contains "$org_out" "discoverable sibling repos: alpha beta" \
+    "init --org did not report the discoverable siblings"
+  case "$org_out" in
+    *plain-dir*) fail "init --org reported a non-repo sibling as discoverable" ;;
+    *nested*) fail "init --org reported a nested directory as a sibling repo" ;;
+  esac
+  assert_contains "$org_out" "discovery is not authority" \
+    "init --org dropped the discovery-is-not-authority note"
   assert_present "$org/.firstmate/config/projects-root" "init --org wrote no projects-root"
   assert_equals ".." "$(cat "$org/.firstmate/config/projects-root")" "org projects-root is not .."
   assert_present "$org/.firstmate/.tasks.toml" "init --org wrote no .tasks.toml"
