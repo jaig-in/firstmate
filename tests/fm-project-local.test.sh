@@ -52,6 +52,19 @@ SH
   printf '%s\n' "$dir"
 }
 
+# make_jqless_path <dir>: a PATH directory holding the tools the project
+# scripts use, minus jq, so the manifest reader's jq-less fallback runs.
+make_jqless_path() {
+  local dir=$1 tool path
+  mkdir -p "$dir"
+  for tool in env bash awk sed grep cat cut sort tr wc head tail basename dirname \
+      mktemp rm mkdir ls find git uname expr; do
+    path=$(command -v "$tool" 2>/dev/null) || continue
+    ln -sf "$path" "$dir/$tool"
+  done
+  printf '%s\n' "$dir"
+}
+
 # --- launcher home resolution ------------------------------------------------
 
 test_launcher_resolution() {
@@ -545,7 +558,66 @@ test_resolver_fails_closed() {
     *"has no brief"*) fail "spawn matched a stale registration against its own cwd" ;;
   esac
 
+  # A registered alias that resolves to no directory is reported on stdout,
+  # where the session digest relays it, not hidden on stderr.
+  local home7="$base/org7/.firstmate" out7
+  mkdir -p "$home7/config" "$home7/data" "$home7/state" "$base/org7"
+  printf '..\n' > "$home7/config/projects-root"
+  printf -- '- gone [direct-PR] - moved away (added 2026-09-17)\n' > "$home7/data/projects.md"
+  out7=$(FM_HOME="$home7" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" 2>/dev/null) \
+    || fail "whole-fleet refresh failed on a stale registration"
+  assert_contains "$out7" "gone: skipped: registered project resolves to no directory" \
+    "a stale registration was not reported in the refresh output"
+
   pass "resolver failures fail closed: fleet refresh, registry lookup, spawn, manifest paths, discover, stale aliases"
+}
+
+# --- the manifest means the same thing with and without jq -------------------
+
+test_manifest_reader_without_jq() {
+  local base home outside nojq out
+  base=$(new_dir)
+  home="$base/home"
+  mkdir -p "$home/config" "$home/data" "$home/state"
+  outside="$base/outside-proj"
+  fm_git_init_commit "$outside"
+  nojq=$(make_jqless_path "$base/nojq")
+  command -v jq >/dev/null 2>&1 || fail "this case needs jq present to compare both readers"
+
+  # The one-line object is the documented form; it must resolve identically
+  # whether or not jq is installed.
+  printf '{"ext": "%s"}\n' "$outside" > "$home/data/project-paths.json"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve ext) \
+    || fail "one-line manifest was rejected with jq"
+  assert_equals "$outside" "$out" "one-line manifest resolved wrongly with jq"
+  out=$(PATH="$nojq" FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve ext) \
+    || fail "one-line manifest was rejected without jq"
+  assert_equals "$outside" "$out" "one-line manifest resolved wrongly without jq"
+
+  # So must the pretty-printed form, including several entries.
+  printf '{\n  "ext": "%s",\n  "ext2": "%s"\n}\n' "$outside" "$outside" \
+    > "$home/data/project-paths.json"
+  out=$(PATH="$nojq" FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve ext2) \
+    || fail "multi-line manifest was rejected without jq"
+  assert_equals "$outside" "$out" "multi-line manifest resolved wrongly without jq"
+
+  # The absolute-path rule still holds in the fallback reader.
+  printf '{"ext": "./rel"}\n' > "$home/data/project-paths.json"
+  if PATH="$nojq" FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve ext \
+      >/dev/null 2>"$base/err-rel"; then
+    fail "the fallback reader accepted a relative manifest path"
+  fi
+  assert_grep "absolute path" "$base/err-rel" "fallback refusal did not name the format"
+
+  # And a document that is not a flat object still fails loudly.
+  printf '{"ext": ["%s"]}\n' "$outside" > "$home/data/project-paths.json"
+  if PATH="$nojq" FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve ext \
+      >/dev/null 2>"$base/err-bad"; then
+    fail "the fallback reader accepted a non-flat manifest"
+  fi
+  assert_grep "flat JSON object" "$base/err-bad" "fallback refusal did not name the format"
+
+  pass "manifest reader: one-line and multi-line forms agree with and without jq"
 }
 
 # --- spawn refuses unregistered siblings -------------------------------------
@@ -662,6 +734,7 @@ test_init
 test_projects_root
 test_discovery_authority
 test_resolver_fails_closed
+test_manifest_reader_without_jq
 test_spawn_refusal
 test_org_seed
 

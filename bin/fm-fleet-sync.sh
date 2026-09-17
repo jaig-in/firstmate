@@ -486,8 +486,12 @@ sync_pairs=$(fm_project_sync_candidate_pairs "$FM_HOME" "$CONFIG" "$DATA") || ex
 sync_candidates=()
 sync_aliases=()
 while IFS= read -r pair; do
+  [ -n "$pair" ] || continue
   proj=${pair#*$'\t'}
-  [ -n "$proj" ] || continue
+  if [ -z "$proj" ]; then
+    echo "${pair%%$'\t'*}: skipped: registered project resolves to no directory"
+    continue
+  fi
   sync_candidates+=("$proj")
   sync_aliases+=("${pair%%$'\t'*}")
 done <<< "$sync_pairs"
