@@ -818,6 +818,32 @@ SH
   pass "bootstrap reports a fleet refresh that failed instead of showing nothing"
 }
 
+test_fleet_sync_runs_in_an_org_home_whose_root_is_absent() {
+  local case_dir home fakebin fake_root out
+  case_dir="$TMP_ROOT/fleet-sync-org-absent-root"
+  home="$case_dir/home"
+  mkdir -p "$home/config"
+  printf '%s\n' manual > "$home/config/backlog-backend"
+  # An org home's registered projects live wherever the registry says; the
+  # projects root itself may be absent (renamed, unmounted).
+  printf '%s\n' "$case_dir/absent-root" > "$home/config/projects-root"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  fake_root="$case_dir/fake-root"
+  mkdir -p "$fake_root/bin"
+  cat > "$fake_root/bin/fm-fleet-sync.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' 'ext: skipped: not a clone root'
+SH
+  chmod +x "$fake_root/bin/fm-fleet-sync.sh"
+
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$home" FM_ROOT_OVERRIDE="$fake_root" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
+
+  assert_contains "$out" "FLEET_SYNC: ext: skipped: not a clone root" \
+    "an org home's refresh must run even when its projects root is absent"
+  pass "bootstrap refreshes an org home whose projects root does not exist"
+}
+
 test_fleet_sync_timeout_is_computed_before_launch() {
   local case_dir home fakebin fake_root out started_marker git_record
   case_dir="$TMP_ROOT/fleet-timeout-launch-order"
@@ -1278,6 +1304,7 @@ test_fleet_sync_timeout_floor_preserves_small_fleets
 test_fleet_sync_timeout_explicit_override_wins
 test_fleet_sync_timeout_empty_override_uses_default
 test_fleet_sync_failure_is_reported
+test_fleet_sync_runs_in_an_org_home_whose_root_is_absent
 test_fleet_sync_timeout_is_computed_before_launch
 test_routine_bootstrap_confirmations_are_silent
 test_routine_bootstrap_contract_runs_under_system_bash

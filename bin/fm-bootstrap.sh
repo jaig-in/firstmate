@@ -333,7 +333,9 @@ fleet_sync_relay_all_output() {
 
 fleet_sync() {
   [ -x "$FM_ROOT/bin/fm-fleet-sync.sh" ] || return 0
-  [ -d "$PROJECTS" ] || return 0
+  # An org home's registered projects live wherever the registry says, not under
+  # the projects root, so its absence is fm-fleet-sync.sh's story to tell.
+  fm_projects_root_is_custom "$CONFIG" || [ -d "$PROJECTS" ] || return 0
 
   tmp=$(mktemp "${TMPDIR:-/tmp}/fm-fleet-sync.XXXXXX" 2>/dev/null) || return 0
   err="$tmp.err"
