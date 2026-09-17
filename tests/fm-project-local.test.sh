@@ -569,7 +569,24 @@ test_resolver_fails_closed() {
   assert_contains "$out7" "gone: skipped: registered project resolves to no directory" \
     "a stale registration was not reported in the refresh output"
 
-  pass "resolver failures fail closed: fleet refresh, registry lookup, spawn, manifest paths, discover, stale aliases"
+  # Remote seeding names the unreadable registry too, instead of blaming a
+  # missing origin the operator would then be told to supply.
+  local home8="$base/org8/.firstmate"
+  mkdir -p "$home8/config" "$home8/data" "$home8/state"
+  printf -- '- reg [direct-PR] - registered project (added 2026-09-17)\n' > "$home8/data/projects.md"
+  printf '{"reg": ["/not-a-path"]}\n' > "$home8/data/project-paths.json"
+  if FM_HOME="$home8" FM_SECONDMATE_CHARTER='Own the reg project.' \
+      FM_SECONDMATE_SCOPE='reg delivery' \
+      "$ROOT/bin/fm-remote-home-seed.sh" mate9 remote-host /remote/root /remote/home reg \
+      >/dev/null 2>"$base/err-remote"; then
+    fail "remote seed proceeded with an unreadable project registry"
+  fi
+  assert_grep "project registry" "$base/err-remote" "remote seed did not name the broken registry"
+  case "$(cat "$base/err-remote")" in
+    *"has no origin"*) fail "remote seed blamed a missing origin for an unreadable registry" ;;
+  esac
+
+  pass "resolver failures fail closed: fleet refresh, registry lookup, spawn, manifest paths, discover, stale aliases, remote seed"
 }
 
 # --- the manifest means the same thing with and without jq -------------------
