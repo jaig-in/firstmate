@@ -33,7 +33,27 @@
 #       rest of the home private.
 set -eu
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The launcher is installed by symlinking it onto PATH, so its own directory is
+# the symlink's target directory, not the one it was invoked through. readlink
+# -f is GNU-only and realpath is not guaranteed on macOS, so follow the chain by
+# hand, the way bin/fm-cursor-lib.sh does.
+launcher_script_dir() {
+  local path=$1 dir base hops=0 target
+  dir=$(CDPATH='' cd -- "$(dirname -- "$path")" 2>/dev/null && pwd -P) || return 1
+  base=$(basename -- "$path")
+  while [ -L "$dir/$base" ] && [ "$hops" -lt 16 ]; do
+    target=$(readlink -- "$dir/$base") || break
+    case "$target" in
+      /*) dir=$(CDPATH='' cd -- "$(dirname -- "$target")" 2>/dev/null && pwd -P) || break ;;
+      *) dir=$(CDPATH='' cd -- "$dir/$(dirname -- "$target")" 2>/dev/null && pwd -P) || break ;;
+    esac
+    base=$(basename -- "$target")
+    hops=$((hops + 1))
+  done
+  printf '%s\n' "$dir"
+}
+
+SCRIPT_DIR="$(launcher_script_dir "${BASH_SOURCE[0]}")"
 INSTALL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # shellcheck source=bin/fm-projects-lib.sh
 . "$SCRIPT_DIR/fm-projects-lib.sh"
