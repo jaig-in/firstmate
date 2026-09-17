@@ -19,15 +19,15 @@
 #       extensions load exactly as they do from a checkout today; the caller's
 #       directory is preserved in FM_LAUNCH_DIR and printed by the
 #       session-start digest. Harness selection: --harness, then the resolved
-#       home's config/primary-harness, then claude. Remaining args pass
-#       through to the harness verbatim.
+#       home's config/primary-harness (verified primary adapter names only),
+#       then claude. Remaining args pass through to the harness verbatim.
 #   firstmate init [--org]
 #       Scaffold a .firstmate/ home. --org creates it at the current directory
 #       (an org root whose sibling directories are the projects); without
 #       --org it must run inside a git repository and creates a per-project
 #       home at that repo's root, registering the repo itself. Both write
-#       config/projects-root=.., a .tasks.toml backlog config, and a
-#       whitelist-style .firstmate/.gitignore. The home is never added to the
+#       config/projects-root=.., a .tasks.toml backlog config, the untracked
+#       .fm-home trust marker, and a whitelist-style .firstmate/.gitignore. The home is never added to the
 #       enclosing repository's .git/info/exclude: git would then never read
 #       the whitelist negations, and the .gitignore's `*` already keeps the
 #       rest of the home private.

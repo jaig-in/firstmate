@@ -27,14 +27,15 @@
 # Usage: fm-fleet-sync.sh [<project-dir-or-name>]
 # The single-project form accepts either a path (absolute, or relative to the
 # caller's cwd) or a bare "<name>"/"projects/<name>" form, resolved through
-# bin/fm-projects-lib.sh's central contract: data/project-paths.json, then the
-# projects root, then the legacy $FM_HOME/projects clone. Example: from
+# the central resolver whose order bin/fm-projects-lib.sh's header owns. Example: from
 # anywhere, `fm-fleet-sync.sh dotfiles-private` syncs just that one clone,
 # same as passing its full path.
 # A home with config/projects-root (an org home) refreshes only REGISTERED
 # projects - data/projects.md and data/project-paths.json aliases - because
 # every sibling of the org root is a user working copy and discovery is not
-# authority. Every other home keeps the legacy direct-children glob.
+# authority; its single-project form likewise refuses a name or path that
+# resolves to no registered alias. Every other home keeps the legacy
+# direct-children glob.
 # That refresh is external-safe: fetch, then fast-forward only a clean default
 # branch; it never prunes branches, re-attaches a detached HEAD, or reports a
 # user's feature branch as STUCK.
