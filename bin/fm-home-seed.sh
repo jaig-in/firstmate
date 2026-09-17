@@ -486,16 +486,34 @@ registered_posture_line() {  # <project>
   printf '%s\n' "$line"
 }
 
+# require_registered_project <project>: the single registration rule for
+# seeding - discovery is not authority, so a name this home never registered is
+# refused rather than cloned or bound.
+require_registered_project() {
+  local project=$1 aliases
+  aliases=$(fm_project_registered_aliases "$DATA") || return 1
+  printf '%s\n' "$aliases" | grep -Fxq -- "$project" || {
+    echo "error: project $project is not registered in $DATA/projects.md or project-paths.json; register it before seeding" >&2
+    return 1
+  }
+}
+
 # seed_project_source <project>: print the source directory for a seed
-# project. Ordinary seeds clone from this home's projects root; an org-shaped
-# seed (SEED_PROJECTS_ROOT set) registers the child's sibling instead.
+# project. Ordinary seeds clone from wherever this home's registry resolves the
+# alias; an org-shaped seed (SEED_PROJECTS_ROOT set) registers the child's
+# sibling instead.
 seed_project_source() {
-  local project=$1
+  local project=$1 resolved
   if [ -n "${SEED_PROJECTS_ROOT:-}" ]; then
     printf '%s/%s\n' "$SEED_PROJECTS_ROOT" "$project"
-  else
-    printf '%s/%s\n' "$PROJECTS" "$project"
+    return 0
   fi
+  resolved=$(fm_project_resolve "$FM_HOME" "$CONFIG" "$DATA" "$project") || return 1
+  [ "$resolved" != "$project" ] || {
+    echo "error: project $project resolves to no directory in this home" >&2
+    return 1
+  }
+  printf '%s\n' "$resolved"
 }
 
 # register_org_project <project>: the org-mode counterpart of clone_project.
@@ -505,11 +523,8 @@ seed_project_source() {
 # data/projects.md (sync_project_registry) is the whole operation.
 register_org_project() {
   local project=$1 src top parent_path
-  fm_project_registered_aliases "$DATA" | grep -Fxq -- "$project" || {
-    echo "error: project $project is not registered in $DATA/projects.md or project-paths.json; register it before seeding" >&2
-    return 1
-  }
-  src=$(seed_project_source "$project")
+  require_registered_project "$project" || return 1
+  src=$(seed_project_source "$project") || return 1
   [ -d "$src" ] || { echo "error: project $project not found at $src" >&2; return 1; }
   top=$(git -C "$src" rev-parse --show-toplevel 2>/dev/null) || {
     echo "error: project $project at $src is not a git repo" >&2
@@ -534,7 +549,7 @@ register_org_project() {
 
 clone_project() {
   local project=$1 home=$2 src dst url dst_url mode mode_line
-  src=$(seed_project_source "$project")
+  src=$(seed_project_source "$project") || return 1
   dst=$(validate_project_destination "$home" "$project") || return 1
   [ -d "$src" ] || { echo "error: project $project not found at $src" >&2; return 1; }
   git -C "$src" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "error: project $project is not a git repo" >&2; return 1; }
@@ -563,6 +578,11 @@ EOF
 
 validate_seed_project() {
   local project=$1 src mode url mode_line manifest_path
+  # In a config/projects-root home every sibling is a user working copy, so
+  # only a registered alias may be seeded; legacy homes keep clone-root rules.
+  if fm_projects_root_is_custom "$CONFIG"; then
+    require_registered_project "$project" || return 1
+  fi
   # A project registered only through data/project-paths.json carries a path
   # but no delivery mode, and the child registry format needs one; refuse
   # manifest-only aliases loudly rather than seeding a wrong entry.
@@ -572,7 +592,7 @@ validate_seed_project() {
     echo "error: project $project is registered only in data/project-paths.json; manifest aliases are not seedable - register it in $DATA/projects.md with a delivery mode first" >&2
     return 1
   fi
-  src=$(seed_project_source "$project")
+  src=$(seed_project_source "$project") || return 1
   [ -d "$src" ] || { echo "error: project $project not found at $src" >&2; return 1; }
   git -C "$src" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "error: project $project is not a git repo" >&2; return 1; }
   mode_line=$(registered_posture_line "$project") || return 1

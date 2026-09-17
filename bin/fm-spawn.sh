@@ -2838,10 +2838,6 @@ elif [ "$RELAUNCH" -eq 1 ]; then
   PROJ_NAME=$(fm_meta_get "$RELAUNCH_META" project_name)
   [ -n "$PROJ_NAME" ] || PROJ_NAME=$(basename "$PROJ_ABS")
 else
-  PROJ_NAME=$(fm_project_name_for "$FM_HOME" "$CONFIG" "$DATA" "$PROJ" "$PROJ_ABS") || {
-    echo "error: could not resolve the project name for $PROJ" >&2
-    exit 1
-  }
   if fm_projects_root_is_custom "$CONFIG"; then
     PROJ_REGISTERED_ALIAS=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$PROJ_ABS") || {
       echo "error: could not read this home's project registry" >&2
@@ -2852,6 +2848,11 @@ else
       exit 1
     }
     PROJ_NAME=$PROJ_REGISTERED_ALIAS
+  else
+    PROJ_NAME=$(fm_project_name_for "$FM_HOME" "$CONFIG" "$DATA" "$PROJ" "$PROJ_ABS") || {
+      echo "error: could not resolve the project name for $PROJ" >&2
+      exit 1
+    }
   fi
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
