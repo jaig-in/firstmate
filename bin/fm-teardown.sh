@@ -2224,6 +2224,31 @@ stale_slot_record_endpoint_state() {  # <meta-file>
   fm_backend_agent_state "$(fm_backend_of_meta "$1")" "$target" 2>/dev/null || printf 'unreadable'
 }
 
+# Records on the stale record itself that this task's claim took its slot, so
+# the slot going back to the pool under this task's teardown can never read as
+# the stale task's own again: a relaunch refuses on it (bin/fm-spawn.sh) and the
+# stale task's own teardown skips the slot's steps. The stale record's metadata
+# lock is taken unless this process already holds it as a descendant's.
+mark_stale_slot_record() {  # <meta-file> <claimant-id>
+  local meta=$1 claimant=$2 lock current acquired=0 rc=0
+  lock=$(fm_meta_lock_path "$meta") || return 1
+  fm_current_pid current || return 1
+  if [ "$(cat "$lock/pid" 2>/dev/null || true)" != "$current" ]; then
+    fm_lock_try_acquire "$lock" || return 1
+    acquired=1
+  fi
+  if [ ! -f "$meta" ] || [ -L "$meta" ]; then
+    rc=1
+  elif [ "$(fm_meta_get "$meta" slot_reassigned_to)" != "$claimant" ]; then
+    if [ -s "$meta" ] && [ -n "$(tail -c 1 -- "$meta" 2>/dev/null)" ]; then
+      printf '\n' >> "$meta" || rc=1
+    fi
+    [ "$rc" -ne 0 ] || printf 'slot_reassigned_to=%s\n' "$claimant" >> "$meta" || rc=1
+  fi
+  [ "$acquired" = 0 ] || fm_lock_release "$lock" || true
+  return "$rc"
+}
+
 require_exclusive_worktree_slot_record() {
   local record_meta=$1 record_id=$2 record_state=$3 worktree=$4
   local slot state_dir other other_id field other_path other_slot other_endpoint claimed=0
@@ -2255,6 +2280,10 @@ require_exclusive_worktree_slot_record() {
           other_endpoint=$(stale_slot_record_endpoint_state "$other")
           case "$other_endpoint" in
             dead|missing)
+              mark_stale_slot_record "$other" "$record_id" || {
+                echo "REFUSED: task $other_id's record also names worktree $slot and is stale, but it could not be marked as having lost that pool slot (its metadata may be changing); nothing was changed - re-run teardown." >&2
+                return 1
+              }
               echo "warning: task $other_id's record also names worktree $slot, but that pool slot's claim names $record_id, which took it after $other_id's record was written, and $other_id's endpoint reads $other_endpoint; $other_id's record is stale and does not block this teardown (bin/fm-crew-state.sh $other_id)." >&2
               continue
               ;;
@@ -2302,11 +2331,21 @@ require_exclusive_task_worktree_slot() {
 # An absent claim proceeds as the slot's owner: a slot taken before claims
 # existed, or already returned to the pool, carries none, and refusing those
 # would strand every task in flight across the change for no evidence at all.
-# Those keep exactly the record-scan protection they had before.
+# Those keep exactly the record-scan protection they had before, unless the
+# record itself carries the mark a claimant's teardown left on it
+# (mark_stale_slot_record), which reads as that claimant's claim.
 TEARDOWN_SLOT_REASSIGNED_RC=3
-require_owned_worktree_slot_record() {  # <task-id> <worktree>
-  local record_id=$1 worktree=$2 marker
+require_owned_worktree_slot_record() {  # <task-id> <worktree> [meta-file]
+  local record_id=$1 worktree=$2 record_meta=${3:-} marker reassigned_to=''
   fm_treehouse_slot_owner_state "$worktree" "$record_id"
+  if [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] && [ -n "$record_meta" ]; then
+    reassigned_to=$(fm_meta_get "$record_meta" slot_reassigned_to)
+    if [ -n "$reassigned_to" ]; then
+      FM_TREEHOUSE_SLOT_OWNER=other
+      FM_TREEHOUSE_SLOT_OWNER_ID=$reassigned_to
+      FM_TREEHOUSE_SLOT_OWNER_HOME=
+    fi
+  fi
   case "$FM_TREEHOUSE_SLOT_OWNER" in
     mine|absent) return 0 ;;
     other)
@@ -2329,7 +2368,7 @@ TEARDOWN_SLOT_REASSIGNED_HOME=
 require_owned_task_worktree_slot() {
   local slot rc=0
   slot=$(teardown_live_slot_path) || return 0
-  require_owned_worktree_slot_record "$ID" "$slot" || rc=$?
+  require_owned_worktree_slot_record "$ID" "$slot" "$META" || rc=$?
   case "$rc" in
     0) return 0 ;;
     "$TEARDOWN_SLOT_REASSIGNED_RC")
@@ -2869,7 +2908,7 @@ preflight_descendant_treehouse_slots() {
     # deadlock against the claimant's surviving record, so it is skipped and
     # the child's slot steps are gated off below.
     owner_rc=0
-    require_owned_worktree_slot_record "$task_id" "$worktree" || owner_rc=$?
+    require_owned_worktree_slot_record "$task_id" "$worktree" "$meta" || owner_rc=$?
     case "$owner_rc" in
       0) require_exclusive_worktree_slot_record "$meta" "$task_id" "$state" "$worktree" || return 1 ;;
       "$TEARDOWN_SLOT_REASSIGNED_RC") DESCENDANT_REASSIGNED_SLOT_METAS+=("$meta") ;;
@@ -3165,12 +3204,12 @@ cleanup_firstmate_home_children() {
       if descendant_slot_reassigned "$child_meta"; then
         child_owner_rc=$TEARDOWN_SLOT_REASSIGNED_RC
       elif fm_treehouse_pool_slot "$child_proj" "$child_wt"; then
-        require_owned_worktree_slot_record "$child_id" "$child_wt" 2>/dev/null || child_owner_rc=$?
+        require_owned_worktree_slot_record "$child_id" "$child_wt" "$child_meta" 2>/dev/null || child_owner_rc=$?
       fi
       if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
         :
       elif [ "$child_owner_rc" -ne 0 ]; then
-        require_owned_worktree_slot_record "$child_id" "$child_wt" || return 1
+        require_owned_worktree_slot_record "$child_id" "$child_wt" "$child_meta" || return 1
       else
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
         rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \

@@ -1105,6 +1105,12 @@ test_spawn_relaunch_refuses_a_slot_claimed_by_another_task() {
   expect_code 1 "$rc" "a relaunch into a slot claimed by another task should refuse"
   assert_contains "$out" "reassigned to task other-task" "the refusal should name the slot's claimant"
   [ -z "$(cat "$dir/fake/literal")" ] || fail "a refused relaunch must send nothing to the endpoint"
+  rm -f "$dir/.fm-slot-owner"
+  printf 'slot_reassigned_to=other-task\n' >> "$dir/home/state/rl22.meta"
+  out=$(run_spawn "$dir" rl22 --relaunch); rc=$?
+  expect_code 1 "$rc" "a relaunch into a slot a claimant's teardown already returned should refuse"
+  assert_contains "$out" "reassigned to task other-task" "the refusal should name the claimant from the record's mark"
+  [ -z "$(cat "$dir/fake/literal")" ] || fail "a refused relaunch must send nothing to the endpoint"
   printf 'task=rl22\nhome=%s\n' "$dir/home" > "$dir/.fm-slot-owner"
   out=$(run_spawn "$dir" rl22 --relaunch)
   assert_contains "$out" "spawned rl22 harness=claude" "a relaunch into its own claimed slot should proceed"

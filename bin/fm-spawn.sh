@@ -1504,8 +1504,16 @@ if [ "$RELAUNCH" -eq 1 ]; then
   # A relaunch reuses the recorded slot without claiming it, so it must never
   # put an agent back into a slot another task has claimed since: that task's
   # teardown treats this record as stale and would return the slot under it.
+  # Once that teardown has returned the slot its claim is gone, so the mark it
+  # left on this record stands in for the claim.
   if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     fm_treehouse_slot_owner_state "$RELAUNCH_WT" "$ID"
+    RELAUNCH_SLOT_REASSIGNED_TO=$(fm_meta_get "$RELAUNCH_META" slot_reassigned_to)
+    if [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] && [ -n "$RELAUNCH_SLOT_REASSIGNED_TO" ]; then
+      FM_TREEHOUSE_SLOT_OWNER=other
+      FM_TREEHOUSE_SLOT_OWNER_ID=$RELAUNCH_SLOT_REASSIGNED_TO
+      FM_TREEHOUSE_SLOT_OWNER_HOME=
+    fi
     case "$FM_TREEHOUSE_SLOT_OWNER" in
       mine|absent) ;;
       other)

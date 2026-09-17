@@ -1066,6 +1066,20 @@ test_claimant_tears_down_first_past_a_stale_record() {
   assert_present "$dir/home/state/$stale.meta" "claimant teardown removed the stale task's record"
   grep -Fq "treehouse <return>" "$dir/runtime.log" \
     || fail "claimant teardown did not return its own pool slot: $(cat "$dir/runtime.log")"
+  grep -Fxq "slot_reassigned_to=$live" "$dir/home/state/$stale.meta" \
+    || fail "claimant teardown did not mark the stale record as having lost its slot: $(cat "$dir/home/state/$stale.meta")"
+
+  # With the claim released, the mark alone keeps the stale record's own
+  # teardown off the slot the claimant already returned.
+  : > "$dir/runtime.log"
+  run_case "$dir" "$stale" > "$dir/stdout" 2> "$dir/stderr" \
+    || fail "stale teardown after the claimant's refused: $(cat "$dir/stderr")"
+  assert_absent "$dir/home/state/$stale.meta" "stale teardown left its task record"
+  grep -Fq "reassigned to task $live" "$dir/stderr" \
+    || fail "stale teardown did not name the claimant from the mark: $(cat "$dir/stderr")"
+  if grep -Fq "treehouse <return>" "$dir/runtime.log"; then
+    fail "stale teardown returned a slot the claimant already returned: $(cat "$dir/runtime.log")"
+  fi
 
   pass "fm-teardown: the claimant tears down first past a stale record naming its slot"
 }
