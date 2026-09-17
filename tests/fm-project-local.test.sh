@@ -582,17 +582,18 @@ test_manifest_reader_without_jq() {
   outside="$base/outside-proj"
   fm_git_init_commit "$outside"
   nojq=$(make_jqless_path "$base/nojq")
-  command -v jq >/dev/null 2>&1 || fail "this case needs jq present to compare both readers"
 
   # The one-line object is the documented form; it must resolve identically
   # whether or not jq is installed.
   printf '{"ext": "%s"}\n' "$outside" > "$home/data/project-paths.json"
-  out=$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve ext) \
-    || fail "one-line manifest was rejected with jq"
-  assert_equals "$outside" "$out" "one-line manifest resolved wrongly with jq"
   out=$(PATH="$nojq" FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve ext) \
     || fail "one-line manifest was rejected without jq"
   assert_equals "$outside" "$out" "one-line manifest resolved wrongly without jq"
+  if command -v jq >/dev/null 2>&1; then
+    out=$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve ext) \
+      || fail "one-line manifest was rejected with jq"
+    assert_equals "$outside" "$out" "one-line manifest resolved wrongly with jq"
+  fi
 
   # So must the pretty-printed form, including several entries.
   printf '{\n  "ext": "%s",\n  "ext2": "%s"\n}\n' "$outside" "$outside" \
@@ -617,7 +618,22 @@ test_manifest_reader_without_jq() {
   fi
   assert_grep "flat JSON object" "$base/err-bad" "fallback refusal did not name the format"
 
-  pass "manifest reader: one-line and multi-line forms agree with and without jq"
+  # A duplicated alias names one directory, not two: jq keeps the last value,
+  # so the fallback reader must resolve to the same repository.
+  local second="$base/second-proj"
+  fm_git_init_commit "$second"
+  printf '{"dup": "%s", "dup": "%s"}\n' "$outside" "$second" \
+    > "$home/data/project-paths.json"
+  out=$(PATH="$nojq" FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve dup) \
+    || fail "duplicate-alias manifest was rejected without jq"
+  assert_equals "$second" "$out" "the fallback reader did not take the last duplicate alias"
+  if command -v jq >/dev/null 2>&1; then
+    out=$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve dup) \
+      || fail "duplicate-alias manifest was rejected with jq"
+    assert_equals "$second" "$out" "jq and the fallback disagree on a duplicate alias"
+  fi
+
+  pass "manifest reader: one-line, multi-line, and duplicate aliases agree with and without jq"
 }
 
 # --- spawn refuses unregistered siblings -------------------------------------
