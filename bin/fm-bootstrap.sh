@@ -342,8 +342,11 @@ fleet_sync() {
   # the projects root, so its absence is fm-fleet-sync.sh's story to tell.
   fm_projects_root_is_custom "$CONFIG" || [ -d "$PROJECTS" ] || return 0
 
-  tmp=$(mktemp "${TMPDIR:-/tmp}/fm-fleet-sync.XXXXXX" 2>/dev/null) || return 0
-  err="$tmp.err"
+  # Both capture files live in one private directory: the refresh's stdout and
+  # stderr carry project paths and git error text.
+  tmpdir=$(umask 077; mktemp -d "${TMPDIR:-/tmp}/fm-fleet-sync.XXXXXX" 2>/dev/null) || return 0
+  tmp="$tmpdir/out"
+  err="$tmpdir/err"
   timeout=$(fleet_sync_bootstrap_timeout)
   monitor_was_on=0
   case $- in *m*) monitor_was_on=1 ;; esac
@@ -360,7 +363,7 @@ fleet_sync() {
       [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
       fleet_sync_relay_all_output "$tmp"
       echo "FLEET_SYNC: fleet: skipped: bootstrap refresh timed out (timeout=${timeout}s elapsed=${elapsed}s)"
-      rm -f "$tmp" "$err"
+      rm -rf "$tmpdir"
       return 0
     fi
     sleep 1
@@ -376,7 +379,7 @@ fleet_sync() {
     reason=$(sed -n 's/^error: //;/./{p;q;}' "$err" 2>/dev/null || true)
     echo "FLEET_SYNC: fleet: skipped: ${reason:-refresh failed (exit $rc)}"
   fi
-  rm -f "$tmp" "$err"
+  rm -rf "$tmpdir"
 }
 
 secondmate_sync() {
