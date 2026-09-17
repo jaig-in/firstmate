@@ -460,7 +460,20 @@ sync_project() {
 }
 
 if [ $# -eq 1 ]; then
-  sync_project "$(resolve_project_arg "$1")"
+  resolved=$(resolve_project_arg "$1") || exit 1
+  if [ "$ORG_HOME" -eq 1 ]; then
+    # Discovery is not authority: in an org home a single-argument refresh may
+    # touch only a registered project, never a merely discoverable sibling.
+    registered=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$resolved") || {
+      echo "error: could not read this home's project registry" >&2
+      exit 1
+    }
+    if [ -z "$registered" ]; then
+      echo "error: $resolved is not a registered project of this home; register it in $DATA/projects.md (or data/project-paths.json) before refreshing" >&2
+      exit 1
+    fi
+  fi
+  sync_project "$resolved"
   exit 0
 fi
 

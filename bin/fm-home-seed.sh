@@ -537,7 +537,16 @@ EOF
 }
 
 validate_seed_project() {
-  local project=$1 src mode url
+  local project=$1 src mode url manifest_path
+  # A project registered only through data/project-paths.json carries a path
+  # but no delivery mode, and the child registry format needs one; refuse
+  # manifest-only aliases loudly rather than seeding a wrong entry.
+  manifest_path=$(fm_project_manifest_lookup "$DATA" "$project") || return 1
+  if [ -n "$manifest_path" ] \
+      && ! awk -v n="$project" '$1=="-" && $2==n { found=1 } END { exit !found }' "$DATA/projects.md" 2>/dev/null; then
+    echo "error: project $project is registered only in data/project-paths.json; manifest aliases are not seedable - register it in $DATA/projects.md with a delivery mode first" >&2
+    return 1
+  fi
   src=$(seed_project_source "$project")
   [ -d "$src" ] || { echo "error: project $project not found at $src" >&2; return 1; }
   git -C "$src" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "error: project $project is not a git repo" >&2; return 1; }
