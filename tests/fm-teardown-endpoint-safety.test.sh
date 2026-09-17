@@ -1042,7 +1042,8 @@ test_reassigned_slot_with_surviving_claimant_record_deadlocks_neither_task() {
 
 # The same deadlock torn down in the order the operator hit it: the claimant
 # first. Its claim proves the other record is the stale one, so the claimant
-# returns its slot; the stale record then finds no claim and no rival record.
+# returns its slot and releases its claim while the stale record is left in
+# place for its own teardown.
 test_claimant_tears_down_first_past_a_stale_record() {
   local dir stale=stale-task live=live-task
 
