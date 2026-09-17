@@ -78,9 +78,17 @@ nearest_firstmate_home() {
 # home_is_trusted <home>: true when the home carries the init-written marker
 # and that marker is not tracked by git. init never commits the marker, so a
 # tracked one arrived with a clone and proves nothing about this machine.
+# Only git's "not tracked" answer (exit 1) counts as untracked; any other git
+# failure inside a work tree (dubious ownership, a corrupt index) fails closed.
 home_is_trusted() {
+  local rc=0
   [ -f "$1/$HOME_MARKER" ] && [ ! -L "$1/$HOME_MARKER" ] || return 1
-  ! git -C "$1" ls-files --error-unmatch -- "$HOME_MARKER" >/dev/null 2>&1
+  git -c safe.directory='*' -C "$1" ls-files --error-unmatch -- "$HOME_MARKER" >/dev/null 2>&1 || rc=$?
+  case "$rc" in
+    0) return 1 ;;
+    1) return 0 ;;
+  esac
+  ! git -c safe.directory='*' -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1
 }
 
 # require_trusted_home <home>: die when an ancestor-discovered home lacks the
