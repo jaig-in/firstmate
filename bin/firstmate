@@ -225,7 +225,7 @@ cmd_launch() {
   Run 'firstmate init' at a repo root for a per-project home,
        'firstmate init --org' at an org root, or 'firstmate --global' for the global home."
   else
-    if [ -d "$HOME/.firstmate" ]; then
+    if [ -n "${HOME:-}" ] && [ -d "$HOME/.firstmate" ]; then
       home=$HOME/.firstmate
     else
       home=$INSTALL_ROOT

@@ -285,14 +285,18 @@ secondmate_note_respawned() {  # <id>
 }
 
 fleet_sync_origin_backed_project_count() {
-  local count proj
+  local count proj candidates
   count=0
+  candidates=$(fm_project_sync_candidates "$FM_HOME" "$CONFIG" "$DATA") || {
+    echo "$count"
+    return 1
+  }
   while IFS= read -r proj; do
     [ -d "$proj" ] || continue
     git -C "$proj" rev-parse --git-dir >/dev/null 2>&1 || continue
     git -C "$proj" remote get-url origin >/dev/null 2>&1 || continue
     count=$((count + 1))
-  done < <(fm_project_sync_candidates "$FM_HOME" "$CONFIG" "$DATA")
+  done <<< "$candidates"
   echo "$count"
 }
 fleet_sync_bootstrap_timeout() {
