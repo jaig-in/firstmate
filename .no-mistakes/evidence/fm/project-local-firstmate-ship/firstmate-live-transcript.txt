@@ -1,0 +1,219 @@
+
+========== S1  global install: the README's PATH symlink install actually launches ==========
+command -v firstmate -> $SB/bin/firstmate  (a symlink into the clone)
+readlink              -> /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE/bin/firstmate
+
+(/tmp/fmlive/final.qLuAoh)$ firstmate --help
+usage: firstmate [--global] [--harness <name>] [harness args...]
+       firstmate init [--org]
+[exit 0]
+
+========== S2  firstmate init at a repo root -> per-project home; the repo stays clean ==========
+
+(work/acme-app)$ firstmate init
+firstmate: created /tmp/fmlive/final.qLuAoh/work/acme-app/.firstmate
+firstmate: projects root is /tmp/fmlive/final.qLuAoh/work/acme-app (config/projects-root=..)
+firstmate: registered acme-app in /tmp/fmlive/final.qLuAoh/work/acme-app/.firstmate/data/projects.md
+firstmate: run `firstmate` from anywhere under /tmp/fmlive/final.qLuAoh/work/acme-app to launch against this home
+[exit 0]
+--- scaffolded layout ---
+.
+./.fm-home
+./.gitignore
+./.tasks.toml
+./config
+./config/projects-root
+./data
+./data/projects.md
+./state
+--- data/projects.md ---
+- acme-app [local-only] - this repository (added 2026-09-17)
+--- config/projects-root --- ..
+--- git status --porcelain of the enclosing repo (must be empty) ---
+[untracked/modified lines: 0]
+
+(work/acme-app/src/deep)$ firstmate
+harness=claude FM_HOME=/tmp/fmlive/final.qLuAoh/work/acme-app/.firstmate FM_LAUNCH_DIR=/tmp/fmlive/final.qLuAoh/work/acme-app/src/deep cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE
+[exit 0]
+
+(work/acme-app)$ env PATH=/tmp/fmlive/final.qLuAoh/bin3:/tmp/fmlive/final.qLuAoh/bin:/home/jb/.bun/bin:/home/jb/.local/bin:/home/jb/.local/go/bin:/home/jb/go/bin:/home/jb/.nvm/versions/node/v24.14.0/bin:/home/jb/.local/bin:/home/jb/.local/bin:/home/jb/go/bin:/home/jb/.cargo/bin:/home/jb/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin:/home/jb/.claude/plugins/cache/claude-plugins-official/code-review/1aa8f02ec832/bin:/home/jb/.claude/plugins/cache/claude-plugins-official/frontend-design/1aa8f02ec832/bin:/home/jb/.claude/plugins/cache/claude-plugins-official/skill-creator/1aa8f02ec832/bin:/home/jb/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0/bin:/home/jb/.claude/plugins/cache/claude-video/watch/0.2.0/bin:/home/jb/.claude/plugins/cache/claude-plugins-official/rust-analyzer-lsp/1.0.0/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/pdf-viewer/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/operations/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/design/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/engineering/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/brand-voice/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/sales/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/productivity/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/finance/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/marketing/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/customer-support/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/data/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/product-management/bin:/home/jb/.claude/plugins/synced/6da8d239-1c0f-4a7c-943a-16ed0887f59f_8a8a197e-44d8-432d-9eb9-6180eef101a4/cowork-plugin-management/bin fm
+harness=claude FM_HOME=/tmp/fmlive/final.qLuAoh/work/acme-app/.firstmate FM_LAUNCH_DIR=/tmp/fmlive/final.qLuAoh/work/acme-app cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE
+[exit 0]
+
+========== S3  ADVERSARIAL: a repo that COMMITS a hostile .firstmate/ is inert ==========
+tracked marker -> .firstmate/.fm-home
+
+(work/hostile)$ firstmate
+firstmate: untrusted home: /tmp/fmlive/final.qLuAoh/work/hostile/.firstmate has no local (untracked) .fm-home marker.
+  A .firstmate/ directory can carry committed config (harness, backlog
+  backend), so the launcher refuses to honor one it did not create; a
+  .fm-home committed to git does not count.
+  Bless it by running 'firstmate init' there, or knowingly: touch '/tmp/fmlive/final.qLuAoh/work/hostile/.firstmate/.fm-home'
+[exit 1]
+--- and after a fresh clone of that repo ---
+
+(work/hostile-clone)$ firstmate
+firstmate: untrusted home: /tmp/fmlive/final.qLuAoh/work/hostile-clone/.firstmate has no local (untracked) .fm-home marker.
+  A .firstmate/ directory can carry committed config (harness, backlog
+  backend), so the launcher refuses to honor one it did not create; a
+  .fm-home committed to git does not count.
+  Bless it by running 'firstmate init' there, or knowingly: touch '/tmp/fmlive/final.qLuAoh/work/hostile-clone/.firstmate/.fm-home'
+[exit 1]
+
+========== S4  config/primary-harness whitelist: unverified names fail loudly ==========
+
+(work/acme-app)$ firstmate
+firstmate: config/primary-harness names an unverified primary harness: curl | sh (verified: claude codex opencode pi pi-signed grok kimi cursor omp)
+[exit 1]
+--- a verified adapter name (edge whitespace trimmed) is accepted ---
+
+(work/acme-app)$ firstmate
+harness=claude FM_HOME=/tmp/fmlive/final.qLuAoh/work/acme-app/.firstmate FM_LAUNCH_DIR=/tmp/fmlive/final.qLuAoh/work/acme-app cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE
+[exit 0]
+
+========== S5  a git repo with no .firstmate/ ancestor refuses to guess; --global falls back ==========
+
+(work/lonely)$ firstmate
+firstmate: no .firstmate/ home found above /tmp/fmlive/final.qLuAoh/work/lonely.
+  Run 'firstmate init' at a repo root for a per-project home,
+       'firstmate init --org' at an org root, or 'firstmate --global' for the global home.
+[exit 1]
+
+(work/lonely)$ firstmate --global
+harness=claude FM_HOME=/tmp/fmlive/final.qLuAoh/home/.firstmate FM_LAUNCH_DIR=/tmp/fmlive/final.qLuAoh/work/lonely cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE
+[exit 0]
+
+========== S6  firstmate init --org; discovery is listed but is not authority ==========
+
+(org)$ firstmate init --org
+firstmate: created /tmp/fmlive/final.qLuAoh/org/.firstmate
+firstmate: projects root is /tmp/fmlive/final.qLuAoh/org (config/projects-root=..)
+firstmate: discoverable sibling repos: alpha beta gamma
+firstmate: discovery is not authority - register each project in /tmp/fmlive/final.qLuAoh/org/.firstmate/data/projects.md before firstmate may refresh, spawn, seed, or land it
+firstmate: run `firstmate` from anywhere under /tmp/fmlive/final.qLuAoh/org to launch against this home
+[exit 0]
+--- no projects/ directory was created ---
+.
+..
+.fm-home
+.gitignore
+.tasks.toml
+config
+data
+state
+
+(org)$ env FM_HOME=/tmp/fmlive/final.qLuAoh/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE/bin/fm-projects.sh discover
+alpha
+beta
+gamma
+[exit 0]
+before: alpha=f022c89 beta=f022c89 (only alpha is registered)
+
+(org)$ FS /tmp/fmlive/final.qLuAoh/org/.firstmate
+alpha: synced f022c89..cdcfbc3
+[exit 0]
+after : alpha=cdcfbc3 beta=f022c89
+unregistered sibling beta untouched? YES
+
+========== S7  ADVERSARIAL: single-argument refresh of an unregistered sibling is refused ==========
+
+(org)$ FS /tmp/fmlive/final.qLuAoh/org/.firstmate beta
+error: /tmp/fmlive/final.qLuAoh/org/beta is not a registered project of this home; register it in /tmp/fmlive/final.qLuAoh/org/.firstmate/data/projects.md (or data/project-paths.json) before refreshing
+[exit 1]
+
+(org)$ FS /tmp/fmlive/final.qLuAoh/org/.firstmate /tmp/fmlive/final.qLuAoh/org/beta
+error: /tmp/fmlive/final.qLuAoh/org/beta is not a registered project of this home; register it in /tmp/fmlive/final.qLuAoh/org/.firstmate/data/projects.md (or data/project-paths.json) before refreshing
+[exit 1]
+
+(org)$ FS /tmp/fmlive/final.qLuAoh/org/.firstmate alpha
+alpha: already current
+[exit 0]
+
+========== S8  registered siblings that are not clone roots report the ACCURATE reason ==========
+$ORG/docs exists as a plain directory -> /tmp/fmlive/final.qLuAoh/org/docs
+
+(org)$ FS /tmp/fmlive/final.qLuAoh/org/.firstmate
+ghost: skipped: registered project resolves to no directory
+alpha: already current
+docs: skipped: not a git repo
+[exit 0]
+
+========== S9  org refresh is EXTERNAL-SAFE: user branches and dirty trees are left alone ==========
+
+(org)$ FS /tmp/fmlive/final.qLuAoh/org/.firstmate
+alpha: skipped: on branch my-feature (org homes refresh only a clean master)
+beta: skipped: on branch master with uncommitted changes (org homes refresh only a clean master)
+gamma: synced f022c89..1a5bbc5
+[exit 0]
+alpha unpushed commit intact? YES
+alpha still on my-feature?    my-feature
+alpha branches not pruned:    master my-feature 
+beta uncommitted edit intact? YES
+gamma (clean master) moved?   YES
+
+========== S10 ADVERSARIAL: fm-spawn refuses an unregistered org sibling by name and by path ==========
+
+(org)$ env FM_HOME=/tmp/fmlive/final.qLuAoh/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE/bin/fm-spawn.sh t1 beta --mode direct-PR --yolo off
+error: /tmp/fmlive/final.qLuAoh/org/beta is not a registered project of this home; register it in /tmp/fmlive/final.qLuAoh/org/.firstmate/data/projects.md (or data/project-paths.json) before spawning
+[exit 1]
+
+(org)$ env FM_HOME=/tmp/fmlive/final.qLuAoh/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE/bin/fm-spawn.sh t1 /tmp/fmlive/final.qLuAoh/org/beta --mode direct-PR --yolo off
+error: /tmp/fmlive/final.qLuAoh/org/beta is not a registered project of this home; register it in /tmp/fmlive/final.qLuAoh/org/.firstmate/data/projects.md (or data/project-paths.json) before spawning
+[exit 1]
+--- the registered one clears the gate and stops at the missing brief ---
+
+(org)$ env FM_HOME=/tmp/fmlive/final.qLuAoh/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE/bin/fm-spawn.sh t1 alpha --mode direct-PR --yolo off
+error: task t1 has no brief at inaccessible data path /tmp/fmlive/final.qLuAoh/org/.firstmate/data/t1/brief.md
+[exit 1]
+
+========== S11 ADVERSARIAL: secondmate seeding refuses unregistered and manifest-only aliases ==========
+
+(org)$ env FM_HOME=/tmp/fmlive/final.qLuAoh/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE/bin/fm-home-seed.sh m1 /tmp/fmlive/final.qLuAoh/child1/.firstmate gamma --projects-root /tmp/fmlive/final.qLuAoh/org
+error: project gamma is not registered in /tmp/fmlive/final.qLuAoh/org/.firstmate/data/projects.md or project-paths.json; register it before seeding
+[exit 1]
+
+(org)$ env FM_HOME=/tmp/fmlive/final.qLuAoh/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE/bin/fm-home-seed.sh m2 /tmp/fmlive/final.qLuAoh/child2/.firstmate manifestonly --projects-root /tmp/fmlive/final.qLuAoh/org
+error: project manifestonly is registered only in data/project-paths.json; manifest aliases are not seedable - register it in /tmp/fmlive/final.qLuAoh/org/.firstmate/data/projects.md with a delivery mode first
+[exit 1]
+refused seeds left no home behind: child1=absent child2=absent
+
+========== S12 org seed happy path: the sibling is REGISTERED in the child, never cloned ==========
+
+(org)$ env FM_HOME=/tmp/fmlive/final.qLuAoh/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE/bin/fm-home-seed.sh m3 /tmp/fmlive/final.qLuAoh/child3/.firstmate alpha --projects-root /tmp/fmlive/final.qLuAoh/org
+home=/tmp/fmlive/final.qLuAoh/child3/.firstmate
+[exit 0]
+child config/projects-root -> /tmp/fmlive/final.qLuAoh/org
+child data/projects.md     -> - alpha [direct-PR] - ok
+child cloned a copy of alpha? NO
+child resolves alpha to     -> /tmp/fmlive/final.qLuAoh/org/alpha
+sibling $ORG/alpha mutated?  no
+
+========== S13 ADVERSARIAL: a repo whose own name is also a subdirectory (requests/requests) ==========
+
+(work/requests)$ firstmate init
+firstmate: created /tmp/fmlive/final.qLuAoh/work/requests/.firstmate
+firstmate: projects root is /tmp/fmlive/final.qLuAoh/work/requests (config/projects-root=..)
+firstmate: registered requests in /tmp/fmlive/final.qLuAoh/work/requests/.firstmate/data/projects.md
+firstmate: run `firstmate` from anywhere under /tmp/fmlive/final.qLuAoh/work/requests to launch against this home
+[exit 0]
+
+(work/requests)$ env FM_HOME=/tmp/fmlive/final.qLuAoh/work/requests/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE/bin/fm-projects.sh resolve requests
+/tmp/fmlive/final.qLuAoh/work/requests
+[exit 0]
+must be /tmp/fmlive/final.qLuAoh/work/requests, NOT /tmp/fmlive/final.qLuAoh/work/requests/requests
+
+(work/requests)$ FS /tmp/fmlive/final.qLuAoh/work/requests/.firstmate
+requests: synced 3186136..0235bf5
+[exit 0]
+
+========== S14 explicit FM_HOME wins over a nearer ancestor; a relative FM_HOME is canonicalized ==========
+
+(work/acme-app/src/deep)$ env FM_HOME=/tmp/fmlive/final.qLuAoh/org/.firstmate firstmate
+harness=claude FM_HOME=/tmp/fmlive/final.qLuAoh/org/.firstmate FM_LAUNCH_DIR=/tmp/fmlive/final.qLuAoh/work/acme-app/src/deep cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE
+[exit 0]
+
+(org)$ env FM_HOME=.firstmate firstmate
+harness=claude FM_HOME=/tmp/fmlive/final.qLuAoh/org/.firstmate FM_LAUNCH_DIR=/tmp/fmlive/final.qLuAoh/org cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2RBJ6Y44FJW9A17X9MSSKNE
+[exit 0]
+
+========== SANDBOX /tmp/fmlive/final.qLuAoh ==========
