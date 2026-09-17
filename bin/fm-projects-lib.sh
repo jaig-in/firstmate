@@ -160,9 +160,10 @@ fm_project_manifest_pairs() {
 }
 
 # fm_project_manifest_lookup <data> <alias>: print the registered absolute
-# path for <alias>, or nothing.
+# path for <alias>, or nothing. A duplicated alias takes its LAST value, the
+# way jq reads the same document, so both readers name the same directory.
 fm_project_manifest_lookup() {
-  local data=$1 alias=$2 pairs key val
+  local data=$1 alias=$2 pairs key val found=''
   case "$alias" in
     *\"*|*\\*)
       echo "error: project alias contains a byte the manifest cannot hold: $alias" >&2
@@ -173,10 +174,10 @@ fm_project_manifest_lookup() {
   while IFS=$'\t' read -r key val; do
     [ -n "$key" ] || continue
     if [ "$key" = "$alias" ]; then
-      printf '%s\n' "$val"
-      return 0
+      found=$val
     fi
   done <<< "$pairs"
+  [ -z "$found" ] || printf '%s\n' "$found"
 }
 
 # fm_project_registered_aliases <data>: print every registered alias, one per
