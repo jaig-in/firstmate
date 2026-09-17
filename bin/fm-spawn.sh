@@ -2834,6 +2834,17 @@ else
     echo "error: could not resolve the project name for $PROJ" >&2
     exit 1
   }
+  if fm_projects_root_is_custom "$CONFIG"; then
+    PROJ_REGISTERED_ALIAS=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$PROJ_ABS") || {
+      echo "error: could not read this home's project registry" >&2
+      exit 1
+    }
+    [ -n "$PROJ_REGISTERED_ALIAS" ] || {
+      echo "error: $PROJ_ABS is not a registered project of this home; register it in $DATA/projects.md (or data/project-paths.json) before spawning" >&2
+      exit 1
+    }
+    PROJ_NAME=$PROJ_REGISTERED_ALIAS
+  fi
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   SPAWN_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$PROJ_ABS") || {
