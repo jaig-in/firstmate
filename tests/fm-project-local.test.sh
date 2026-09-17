@@ -158,6 +158,23 @@ test_launcher_trust() {
   assert_grep "untrusted" "$base/err-tracked" "tracked-marker refusal did not name the home untrusted"
   git -C "$repo" rm -q --cached .firstmate/.fm-home
 
+  # A git failure while checking the marker fails closed, not open.
+  local failgit="$base/failgit"
+  mkdir -p "$failgit"
+  cat > "$failgit/git" <<SH
+#!/usr/bin/env bash
+for a in "\$@"; do
+  [ "\$a" = ls-files ] && { echo "fatal: detected dubious ownership" >&2; exit 128; }
+done
+exec $(command -v git) "\$@"
+SH
+  chmod +x "$failgit/git"
+  if (cd "$repo/sub" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out-failgit" \
+      PATH="$failgit:$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err-failgit"); then
+    fail "a git error while checking the marker blessed the home"
+  fi
+  assert_grep "untrusted" "$base/err-failgit" "git-error refusal did not name the home untrusted"
+
   # config/primary-harness accepts only verified primary adapters.
   mkdir -p "$repo/.firstmate/config"
   printf 'muse\n' > "$repo/.firstmate/config/primary-harness"
