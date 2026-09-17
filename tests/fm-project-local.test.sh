@@ -23,6 +23,9 @@
 #   - central resolver precedence: data/project-paths.json, then
 #     <projects-root>/<alias>, then $FM_HOME/projects/<alias>; projects/<name>
 #     prefers the legacy clone.
+#   - a bare-name refresh argument keeps its registry alias as the label, so a
+#     manifest-registered project outside the projects root still resolves its
+#     registered posture (local-only is skipped, not fetched).
 #   - org-shaped secondmate seed registers siblings instead of cloning them.
 set -u
 
@@ -182,13 +185,15 @@ test_launcher_trust() {
   assert_grep "untrusted" "$base/err-tracked" "tracked-marker refusal did not name the home untrusted"
   git -C "$repo" rm -q --cached .firstmate/.fm-home
 
-  # A git failure while checking the marker fails closed, not open.
+  # A git failure while checking the marker fails closed, not open. Ownership
+  # refusals are not reachable (the check passes safe.directory='*'), so the
+  # stub raises the generic failure the fail-closed leg exists for.
   local failgit="$base/failgit"
   mkdir -p "$failgit"
   cat > "$failgit/git" <<SH
 #!/usr/bin/env bash
 for a in "\$@"; do
-  [ "\$a" = ls-files ] && { echo "fatal: detected dubious ownership" >&2; exit 128; }
+  [ "\$a" = ls-files ] && { echo "fatal: index file corrupt" >&2; exit 128; }
 done
 exec $(command -v git) "\$@"
 SH
@@ -835,6 +840,42 @@ test_org_seed() {
   pass "org seed: siblings registered not cloned, unregistered refused, registered path owns the source"
 }
 
+# --- a bare alias keeps its registry label in a legacy home ------------------
+
+# Regression: a single-argument refresh of a manifest-registered alias in a
+# home WITHOUT config/projects-root used to label the project by its absolute
+# path, so the registry lookup that carries local-only found nothing and the
+# clone was fetched instead of skipped.
+test_manifest_alias_label() {
+  local base home local_only shipped out
+  base=$(new_dir)
+  home="$base/home"
+  mkdir -p "$home/config" "$home/data" "$home/state" "$home/projects"
+
+  local_only="$base/outside/ext"
+  fm_git_init_commit "$local_only"
+  fm_git_add_origin "$local_only" "$base/remotes/ext.git"
+  shipped="$base/outside/ship"
+  fm_git_init_commit "$shipped"
+  fm_git_add_origin "$shipped" "$base/remotes/ship.git"
+
+  printf -- '- ext [local-only] - external project (added 2026-09-17)\n' > "$home/data/projects.md"
+  printf -- '- ship [direct-PR] - external project (added 2026-09-17)\n' >> "$home/data/projects.md"
+  printf '{"ext": "%s", "ship": "%s"}\n' "$local_only" "$shipped" > "$home/data/project-paths.json"
+
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" ext 2>/dev/null) \
+    || fail "single-arg refresh of a manifest alias failed"
+  assert_contains "$out" "ext: skipped: local-only project" \
+    "a manifest alias lost its registry label, and with it the local-only skip"
+
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" ship 2>/dev/null) \
+    || fail "single-arg refresh of a shipped manifest alias failed"
+  assert_contains "$out" "ship:" "a manifest alias was not reported by its registered name"
+  case "$out" in *"$shipped"*) fail "a manifest alias was reported by absolute path" ;; esac
+
+  pass "legacy home: a bare alias keeps its registry label and its local-only skip"
+}
+
 test_launcher_resolution
 test_launcher_trust
 test_init
@@ -842,6 +883,7 @@ test_projects_root
 test_discovery_authority
 test_resolver_fails_closed
 test_manifest_reader_without_jq
+test_manifest_alias_label
 test_spawn_refusal
 test_org_seed
 
