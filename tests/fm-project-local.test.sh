@@ -254,6 +254,28 @@ SH
     fail "--harness=muse was accepted"
   fi
   assert_grep "not primary-capable" "$base/err3f" "--harness=muse refusal did not fail loudly"
+  # Pi-family primaries carry their own launch-boundary identity marker, so an
+  # inherited FM_PI_HARNESS cannot relabel the session.
+  local h
+  for h in pi pi-signed omp; do
+    cat > "$fakebin/$h" <<'SH'
+#!/usr/bin/env bash
+printf 'FM_PI_HARNESS=%s\nFM_OMP_HARNESS=%s\n' "${FM_PI_HARNESS:-}" "${FM_OMP_HARNESS:-}" > "$FM_FAKE_HARNESS_OUT"
+SH
+    chmod +x "$fakebin/$h"
+  done
+  (cd "$repo/sub" && env -u FM_HOME -u FM_PI_HARNESS FM_FAKE_HARNESS_OUT="$base/out-pisigned" \
+    PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" --harness pi-signed) \
+    || fail "--harness pi-signed was refused"
+  grep -qxF "FM_PI_HARNESS=pi-signed" "$base/out-pisigned" || fail "pi-signed primary launched without its identity marker"
+  (cd "$repo/sub" && env -u FM_HOME FM_PI_HARNESS=pi-signed FM_FAKE_HARNESS_OUT="$base/out-pi" \
+    PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" --harness pi) \
+    || fail "--harness pi was refused"
+  grep -qxF "FM_PI_HARNESS=pi" "$base/out-pi" || fail "inherited FM_PI_HARNESS relabeled a pi primary"
+  (cd "$repo/sub" && env -u FM_HOME -u FM_OMP_HARNESS FM_FAKE_HARNESS_OUT="$base/out-omp" \
+    PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" --harness omp) \
+    || fail "--harness omp was refused"
+  grep -qxF "FM_OMP_HARNESS=omp" "$base/out-omp" || fail "omp primary launched without its identity marker"
 
   # A relative FM_HOME is canonicalized before export, not resolved against
   # the install root after the launcher's cd.
