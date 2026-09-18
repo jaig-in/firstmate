@@ -132,7 +132,7 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 # shellcheck source=bin/fm-projects-lib.sh
 . "$SCRIPT_DIR/fm-projects-lib.sh"
-PROJECTS=$(fm_projects_root "$FM_HOME" "$CONFIG") || exit 1
+PROJECTS=$(fm_projects_root "$FM_HOME" "$CONFIG" 2>/dev/null) || PROJECTS=
 BACKLOG="$DATA/backlog.md"
 SNAPSHOT_NOW=${FM_SNAPSHOT_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
 if [ -n "${FM_SNAPSHOT_NOW_EPOCH:-}" ]; then
@@ -2066,7 +2066,7 @@ jq -n \
      schema:"fm-fleet-snapshot.v1",
      generated:$generated,
      fm_home:$fm_home,
-     roots:{fm_root:$fm_root,state:$state,data:$data,config:$config,projects:$projects},
+     roots:{fm_root:$fm_root,state:$state,data:$data,config:$config,projects:($projects | if . == "" then null else . end)},
      backlog:$backlog,
      tasks:($tasks | map(. + {backlog:backlog_by_id(.id)})),
      main_inventory:$main_inventory,
