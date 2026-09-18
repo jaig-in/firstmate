@@ -273,7 +273,7 @@ cmd_launch() {
       harness=$(sed -n '1p' "$home/config/primary-harness" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
       case " $VERIFIED_PRIMARY_HARNESSES " in
         *" $harness "*) ;;
-        *) die "config/primary-harness names an unverified primary harness: $harness (verified: $VERIFIED_PRIMARY_HARNESSES)" ;;
+        *) die "config/primary-harness names a harness that is not primary-capable: $harness (primary-capable: $VERIFIED_PRIMARY_HARNESSES)" ;;
       esac
     fi
     [ -n "$harness" ] || harness=claude

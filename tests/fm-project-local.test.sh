@@ -204,32 +204,32 @@ SH
   fi
   assert_grep "untrusted" "$base/err-failgit" "git-error refusal did not name the home untrusted"
 
-  # config/primary-harness accepts only verified primary adapters.
+  # config/primary-harness accepts only primary-capable adapters.
   mkdir -p "$repo/.firstmate/config"
   printf 'muse\n' > "$repo/.firstmate/config/primary-harness"
   if (cd "$repo/sub" && env -u FM_HOME \
       PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err2"); then
     fail "crew-only primary-harness was accepted"
   fi
-  assert_grep "unverified primary harness" "$base/err2" "adapter refusal did not fail loudly"
+  assert_grep "not primary-capable" "$base/err2" "adapter refusal did not fail loudly"
   printf 'kimi\n' > "$repo/.firstmate/config/primary-harness"
   if (cd "$repo/sub" && env -u FM_HOME \
       PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err2k"); then
     fail "crew-scope kimi primary-harness was accepted"
   fi
-  assert_grep "unverified primary harness" "$base/err2k" "kimi refusal did not fail loudly"
+  assert_grep "not primary-capable" "$base/err2k" "kimi refusal did not fail loudly"
   printf 'definitely-not-a-harness\n' > "$repo/.firstmate/config/primary-harness"
   if (cd "$repo/sub" && env -u FM_HOME \
       PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err3"); then
     fail "unknown primary-harness was accepted"
   fi
-  assert_grep "unverified primary harness" "$base/err3" "unknown adapter did not fail loudly"
+  assert_grep "not primary-capable" "$base/err3" "unknown adapter did not fail loudly"
   printf 'cla ude\n' > "$repo/.firstmate/config/primary-harness"
   if (cd "$repo/sub" && env -u FM_HOME \
       PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err3b"); then
     fail "interior-whitespace primary-harness was accepted"
   fi
-  assert_grep "unverified primary harness" "$base/err3b" "interior-whitespace adapter did not fail loudly"
+  assert_grep "not primary-capable" "$base/err3b" "interior-whitespace adapter did not fail loudly"
   printf '  claude  \n' > "$repo/.firstmate/config/primary-harness"
   (cd "$repo/sub" && env -u FM_HOME \
     FM_FAKE_HARNESS_OUT="$base/out3c" PATH="$fakebin:$PATH" "$ROOT/bin/firstmate") \
