@@ -168,7 +168,6 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 # shellcheck source=bin/fm-projects-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-projects-lib.sh"
-PROJECTS=$(fm_projects_root "$FM_HOME" "$CONFIG") || exit 1
 # shellcheck source=bin/fm-tasks-axi-lib.sh disable=SC1091
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-backlog-transition-lib.sh disable=SC1091
@@ -282,7 +281,7 @@ secondmate_note_respawned() {  # <id>
 fleet_sync_origin_backed_project_count() {
   local count proj candidates
   count=0
-  candidates=$(fm_project_sync_candidates "$FM_HOME" "$CONFIG" "$DATA") || {
+  candidates=$(fm_project_sync_candidates "$FM_HOME" "$CONFIG" "$DATA" 2>/dev/null) || {
     echo "$count"
     return 1
   }
@@ -334,8 +333,12 @@ fleet_sync_relay_all_output() {
 fleet_sync() {
   [ -x "$FM_ROOT/bin/fm-fleet-sync.sh" ] || return 0
   # An org home's registered projects live wherever the registry says, not under
-  # the projects root, so its absence is fm-fleet-sync.sh's story to tell.
-  fm_projects_root_is_custom "$CONFIG" || [ -d "$PROJECTS" ] || return 0
+  # the projects root, so its absence - or a malformed config/projects-root - is
+  # fm-fleet-sync.sh's story to tell.
+  local projects_root
+  if projects_root=$(fm_projects_root "$FM_HOME" "$CONFIG" 2>/dev/null); then
+    fm_projects_root_is_custom "$CONFIG" || [ -d "$projects_root" ] || return 0
+  fi
 
   # Both capture files live in one private directory: the refresh's stdout and
   # stderr carry project paths and git error text.
