@@ -77,10 +77,10 @@ HOME_MARKER=".fm-home"
 
 # The verified harness adapters minus the crew-only ones (AGENTS.md section 4)
 # and minus kimi, which is verified as a crewmate harness but sits outside the
-# primary turn-end guard scope (references/harness/kimi.md); config/primary-harness
-# is restricted to this list so a home config cannot name an arbitrary binary or
-# a harness with no primary supervision protocol. README's Requirements own the
-# supported primary set.
+# primary turn-end guard scope (references/harness/kimi.md); the launched harness,
+# from --harness or config/primary-harness, is restricted to this list so neither
+# can name an arbitrary binary or a harness with no primary supervision protocol.
+# README's Requirements own the supported primary set.
 VERIFIED_PRIMARY_HARNESSES="claude codex opencode pi pi-signed grok cursor omp"
 
 # nearest_firstmate_home <dir>: print the nearest .firstmate/ ancestor, or
