@@ -243,6 +243,17 @@ SH
   fi
   assert_grep "symlink" "$base/err3d" "symlinked primary-harness did not fail loudly"
   rm -f "$repo/.firstmate/config/primary-harness"
+  # --harness is held to the same primary-capable set as config/primary-harness.
+  if (cd "$repo/sub" && env -u FM_HOME \
+      PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" --harness kimi >/dev/null 2>"$base/err3e"); then
+    fail "--harness kimi was accepted"
+  fi
+  assert_grep "not primary-capable" "$base/err3e" "--harness kimi refusal did not fail loudly"
+  if (cd "$repo/sub" && env -u FM_HOME \
+      PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" --harness=muse >/dev/null 2>"$base/err3f"); then
+    fail "--harness=muse was accepted"
+  fi
+  assert_grep "not primary-capable" "$base/err3f" "--harness=muse refusal did not fail loudly"
 
   # A relative FM_HOME is canonicalized before export, not resolved against
   # the install root after the launcher's cd.

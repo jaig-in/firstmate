@@ -271,13 +271,13 @@ cmd_launch() {
       die "config/primary-harness must be a regular file, not a symlink: $home/config/primary-harness"
     elif [ -f "$home/config/primary-harness" ]; then
       harness=$(sed -n '1p' "$home/config/primary-harness" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
-      case " $VERIFIED_PRIMARY_HARNESSES " in
-        *" $harness "*) ;;
-        *) die "config/primary-harness names a harness that is not primary-capable: $harness (primary-capable: $VERIFIED_PRIMARY_HARNESSES)" ;;
-      esac
     fi
     [ -n "$harness" ] || harness=claude
   fi
+  case " $VERIFIED_PRIMARY_HARNESSES " in
+    *" $harness "*) ;;
+    *) die "harness is not primary-capable: $harness (primary-capable: $VERIFIED_PRIMARY_HARNESSES)" ;;
+  esac
   command -v "$harness" >/dev/null 2>&1 || die "harness not found on PATH: $harness"
 
   export FM_HOME=$home
