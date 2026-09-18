@@ -555,7 +555,7 @@ test_resolver_fails_closed() {
   # fall through to the launcher's own working directory.
   local plain="$base/plain"
   mkdir -p "$plain/config" "$plain/data" "$plain/state"
-  if FM_HOME="$plain" "$ROOT/bin/fm-spawn.sh" t1 'proj\name' --mode direct-PR --yolo off \
+  if FM_HOME="$plain" "$ROOT/bin/fm-spawn.sh" t1 'proj\name' --harness claude --mode direct-PR --yolo off \
       >/dev/null 2>"$base/err-spawn"; then
     fail "spawn accepted an alias the manifest cannot hold"
   fi
@@ -578,7 +578,7 @@ test_resolver_fails_closed() {
   fi
   assert_grep "absolute path" "$base/err-rel" "relative manifest refusal did not name the format"
   case "$(cat "$base/out-rel")" in *docs*) fail "relative manifest path was printed as a resolution" ;; esac
-  if (cd "$cwd" && FM_HOME="$home3" "$ROOT/bin/fm-spawn.sh" t1 docs --mode direct-PR --yolo off) \
+  if (cd "$cwd" && FM_HOME="$home3" "$ROOT/bin/fm-spawn.sh" t1 docs --harness claude --mode direct-PR --yolo off) \
       >/dev/null 2>"$base/err-rel-spawn"; then
     fail "spawn accepted a relative manifest path"
   fi
@@ -623,7 +623,7 @@ test_resolver_fails_closed() {
     *"$cwd6"*|*synced*|*"already current"*)
       fail "single-arg refresh acted on a cwd directory as a registered project" ;;
   esac
-  if (cd "$cwd6" && FM_HOME="$home6" "$ROOT/bin/fm-spawn.sh" t1 ghostproj --mode direct-PR --yolo off) \
+  if (cd "$cwd6" && FM_HOME="$home6" "$ROOT/bin/fm-spawn.sh" t1 ghostproj --harness claude --mode direct-PR --yolo off) \
       >/dev/null 2>"$base/err-ghost-spawn"; then
     fail "spawn accepted a cwd directory as a registered project"
   fi
@@ -759,18 +759,18 @@ test_spawn_refusal() {
   printf -- '- reg [direct-PR] - registered sibling (added 2026-09-17)\n' > "$home/data/projects.md"
 
   # An unregistered sibling is refused by name and by path.
-  if FM_HOME="$home" "$ROOT/bin/fm-spawn.sh" t1 unreg --mode direct-PR --yolo off >/dev/null 2>"$base/err1"; then
+  if FM_HOME="$home" "$ROOT/bin/fm-spawn.sh" t1 unreg --harness claude --mode direct-PR --yolo off >/dev/null 2>"$base/err1"; then
     fail "spawn accepted an unregistered sibling name"
   fi
   assert_grep "not a registered project" "$base/err1" "spawn refusal did not name registration"
-  if FM_HOME="$home" "$ROOT/bin/fm-spawn.sh" t1 "$unreg" --mode direct-PR --yolo off >/dev/null 2>"$base/err2"; then
+  if FM_HOME="$home" "$ROOT/bin/fm-spawn.sh" t1 "$unreg" --harness claude --mode direct-PR --yolo off >/dev/null 2>"$base/err2"; then
     fail "spawn accepted an unregistered sibling path"
   fi
   assert_grep "not a registered project" "$base/err2" "path spawn refusal did not name registration"
 
   # The registered sibling passes the gate and fails later on its missing
   # brief - proof the refusal above is the registration gate, not a dead end.
-  if FM_HOME="$home" "$ROOT/bin/fm-spawn.sh" t1 reg --mode direct-PR --yolo off >/dev/null 2>"$base/err3"; then
+  if FM_HOME="$home" "$ROOT/bin/fm-spawn.sh" t1 reg --harness claude --mode direct-PR --yolo off >/dev/null 2>"$base/err3"; then
     fail "spawn of a registered sibling unexpectedly succeeded"
   fi
   assert_grep "no brief" "$base/err3" "registered sibling did not reach the brief check"
