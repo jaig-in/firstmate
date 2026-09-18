@@ -1,0 +1,23 @@
+$ firstmate --harness pi-signed
+[exec'd pi-signed] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/tmp/fm-live.cGoGxR/work/app/.firstmate FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/app/src FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=pi-signed FM_OMP_HARNESS=<unset>
+  fm-harness.sh (PI_CODING_AGENT=true) => pi-signed
+[exit 0]
+$ firstmate --harness pi
+[exec'd pi] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/tmp/fm-live.cGoGxR/work/app/.firstmate FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/app/src FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=pi FM_OMP_HARNESS=<unset>
+  fm-harness.sh (PI_CODING_AGENT=true) => pi
+[exit 0]
+$ firstmate --harness=omp
+[exec'd omp] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/tmp/fm-live.cGoGxR/work/app/.firstmate FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/app/src FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=<unset> FM_OMP_HARNESS=omp
+[exit 0]
+$ FM_PI_HARNESS=pi-signed firstmate --harness pi   (stale marker from the shell)
+[exec'd pi] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/tmp/fm-live.cGoGxR/work/app/.firstmate FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/app/src FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=pi FM_OMP_HARNESS=<unset>
+  fm-harness.sh (PI_CODING_AGENT=true) => pi
+[exit 0]

@@ -1,0 +1,62 @@
+ok - launcher: FM_HOME win, nested shadowing, global+install fallback, in-repo refusal
+ok - trust: unmarked home refused, marker blesses, adapter whitelist, relative FM_HOME canonicalized
+ok - init: org scaffold, per-project registration, repo-root landing, outside-repo refusal
+ok - projects-root: override > config > legacy default; malformed fails loudly
+ok - discovery=authority: discover lists siblings, refresh touches registered only, resolver precedence
+ok - resolver failures fail closed: fleet refresh, registry lookup, spawn, manifest paths, discover, stale aliases, remote seed
+ok - manifest reader: one-line, multi-line, and duplicate aliases agree with and without jq
+ok - legacy home: a bare alias keeps its registry label and its local-only skip
+ok - spawn: unregistered sibling refused by name and path, registered reaches the brief check
+Note: switching to '079e6a26e1163a3d6306107881b9a19a29545f24'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+Note: switching to '079e6a26e1163a3d6306107881b9a19a29545f24'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+Note: switching to '079e6a26e1163a3d6306107881b9a19a29545f24'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+ok - org seed: siblings registered not cloned, unregistered refused, registered path owns the source
+all project-local tests passed

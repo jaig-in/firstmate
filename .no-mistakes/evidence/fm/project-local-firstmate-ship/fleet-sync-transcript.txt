@@ -1,0 +1,77 @@
+
+=================== F1 org home: whole-fleet refresh touches registered projects only ===================
+firstmate: created /tmp/fm-fleet.sbz4pK/org/.firstmate
+firstmate: projects root is /tmp/fm-fleet.sbz4pK/org (config/projects-root=..)
+firstmate: discoverable sibling repos: alpha beta
+firstmate: discovery is not authority - register each project in /tmp/fm-fleet.sbz4pK/org/.firstmate/data/projects.md before firstmate may refresh, spawn, seed, or land it
+firstmate: run `firstmate` from anywhere under /tmp/fm-fleet.sbz4pK/org to launch against this home
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-projects.sh aliases
+alpha
+gone
+notes
+[exit 0]
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-projects.sh discover
+alpha
+beta
+[exit 0]
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-fleet-sync.sh
+gone: skipped: registered project resolves to no directory
+alpha: synced afa962c..61957f2
+notes: skipped: not a git repo
+[exit 0]
+beta HEAD before=afa962c after=afa962c (unregistered sibling must be untouched)
+
+=================== F2 org home single-arg: unregistered sibling refused; registered non-repo / stale reported accurately ===================
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-fleet-sync.sh beta
+error: /tmp/fm-fleet.sbz4pK/org/beta is not a registered project of this home; register it in /tmp/fm-fleet.sbz4pK/org/.firstmate/data/projects.md (or data/project-paths.json) before refreshing
+[exit 1]
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-fleet-sync.sh /tmp/fm-fleet.sbz4pK/org/beta
+error: /tmp/fm-fleet.sbz4pK/org/beta is not a registered project of this home; register it in /tmp/fm-fleet.sbz4pK/org/.firstmate/data/projects.md (or data/project-paths.json) before refreshing
+[exit 1]
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-fleet-sync.sh notes
+notes: skipped: not a git repo
+[exit 0]
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-fleet-sync.sh gone
+gone: skipped: registered project resolves to no directory
+[exit 0]
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-fleet-sync.sh alpha
+alpha: already current
+[exit 0]
+beta HEAD now=afa962c
+
+=================== F3 same-named directory in caller's cwd is never touched by an org single-arg refresh ===================
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-fleet-sync.sh beta
+error: /tmp/fm-fleet.sbz4pK/org/beta is not a registered project of this home; register it in /tmp/fm-fleet.sbz4pK/org/.firstmate/data/projects.md (or data/project-paths.json) before refreshing
+[exit 1]
+cwd ./beta HEAD before=468f78c after=468f78c
+
+=================== F4 malformed data/project-paths.json fails closed with an error: line ===================
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-fleet-sync.sh
+error: /tmp/fm-fleet.sbz4pK/org/.firstmate/data/project-paths.json must be a flat JSON object of alias -> absolute path
+[exit 1]
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-fleet-sync.sh
+error: /tmp/fm-fleet.sbz4pK/org/.firstmate/data/project-paths.json must be a flat JSON object of alias -> absolute path
+[exit 1]
+
+=================== F5 legacy home (no projects-root): manifest bare alias keeps its label and local-only guard ===================
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-projects.sh resolve ext
+/tmp/fm-fleet.sbz4pK/outside/ext
+[exit 0]
+
+$ /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-fleet-sync.sh ext
+ext: skipped: local-only project
+[exit 0]
+ext HEAD before=0dab5d4 after=0dab5d4 (local-only must not fast-forward)
+SANDBOX=/tmp/fm-fleet.sbz4pK

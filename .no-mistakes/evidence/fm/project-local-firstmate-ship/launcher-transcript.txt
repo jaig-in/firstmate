@@ -1,0 +1,215 @@
+
+=================== S1 firstmate init in a git repo (per-project home) ===================
+
+$ firstmate init
+firstmate: created /tmp/fm-live.cGoGxR/work/app/.firstmate
+firstmate: projects root is /tmp/fm-live.cGoGxR/work/app (config/projects-root=..)
+firstmate: registered app in /tmp/fm-live.cGoGxR/work/app/.firstmate/data/projects.md
+firstmate: run `firstmate` from anywhere under /tmp/fm-live.cGoGxR/work/app to launch against this home
+[exit 0]
+
+$ find /tmp/fm-live.cGoGxR/work/app/.firstmate -maxdepth 2
+/tmp/fm-live.cGoGxR/work/app/.firstmate
+/tmp/fm-live.cGoGxR/work/app/.firstmate/.fm-home
+/tmp/fm-live.cGoGxR/work/app/.firstmate/.gitignore
+/tmp/fm-live.cGoGxR/work/app/.firstmate/.tasks.toml
+/tmp/fm-live.cGoGxR/work/app/.firstmate/config
+/tmp/fm-live.cGoGxR/work/app/.firstmate/config/projects-root
+/tmp/fm-live.cGoGxR/work/app/.firstmate/state
+/tmp/fm-live.cGoGxR/work/app/.firstmate/data
+/tmp/fm-live.cGoGxR/work/app/.firstmate/data/projects.md
+[exit 0]
+
+$ cat /tmp/fm-live.cGoGxR/work/app/.firstmate/data/projects.md
+- app [local-only] - this repository (added 2026-09-17)
+[exit 0]
+
+$ cat /tmp/fm-live.cGoGxR/work/app/.firstmate/config/projects-root
+..
+[exit 0]
+
+$ git -C /tmp/fm-live.cGoGxR/work/app status --porcelain --ignored
+!! .firstmate/
+[exit 0]
+
+$ firstmate init
+firstmate: /tmp/fm-live.cGoGxR/work/app/.firstmate already exists
+[exit 1]
+
+=================== S2 launch from a subdir resolves nearest home (real claude, --version passthrough) ===================
+
+$ firstmate --harness claude --version
+2.1.276 (Claude Code)
+[exit 0]
+
+$ firstmate --harness pi --flag-for-harness x
+[exec'd pi] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=--flag-for-harness x
+  FM_HOME=/tmp/fm-live.cGoGxR/work/app/.firstmate FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/app/src FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=pi FM_OMP_HARNESS=<unset>
+  fm-harness.sh (PI_CODING_AGENT=true) => claude
+[exit 0]
+
+=================== S3 repo without a .firstmate refuses to guess ===================
+
+$ firstmate --harness pi
+firstmate: no .firstmate/ home found above /tmp/fm-live.cGoGxR/work/other.
+  Run 'firstmate init' at a repo root for a per-project home,
+       'firstmate init --org' at an org root, or 'firstmate --global' for the global home.
+[exit 1]
+
+=================== S3b --global in that repo, and a non-repo cwd, fall back to global home ===================
+
+$ firstmate --global --harness pi
+[exec'd pi] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/other FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=pi FM_OMP_HARNESS=<unset>
+  fm-harness.sh (PI_CODING_AGENT=true) => claude
+[exit 0]
+
+$ firstmate --harness pi
+[exec'd pi] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/tmp/fm-live.cGoGxR/home/.firstmate FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/plain FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=pi FM_OMP_HARNESS=<unset>
+  fm-harness.sh (PI_CODING_AGENT=true) => claude
+[exit 0]
+
+=================== S4 trust marker: missing, tracked (committed with clone), symlinked ===================
+
+$ firstmate
+firstmate: untrusted home: /tmp/fm-live.cGoGxR/work/cloned/.firstmate has no local (untracked) .fm-home marker.
+  A .firstmate/ directory can carry committed config (harness, backlog
+  backend), so the launcher refuses to honor one it did not create; a
+  .fm-home committed to git does not count.
+  Bless it by running 'firstmate init' there, or knowingly: touch '/tmp/fm-live.cGoGxR/work/cloned/.firstmate/.fm-home'
+[exit 1]
+
+$ firstmate
+firstmate: untrusted home: /tmp/fm-live.cGoGxR/work/cloned/.firstmate has no local (untracked) .fm-home marker.
+  A .firstmate/ directory can carry committed config (harness, backlog
+  backend), so the launcher refuses to honor one it did not create; a
+  .fm-home committed to git does not count.
+  Bless it by running 'firstmate init' there, or knowingly: touch '/tmp/fm-live.cGoGxR/work/cloned/.firstmate/.fm-home'
+[exit 1]
+
+$ firstmate
+firstmate: untrusted home: /tmp/fm-live.cGoGxR/work/cloned/.firstmate has no local (untracked) .fm-home marker.
+  A .firstmate/ directory can carry committed config (harness, backlog
+  backend), so the launcher refuses to honor one it did not create; a
+  .fm-home committed to git does not count.
+  Bless it by running 'firstmate init' there, or knowingly: touch '/tmp/fm-live.cGoGxR/work/cloned/.firstmate/.fm-home'
+[exit 1]
+
+=================== S5 config/primary-harness selection and whitelist ===================
+
+$ firstmate
+[exec'd omp] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/tmp/fm-live.cGoGxR/work/app/.firstmate FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/app FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=<unset> FM_OMP_HARNESS=omp
+[exit 0]
+
+$ firstmate
+[exec'd pi-signed] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/tmp/fm-live.cGoGxR/work/app/.firstmate FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/app FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=pi-signed FM_OMP_HARNESS=<unset>
+  fm-harness.sh (PI_CODING_AGENT=true) => claude
+[exit 0]
+
+$ firstmate
+firstmate: harness is not primary-capable: kimi (primary-capable: claude codex opencode pi pi-signed grok cursor omp)
+[exit 1]
+
+$ firstmate
+firstmate: harness is not primary-capable: rm (primary-capable: claude codex opencode pi pi-signed grok cursor omp)
+[exit 1]
+
+$ firstmate
+firstmate: harness is not primary-capable: gemini (primary-capable: claude codex opencode pi pi-signed grok cursor omp)
+[exit 1]
+
+$ firstmate
+firstmate: config/primary-harness must be a regular file, not a symlink: /tmp/fm-live.cGoGxR/work/app/.firstmate/config/primary-harness
+[exit 1]
+
+=================== S6 --harness flag held to the same primary-capable set ===================
+
+$ firstmate --harness kimi
+firstmate: harness is not primary-capable: kimi (primary-capable: claude codex opencode pi pi-signed grok cursor omp)
+[exit 1]
+
+$ firstmate --harness=kimi
+firstmate: harness is not primary-capable: kimi (primary-capable: claude codex opencode pi pi-signed grok cursor omp)
+[exit 1]
+
+$ firstmate --harness bash -c echo pwned
+firstmate: harness is not primary-capable: bash (primary-capable: claude codex opencode pi pi-signed grok cursor omp)
+[exit 1]
+
+$ firstmate --harness=/bin/sh
+firstmate: harness is not primary-capable: /bin/sh (primary-capable: claude codex opencode pi pi-signed grok cursor omp)
+[exit 1]
+
+$ firstmate --harness pi
+[exec'd pi] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/tmp/fm-live.cGoGxR/work/app/.firstmate FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/app FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=pi FM_OMP_HARNESS=<unset>
+  fm-harness.sh (PI_CODING_AGENT=true) => claude
+[exit 0]
+
+=================== S7 pi / pi-signed / omp identity markers set per launch ===================
+
+$ firstmate --harness pi-signed
+[exec'd pi-signed] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/tmp/fm-live.cGoGxR/work/app/.firstmate FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/app FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=pi-signed FM_OMP_HARNESS=<unset>
+  fm-harness.sh (PI_CODING_AGENT=true) => claude
+[exit 0]
+
+$ firstmate --harness pi
+[exec'd pi] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/tmp/fm-live.cGoGxR/work/app/.firstmate FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/app FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=pi FM_OMP_HARNESS=<unset>
+  fm-harness.sh (PI_CODING_AGENT=true) => claude
+[exit 0]
+
+$ firstmate --harness=omp
+[exec'd omp] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/tmp/fm-live.cGoGxR/work/app/.firstmate FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/app FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=<unset> FM_OMP_HARNESS=omp
+[exit 0]
+
+$ firstmate --harness pi --version
+0.85.1
+[exit 0]
+
+=================== S8 explicit FM_HOME wins; relative FM_HOME canonicalized ===================
+
+$ firstmate --harness pi
+[exec'd pi] cwd=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3 args=
+  FM_HOME=/tmp/fm-live.cGoGxR/explicit FM_LAUNCH_DIR=/tmp/fm-live.cGoGxR/work/app/src FM_ROOT_OVERRIDE=/home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3
+  FM_PI_HARNESS=pi FM_OMP_HARNESS=<unset>
+  fm-harness.sh (PI_CODING_AGENT=true) => claude
+[exit 0]
+
+=================== S9 firstmate init --org lists discoverable siblings without registering them ===================
+
+$ firstmate init --org
+firstmate: created /tmp/fm-live.cGoGxR/org/.firstmate
+firstmate: projects root is /tmp/fm-live.cGoGxR/org (config/projects-root=..)
+firstmate: discoverable sibling repos: alpha beta
+firstmate: discovery is not authority - register each project in /tmp/fm-live.cGoGxR/org/.firstmate/data/projects.md before firstmate may refresh, spawn, seed, or land it
+firstmate: run `firstmate` from anywhere under /tmp/fm-live.cGoGxR/org to launch against this home
+[exit 0]
+
+$ cat /tmp/fm-live.cGoGxR/org/.firstmate/data/projects.md
+cat: /tmp/fm-live.cGoGxR/org/.firstmate/data/projects.md: No such file or directory
+[exit 1]
+
+$ env FM_HOME=/tmp/fm-live.cGoGxR/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-projects.sh discover
+alpha
+beta
+[exit 0]
+
+$ env FM_HOME=/tmp/fm-live.cGoGxR/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2S7T9502TSF6YEXZFVQ6PC3/bin/fm-projects.sh root
+/tmp/fm-live.cGoGxR/org
+[exit 0]
+SANDBOX=/tmp/fm-live.cGoGxR
