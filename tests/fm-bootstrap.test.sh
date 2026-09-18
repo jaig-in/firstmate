@@ -873,6 +873,28 @@ SH
   pass "bootstrap refreshes an org home whose projects root does not exist"
 }
 
+test_malformed_projects_root_is_reported_not_fatal() {
+  local case_dir home fakebin out rc
+  case_dir="$TMP_ROOT/fleet-sync-malformed-root"
+  home="$case_dir/home"
+  mkdir -p "$home/config"
+  printf '%s\n' manual > "$home/config/backlog-backend"
+  printf '%s\n%s\n' "$case_dir/a" "$case_dir/b" > "$home/config/projects-root"
+  fakebin=$(make_fake_toolchain "$case_dir")
+
+  rc=0
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_LAVISH_AXI_VERSION=0.1.46 \
+    "$ROOT/bin/fm-bootstrap.sh" lavish-compatible 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a malformed projects-root made lavish-compatible fail: $out"
+
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
+  assert_contains "$out" "FLEET_SYNC: fleet: skipped: $home/config/projects-root must contain exactly one path line" \
+    "a malformed projects-root was not reported as the fleet refresh's cause"
+  pass "a malformed projects-root is reported by the fleet refresh, not fatal to bootstrap"
+}
+
 test_fleet_sync_timeout_is_computed_before_launch() {
   local case_dir home fakebin fake_root out started_marker git_record
   case_dir="$TMP_ROOT/fleet-timeout-launch-order"
@@ -1340,6 +1362,7 @@ test_fleet_sync_timeout_explicit_override_wins
 test_fleet_sync_timeout_empty_override_uses_default
 test_fleet_sync_failure_is_reported
 test_fleet_sync_runs_in_an_org_home_whose_root_is_absent
+test_malformed_projects_root_is_reported_not_fatal
 test_fleet_sync_timeout_is_computed_before_launch
 test_routine_bootstrap_confirmations_are_silent
 test_routine_bootstrap_contract_runs_under_system_bash
