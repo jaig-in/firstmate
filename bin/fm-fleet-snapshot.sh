@@ -13,7 +13,8 @@
 #   schema: stable schema id.
 #   generated: UTC observation time for this fresh command execution.
 #   fm_home: resolved operational home.
-#   roots: resolved root/config/data/state/projects directories.
+#   roots: resolved root/config/data/state/projects directories; projects is
+#     null when a malformed config/projects-root leaves no effective root.
 #   backlog: {path,present,records[]} where records are ordered as written in
 #     data/backlog.md and cover In flight, Queued, and Done.
 #     Canonical tasks-axi rows are structured; free-form non-empty lines in
