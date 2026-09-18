@@ -153,7 +153,7 @@ Both write `config/projects-root` (below), a `.tasks.toml` backlog config, and a
 
 `config/projects-root` holds one line naming the directory whose children are this home's projects: a relative path resolves against the home, and `firstmate init` writes `..` so an org home's projects are the org root's sibling repositories.
 Resolution order for the effective projects root is `FM_PROJECTS_OVERRIDE`, then `config/projects-root`, then `$FM_HOME/projects`; `bin/fm-projects-lib.sh` owns the contract and every script that computes a projects root consumes it.
-A malformed `config/projects-root` fails loudly rather than falling back.
+A malformed `config/projects-root` fails loudly rather than falling back: scripts that act on projects refuse, bootstrap reports it as `FLEET_SYNC: fleet: skipped: <reason>` without abandoning its other duties, and the fleet snapshot keeps reporting with `roots.projects` set to `null`.
 
 Discovery is not authority: sibling repositories under a `config/projects-root` home are discoverable for intake and registry rebuild (`bin/fm-projects.sh discover`), but only registered `data/projects.md` entries and `data/project-paths.json` aliases are eligible for refresh, spawn, seeding, or landing.
 `data/project-paths.json` is a flat JSON object `{"<alias>": "<absolute-path>"}` registering a project that lives outside the projects root.
