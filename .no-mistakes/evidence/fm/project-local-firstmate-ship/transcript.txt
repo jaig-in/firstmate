@@ -1,0 +1,180 @@
+
+=================== S1 per-project init in a repo ===================
+
+$ (cd $SB/work/app) firstmate init
+firstmate: created $SB/work/app/.firstmate
+firstmate: projects root is $SB/work/app (config/projects-root=..)
+firstmate: registered app in $SB/work/app/.firstmate/data/projects.md
+firstmate: run `firstmate` from anywhere under $SB/work/app to launch against this home
+[exit 0]
+
+$ (cd $SB/work/app) git status --porcelain --untracked-files=all
+[exit 0]
+(empty porcelain above = enclosing repo left clean)
+
+$ (cd $SB/work/app) cat .firstmate/data/projects.md
+- app [local-only] - this repository (added 2026-09-18)
+[exit 0]
+
+$ (cd $SB/work/app) cat .firstmate/config/projects-root
+..
+[exit 0]
+
+=================== S2 launch from a subdirectory resolves the per-project home ===================
+
+$ (cd $SB/work/app/src/deep) firstmate --resume abc
+[harness claude] FM_HOME=$SB/work/app/.firstmate
+[harness claude] FM_LAUNCH_DIR=$SB/work/app/src/deep
+[harness claude] cwd=$WT
+[harness claude] FM_PI_HARNESS=<unset> args=--resume abc
+[exit 0]
+
+=================== S3 repo with no home refuses to guess ===================
+
+$ (cd $SB/work/other) firstmate
+firstmate: no .firstmate/ home found above $SB/work/other.
+  Run 'firstmate init' at a repo root for a per-project home,
+       'firstmate init --org' at an org root, or 'firstmate --global' for the global home.
+[exit 1]
+
+=================== S4 outside any repo falls back to the global home ===================
+
+$ (cd $SB/plain) firstmate
+[harness claude] FM_HOME=$SB/home/.firstmate
+[harness claude] FM_LAUNCH_DIR=$SB/plain
+[harness claude] cwd=$WT
+[harness claude] FM_PI_HARNESS=<unset> args=
+[exit 0]
+
+$ (cd $SB/work/other) firstmate --global
+[harness claude] FM_HOME=$SB/home/.firstmate
+[harness claude] FM_LAUNCH_DIR=$SB/work/other
+[harness claude] cwd=$WT
+[harness claude] FM_PI_HARNESS=<unset> args=
+[exit 0]
+
+=================== S5 adversarial: committed .firstmate with tracked trust marker is refused ===================
+
+$ (cd $SB/work/hostile) firstmate
+firstmate: untrusted home: $SB/work/hostile/.firstmate has no local (untracked) .fm-home marker.
+  A .firstmate/ directory can carry committed config (harness, backlog
+  backend), so the launcher refuses to honor one it did not create; a
+  .fm-home committed to git does not count.
+  Bless it by running 'firstmate init' there, or knowingly: touch '$SB/work/hostile/.firstmate/.fm-home'
+[exit 1]
+
+=================== S6 adversarial: harness whitelist (config and --harness) ===================
+
+$ (cd $SB/work/app) firstmate
+firstmate: harness is not primary-capable: sh-evil (primary-capable: claude codex opencode pi pi-signed grok cursor omp)
+[exit 1]
+
+$ (cd $SB/work/app) firstmate
+firstmate: harness is not primary-capable: kimi (primary-capable: claude codex opencode pi pi-signed grok cursor omp)
+[exit 1]
+
+$ (cd $SB/work/app) firstmate --harness kimi
+firstmate: harness is not primary-capable: kimi (primary-capable: claude codex opencode pi pi-signed grok cursor omp)
+[exit 1]
+
+$ (cd $SB/work/app) firstmate
+firstmate: config/primary-harness must be a regular file, not a symlink: $SB/work/app/.firstmate/config/primary-harness
+[exit 1]
+
+=================== S7 pi-signed primary gets its identity marker; a stale shell marker cannot relabel ===================
+
+$ (cd $SB/work/app) firstmate
+[harness pi-signed] FM_HOME=$SB/work/app/.firstmate
+[harness pi-signed] FM_LAUNCH_DIR=$SB/work/app
+[harness pi-signed] cwd=$WT
+[harness pi-signed] FM_PI_HARNESS=pi-signed args=
+[exit 0]
+
+$ (cd $SB/work/app) env FM_PI_HARNESS=pi-signed firstmate --harness claude
+[harness claude] FM_HOME=$SB/work/app/.firstmate
+[harness claude] FM_LAUNCH_DIR=$SB/work/app
+[harness claude] cwd=$WT
+[harness claude] FM_PI_HARNESS=pi-signed args=
+[exit 0]
+
+=================== S8 org home: init --org, discovery is not authority, refresh only registered ===================
+
+$ (cd $SB/org) firstmate init --org
+firstmate: created $SB/org/.firstmate
+firstmate: projects root is $SB/org (config/projects-root=..)
+firstmate: discoverable sibling repos: api web
+firstmate: discovery is not authority - register each project in $SB/org/.firstmate/data/projects.md before firstmate may refresh, spawn, seed, or land it
+firstmate: run `firstmate` from anywhere under $SB/org to launch against this home
+[exit 0]
+
+$ (cd $SB/org) env FM_HOME=/tmp/fm-live.NlPSRa/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2TDM6HS7N0AE32D126A35TZ/bin/fm-projects.sh discover
+api
+web
+[exit 0]
+
+$ (cd $SB/org) env FM_HOME=/tmp/fm-live.NlPSRa/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2TDM6HS7N0AE32D126A35TZ/bin/fm-projects.sh aliases
+api
+[exit 0]
+
+$ (cd $SB/org) env FM_HOME=/tmp/fm-live.NlPSRa/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2TDM6HS7N0AE32D126A35TZ/bin/fm-projects.sh resolve api
+$SB/org/api
+[exit 0]
+before: api=c1 web=c1
+
+$ (cd $SB/org) env FM_HOME=/tmp/fm-live.NlPSRa/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2TDM6HS7N0AE32D126A35TZ/bin/fm-fleet-sync.sh
+api: synced a298749..ade1fce
+[exit 0]
+after:  api=upstream c2 web=c1
+
+$ (cd $SB/org) env FM_HOME=/tmp/fm-live.NlPSRa/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2TDM6HS7N0AE32D126A35TZ/bin/fm-fleet-sync.sh web
+error: $SB/org/web is not a registered project of this home; register it in $SB/org/.firstmate/data/projects.md (or data/project-paths.json) before refreshing
+[exit 1]
+
+$ (cd $SB/org) env FM_HOME=/tmp/fm-live.NlPSRa/org/.firstmate /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2TDM6HS7N0AE32D126A35TZ/bin/fm-fleet-sync.sh notes
+notes: skipped: not a git repo
+[exit 0]
+
+$ (cd $SB/org/web) firstmate
+[harness claude] FM_HOME=$SB/org/.firstmate
+[harness claude] FM_LAUNCH_DIR=$SB/org/web
+[harness claude] cwd=$WT
+[harness claude] FM_PI_HARNESS=<unset> args=
+[exit 0]
+
+=================== S9 malformed config/projects-root: snapshot, home-summary refresh, bootstrap survive ===================
+
+$ (cd $SB/org/web) env FM_HOME=/tmp/fm-live.NlPSRa/malformed /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2TDM6HS7N0AE32D126A35TZ/bin/fm-fleet-sync.sh
+error: $SB/malformed/config/projects-root must contain exactly one path line
+[exit 1]
+$ FM_HOME=$SB/malformed fm-fleet-snapshot.sh --json | jq '{schema, projects: .roots.projects, backlog_type: (.backlog|type)}'
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "projects": null,
+  "backlog_type": "object"
+}
+[exit 0]
+
+$ (cd $SB/org/web) env FM_HOME=/tmp/fm-live.NlPSRa/malformed /home/jb/.no-mistakes/worktrees/9a303e19c024/01M2TDM6HS7N0AE32D126A35TZ/bin/fm-home-summary-refresh.sh --best-effort
+[exit 0]
+
+$ (cd $SB/org/web) ls -a /tmp/fm-live.NlPSRa/malformed/state
+.
+..
+home-summary.json
+[exit 0]
+$ jq keys state/home-summary.json
+["active_children","contributions","counts","decisions_open","endpoints","generated","generated_epoch","hold_classifier_schema","holds","home","invalidity","landed","omitted","queued","reason","schema","state","valid"]
+$ FM_HOME=$SB/malformed FM_BOOTSTRAP_NETWORK=skip fm-bootstrap.sh | grep -E 'FLEET_SYNC|error'
+[bootstrap exit 0]
+
+=================== S10 session-start digest shows the launch directory ===================
+$ FM_HOME=$SB/work/app/.firstmate FM_LAUNCH_DIR=$SB/work/app/src/deep fm-session-start.sh | head
+
+================================================================================
+SESSION START - $SB/work/app/.firstmate
+================================================================================
+Launched from: $SB/work/app/src/deep
+
+LOCK
+--------------------------------------------------------------------------------
+SANDBOX=/tmp/fm-live.NlPSRa

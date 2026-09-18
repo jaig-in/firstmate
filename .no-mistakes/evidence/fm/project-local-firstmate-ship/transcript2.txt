@@ -1,0 +1,12 @@
+$ printf 'a\nb\n' > $SB/malformed/config/projects-root
+$ FM_HOME=$SB/malformed FM_BOOTSTRAP_NETWORK=only fm-bootstrap.sh   (network phase, where fleet_sync runs)
+NEEDS_GH_AUTH
+FLEET_SYNC: fleet: skipped: $SB/malformed/config/projects-root must contain exactly one path line
+[exit 0]
+
+$ FM_HOME=$SB/malformed fm-bootstrap.sh lavish-compatible
+[exit 0]
+
+$ FM_PI_HARNESS=pi-signed firstmate --harness pi   (stale signed marker exported in the shell)
+[harness pi] FM_PI_HARNESS=pi
+[exit 0]
