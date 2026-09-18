@@ -19,8 +19,10 @@
 #       extensions load exactly as they do from a checkout today; the caller's
 #       directory is preserved in FM_LAUNCH_DIR and printed by the
 #       session-start digest. Harness selection: --harness, then the resolved
-#       home's config/primary-harness (verified primary adapter names only),
-#       then claude. Remaining args pass through to the harness verbatim.
+#       home's config/primary-harness, then claude; whichever source supplies
+#       it must be a primary-capable adapter name. Pi, pi-signed, and omp get
+#       their launch-boundary identity marker (FM_PI_HARNESS / FM_OMP_HARNESS)
+#       set for this launch. Remaining args pass through to the harness verbatim.
 #   firstmate init [--org]
 #       Scaffold a .firstmate/ home. --org creates it at the current directory
 #       (an org root whose sibling directories are the projects); without
@@ -284,6 +286,10 @@ cmd_launch() {
   export FM_ROOT_OVERRIDE=$INSTALL_ROOT
   FM_LAUNCH_DIR=$(pwd -P)
   export FM_LAUNCH_DIR
+  case $harness in
+    pi | pi-signed) export FM_PI_HARNESS=$harness ;;
+    omp) export FM_OMP_HARNESS=omp ;;
+  esac
   cd "$INSTALL_ROOT"
   exec "$harness" "$@"
 }
