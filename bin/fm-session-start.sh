@@ -30,14 +30,14 @@
 #                       than the install checkout, print the launch directory,
 #                       that repository as the working project, the registered
 #                       alias (a linked worktree resolves by its own path,
-#                       then its main worktree), unregistered, or an unreadable registry, and
-#                       the path of the AGENTS.md or CLAUDE.md whose bounded
-#                       excerpt the context digest carries. A direct harness
-#                       launch (no FM_LAUNCH_DIR) or a launch outside any git
-#                       repository omits this section. An unregistered
-#                       repository is named, never auto-registered. Read-only
-#                       local lookups only; print_launch_context owns the
-#                       section.
+#                       then its main worktree), unregistered, or an
+#                       unreadable registry, and the path of the AGENTS.md or
+#                       CLAUDE.md whose bounded excerpt the context digest
+#                       carries. A direct harness launch (no FM_LAUNCH_DIR)
+#                       or a launch outside any git repository omits this
+#                       section. An unregistered repository is named, never
+#                       auto-registered. Read-only local lookups only;
+#                       print_launch_context owns the section.
 #   2. lock          - acquire the per-home session lock FIRST, before any
 #                       mutating step runs.
 #   3. bootstrap      - home-local stale Herdr projection cleanup runs only
@@ -386,9 +386,9 @@ subsection() { printf '\n%s\n%s\n' "$1" "$SUBRULE"; }
 # identity lines and record its AGENTS.md or CLAUDE.md in LAUNCH_INSTR for
 # print_launch_instructions_excerpt. A linked worktree is named as the working
 # project and looked up in the registry by its own path, then by its main
-# worktree when its own path is not registered. A launch outside
-# any git repository, or within the install checkout, claims no project and
-# emits nothing, as does a direct harness launch (no FM_LAUNCH_DIR). Does not
+# worktree when its own path is not registered. A launch outside any git
+# repository, or within the install checkout, claims no project and emits
+# nothing, as does a direct harness launch (no FM_LAUNCH_DIR). Does not
 # register anything.
 LAUNCH_INSTR=
 print_launch_context() {
