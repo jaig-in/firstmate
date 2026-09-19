@@ -4,12 +4,13 @@
 # (recovery) into one ordered digest.
 #
 # Coverage:
-#   - LAUNCH CONTEXT: omitted without FM_LAUNCH_DIR and when the launch dir is
-#     the install root; registered vs unregistered vs unreadable-registry
-#     launch repos; a non-repo launch claims no working project but surfaces
-#     the launch dir's own instruction file; AGENTS.md excerpt (line- and
-#     width-bounded, printed after the CONTEXT digest) vs CLAUDE.md fallback
-#     vs absent instructions
+#   - LAUNCH CONTEXT: omitted without FM_LAUNCH_DIR, when the launch dir is
+#     the install root or inside it, and outside any git repository (whose
+#     instruction file is never read); registered vs unregistered vs
+#     unreadable-registry launch repos; a linked worktree resolves its alias
+#     through the main worktree; AGENTS.md excerpt (line- and width-bounded,
+#     printed after the CONTEXT digest) vs CLAUDE.md fallback vs absent
+#     instructions
 #   - absent-file markers vs empty-but-present files in the context digest
 #   - the lock-refusal read-only path: banner leads, every mutating step is
 #     skipped (including bootstrap's seven mutating sweeps, verified by their
@@ -814,7 +815,12 @@ EOF
   assert_not_contains "$out" "LAUNCH CONTEXT" \
     "launching from the install root printed a LAUNCH CONTEXT section"
 
-  pass "LAUNCH CONTEXT is omitted without FM_LAUNCH_DIR and when launched from the install root"
+  mkdir -p "$root/docs"
+  out=$(run_session_start_launched_from "$home" "$root" "$fakebin:$BASE_PATH" "$root/docs")
+  assert_not_contains "$out" "LAUNCH CONTEXT" \
+    "launching from a subdirectory of the install checkout printed a LAUNCH CONTEXT section"
+
+  pass "LAUNCH CONTEXT is omitted without FM_LAUNCH_DIR and when launched from within the install checkout"
 }
 
 test_launch_context_registered_project_primes_agents_excerpt() {
@@ -923,7 +929,7 @@ EOF
   pass "LAUNCH CONTEXT reports an unreadable registry instead of calling the repo unregistered"
 }
 
-test_launch_context_non_repo_launch_claims_no_working_project() {
+test_launch_context_non_repo_launch_omits_section_and_instructions() {
   local rec root home fakebin plain out
   rec=$(new_world launch-non-repo)
   IFS='|' read -r root home fakebin <<EOF
@@ -938,23 +944,46 @@ EOF
   if git -C "$plain" rev-parse --show-toplevel >/dev/null 2>&1; then
     fail "fixture directory $plain is unexpectedly inside a git repository"
   fi
-
-  out=$(run_session_start_launched_from "$home" "$root" "$fakebin:$BASE_PATH" "$plain")
-  assert_contains "$out" "LAUNCH CONTEXT" "a non-repo launch omitted the LAUNCH CONTEXT section"
-  assert_contains "$out" "Working project: none" "a non-repo launch claimed a working project"
-  assert_not_contains "$out" "Project alias:" "a non-repo launch printed a project alias"
-  assert_not_contains "$out" "does not auto-register" "a non-repo launch printed registration advice"
-  assert_contains "$out" "Launch instructions: none (no AGENTS.md or CLAUDE.md in the launch directory)" \
-    "a non-repo launch without instruction files did not say so"
-
   printf 'PLAIN_DIR_CLAUDE_MARKER\n' > "$plain/CLAUDE.md"
-  out=$(run_session_start_launched_from "$home" "$root" "$fakebin:$BASE_PATH" "$plain")
-  assert_contains "$out" "Launch instructions: $plain/CLAUDE.md" \
-    "a non-repo launch did not surface the launch directory's CLAUDE.md"
-  assert_contains "$out" "PLAIN_DIR_CLAUDE_MARKER" "a non-repo launch omitted the launch-dir instructions excerpt"
-  assert_not_contains "$out" "Project instructions:" "a non-repo launch labeled launch-dir instructions as a project's"
+  printf 'PLAIN_DIR_AGENTS_MARKER\n' > "$plain/AGENTS.md"
 
-  pass "LAUNCH CONTEXT outside a repository claims no working project and surfaces launch-dir instructions"
+  out=$(run_session_start_launched_from "$home" "$root" "$fakebin:$BASE_PATH" "$plain")
+  assert_not_contains "$out" "LAUNCH CONTEXT" "a non-repo launch printed a LAUNCH CONTEXT section"
+  assert_not_contains "$out" "LAUNCH INSTRUCTIONS EXCERPT" "a non-repo launch printed an instructions excerpt"
+  assert_not_contains "$out" "PLAIN_DIR_CLAUDE_MARKER" "a non-repo launch primed the launch directory's CLAUDE.md"
+  assert_not_contains "$out" "PLAIN_DIR_AGENTS_MARKER" "a non-repo launch primed the launch directory's AGENTS.md"
+
+  pass "LAUNCH CONTEXT is omitted outside a repository and never reads launch-dir instructions"
+}
+
+test_launch_context_linked_worktree_resolves_registry_via_main_worktree() {
+  local rec root home fakebin proj out repo_root wt
+  rec=$(new_world launch-worktree)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+
+  proj="${home%/home}/demo"
+  fm_git_init_commit "$proj"
+  repo_root=$(cd "$proj" && pwd -P)
+  git -C "$proj" worktree add -q "$proj/.worktrees/x" -b wt-x
+  wt=$(cd "$proj/.worktrees/x" && pwd -P)
+  printf 'WORKTREE_AGENTS_MARKER\n' > "$wt/AGENTS.md"
+  printf -- '- demo [local-only] - demo project (added 2026-09-19)\n' > "$home/data/projects.md"
+  printf '{"demo": "%s"}\n' "$repo_root" > "$home/data/project-paths.json"
+
+  out=$(run_session_start_launched_from "$home" "$root" "$fakebin:$BASE_PATH" "$wt")
+  assert_contains "$out" "Repo root: $wt" "a worktree launch did not name the worktree as the repo root"
+  assert_contains "$out" "Working project: $wt" "a worktree launch did not name the worktree as the working project"
+  assert_contains "$out" "Project alias: demo" "a worktree launch did not resolve the main worktree's alias"
+  assert_not_contains "$out" "Project alias: unregistered" "a worktree of a registered project was labeled unregistered"
+  assert_not_contains "$out" "does not auto-register" "a worktree of a registered project printed registration advice"
+  assert_contains "$out" "Project instructions: $wt/AGENTS.md" "a worktree launch did not name the worktree's AGENTS.md"
+  assert_contains "$out" "WORKTREE_AGENTS_MARKER" "a worktree launch omitted the worktree's instructions excerpt"
+
+  pass "LAUNCH CONTEXT resolves a linked worktree's registry alias through its main worktree"
 }
 
 test_launch_context_unregistered_repo_names_registration_and_absent_instructions() {
@@ -2926,7 +2955,8 @@ test_launch_context_unregistered_repo_names_registration_and_absent_instructions
 test_launch_context_uses_claude_md_when_agents_absent
 test_launch_context_excerpt_caps_long_lines
 test_launch_context_unreadable_registry_is_not_reported_unregistered
-test_launch_context_non_repo_launch_claims_no_working_project
+test_launch_context_non_repo_launch_omits_section_and_instructions
+test_launch_context_linked_worktree_resolves_registry_via_main_worktree
 test_lock_refusal_read_only_path
 test_lock_write_failure_read_only_path
 test_trace_context_effective_state_is_frozen_after_lock

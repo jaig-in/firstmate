@@ -26,16 +26,18 @@
 # ORDERING, and why LOCK now runs before BOOTSTRAP (the old AGENTS.md order
 # was bootstrap-then-lock):
 #
-#   1. launch-context - when FM_LAUNCH_DIR is set and is not the install
-#                       root, print the launch directory, its enclosing git
-#                       repository as the working project (or none outside a
-#                       repository), the registered alias, unregistered, or an
-#                       unreadable registry, and the path of the AGENTS.md or
-#                       CLAUDE.md whose bounded excerpt the context digest
-#                       carries. A direct harness launch (no FM_LAUNCH_DIR)
-#                       omits this section. An unregistered repository is
-#                       named, never auto-registered. Read-only local lookups
-#                       only; print_launch_context owns the section.
+#   1. launch-context - when FM_LAUNCH_DIR is inside a git repository other
+#                       than the install checkout, print the launch directory,
+#                       that repository as the working project, the registered
+#                       alias (a linked worktree resolves through its main
+#                       worktree), unregistered, or an unreadable registry, and
+#                       the path of the AGENTS.md or CLAUDE.md whose bounded
+#                       excerpt the context digest carries. A direct harness
+#                       launch (no FM_LAUNCH_DIR) or a launch outside any git
+#                       repository omits this section. An unregistered
+#                       repository is named, never auto-registered. Read-only
+#                       local lookups only; print_launch_context owns the
+#                       section.
 #   2. lock          - acquire the per-home session lock FIRST, before any
 #                       mutating step runs.
 #   3. bootstrap      - home-local stale Herdr projection cleanup runs only
@@ -378,70 +380,64 @@ SUBRULE='-----------------------------------------------------------------------
 section() { printf '\n%s\n%s\n%s\n' "$RULE" "$1" "$RULE"; }
 subsection() { printf '\n%s\n%s\n' "$1" "$SUBRULE"; }
 
-# print_launch_context: when the launcher recorded a caller directory that is
-# not the install root, emit the launch project's identity lines and record its
-# AGENTS.md or CLAUDE.md in LAUNCH_INSTR for print_launch_instructions_excerpt.
-# A launch inside a git repository names that repository as the working
-# project; a launch outside one claims no working project and looks for the
-# instruction file in the launch directory itself. Absent FM_LAUNCH_DIR (a
-# direct harness launch) emits nothing. Does not register anything.
+# print_launch_context: when the launcher recorded a caller directory inside a
+# git repository other than the install checkout, emit the launch project's
+# identity lines and record its AGENTS.md or CLAUDE.md in LAUNCH_INSTR for
+# print_launch_instructions_excerpt. A linked worktree is named as the working
+# project but looked up in the registry by its main worktree. A launch outside
+# any git repository, or within the install checkout, claims no project and
+# emits nothing, as does a direct harness launch (no FM_LAUNCH_DIR). Does not
+# register anything.
 LAUNCH_INSTR=
 print_launch_context() {
-  local launch_dir install_root repo_root project_alias registry_out instr_dir instr_label instr_where
+  local launch_dir install_root repo_root registry_root common_dir project_alias registry_out
   [ -n "${FM_LAUNCH_DIR:-}" ] || return 0
-  if [ -d "$FM_LAUNCH_DIR" ]; then
-    launch_dir=$(CDPATH='' cd -- "$FM_LAUNCH_DIR" && pwd -P) || launch_dir=$FM_LAUNCH_DIR
-  else
-    launch_dir=$FM_LAUNCH_DIR
-  fi
+  [ -d "$FM_LAUNCH_DIR" ] || return 0
+  launch_dir=$(CDPATH='' cd -- "$FM_LAUNCH_DIR" && pwd -P) || return 0
+  repo_root=$(git -C "$launch_dir" rev-parse --show-toplevel 2>/dev/null) || return 0
+  repo_root=$(CDPATH='' cd -- "$repo_root" && pwd -P) || return 0
   install_root=$(CDPATH='' cd -- "$FM_ROOT" && pwd -P) || install_root=$FM_ROOT
-  [ "$launch_dir" != "$install_root" ] || return 0
+  [ "$repo_root" != "$install_root" ] || return 0
+
+  registry_root=$repo_root
+  common_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || common_dir=
+  case $common_dir in
+    */.git)
+      common_dir=$(CDPATH='' cd -- "${common_dir%/.git}" 2>/dev/null && pwd -P) && registry_root=$common_dir
+      ;;
+  esac
 
   section "LAUNCH CONTEXT"
   printf 'Launch dir: %s\n' "$launch_dir"
-
-  repo_root=$(git -C "$launch_dir" rev-parse --show-toplevel 2>/dev/null) || repo_root=
-  if [ -n "$repo_root" ] && [ -d "$repo_root" ]; then
-    repo_root=$(CDPATH='' cd -- "$repo_root" && pwd -P) || true
-    printf 'Repo root: %s\n' "$repo_root"
-    printf 'Working project: %s\n' "$repo_root"
-    if registry_out=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$repo_root" 2>&1); then
-      project_alias=$registry_out
-      if [ -n "$project_alias" ]; then
-        printf 'Project alias: %s\n' "$project_alias"
-        printf 'Registry: registered in this home\n'
-      else
-        printf 'Project alias: unregistered\n'
-        printf 'Registry: not registered in this home\n'
-        printf 'This launch is inside a repository this home has not registered. Run firstmate init in the repository for a per-project home, or add the project to data/projects.md (and data/project-paths.json when it lives outside the projects root). Firstmate does not auto-register it.\n'
-      fi
+  printf 'Repo root: %s\n' "$repo_root"
+  printf 'Working project: %s\n' "$repo_root"
+  if registry_out=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$registry_root" 2>&1); then
+    project_alias=$registry_out
+    if [ -n "$project_alias" ]; then
+      printf 'Project alias: %s\n' "$project_alias"
+      printf 'Registry: registered in this home\n'
     else
-      registry_out=${registry_out%%$'\n'*}
-      fm_cap_line_var "${registry_out#error: }"
-      printf 'Project alias: unknown\n'
-      printf 'Registry: unreadable (%s)\n' "${FM_LINE_CAP_LINE:-no reason given}"
+      printf 'Project alias: unregistered\n'
+      printf 'Registry: not registered in this home\n'
+      printf 'This launch is inside a repository this home has not registered. Run firstmate init in the repository for a per-project home, or add the project to data/projects.md (and data/project-paths.json when it lives outside the projects root). Firstmate does not auto-register it.\n'
     fi
-    instr_dir=$repo_root
-    instr_label='Project instructions'
-    instr_where='at the repo root'
   else
-    printf 'Repo root: (not inside a git repository)\n'
-    printf 'Working project: none (the launch directory is not inside a git repository)\n'
-    instr_dir=$launch_dir
-    instr_label='Launch instructions'
-    instr_where='in the launch directory'
+    registry_out=${registry_out%%$'\n'*}
+    fm_cap_line_var "${registry_out#error: }"
+    printf 'Project alias: unknown\n'
+    printf 'Registry: unreadable (%s)\n' "${FM_LINE_CAP_LINE:-no reason given}"
   fi
 
-  if [ -f "$instr_dir/AGENTS.md" ]; then
-    LAUNCH_INSTR="$instr_dir/AGENTS.md"
-  elif [ -f "$instr_dir/CLAUDE.md" ]; then
-    LAUNCH_INSTR="$instr_dir/CLAUDE.md"
+  if [ -f "$repo_root/AGENTS.md" ]; then
+    LAUNCH_INSTR="$repo_root/AGENTS.md"
+  elif [ -f "$repo_root/CLAUDE.md" ]; then
+    LAUNCH_INSTR="$repo_root/CLAUDE.md"
   fi
   if [ -z "$LAUNCH_INSTR" ]; then
-    printf '%s: none (no AGENTS.md or CLAUDE.md %s)\n' "$instr_label" "$instr_where"
+    printf 'Project instructions: none (no AGENTS.md or CLAUDE.md at the repo root)\n'
     return 0
   fi
-  printf '%s: %s\n' "$instr_label" "$LAUNCH_INSTR"
+  printf 'Project instructions: %s\n' "$LAUNCH_INSTR"
   printf 'Excerpt: LAUNCH INSTRUCTIONS EXCERPT, after the CONTEXT digest below\n'
 }
 

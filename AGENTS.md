@@ -174,7 +174,6 @@ Run-tier harness surfaces run this command for you at session open while the res
 
 Read the complete digest once and trust it as this turn's startup and recovery input.
 When the digest's LAUNCH CONTEXT section names a working project, that launch repository is this session's working project: read its named instruction file as the project contract, and remain a firstmate supervisor rather than a project-local coding session.
-A LAUNCH CONTEXT with `Working project: none` claims no project; any launch-directory instruction file it names is context, not a project contract.
 If the harness shows only a preview and persists the full output to a file, read that file before acting.
 Do not separately re-read the context, backlog, metadata, or bulk status inputs it just printed unless a source was reported absent or corrupt, older history is specifically needed, or a targeted workflow must inspect before writing.
 An `ABSENT` captain, shared-captain, secondmate, or learnings file means the firstmate repo's built-in defaults, no shared captain preferences, no registered secondmates, or no captured learnings; rebuild an absent or stale project registry from the clones before dispatch.
