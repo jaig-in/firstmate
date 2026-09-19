@@ -5,8 +5,11 @@
 #
 # Coverage:
 #   - LAUNCH CONTEXT: omitted without FM_LAUNCH_DIR and when the launch dir is
-#     the install root; registered vs unregistered launch repos; AGENTS.md
-#     excerpt (bounded) vs CLAUDE.md fallback vs absent instructions
+#     the install root; registered vs unregistered vs unreadable-registry
+#     launch repos; a non-repo launch claims no working project but surfaces
+#     the launch dir's own instruction file; AGENTS.md excerpt (line- and
+#     width-bounded, printed after the CONTEXT digest) vs CLAUDE.md fallback
+#     vs absent instructions
 #   - absent-file markers vs empty-but-present files in the context digest
 #   - the lock-refusal read-only path: banner leads, every mutating step is
 #     skipped (including bootstrap's seven mutating sweeps, verified by their
@@ -777,6 +780,10 @@ EOF
 
 # --- launch context ----------------------------------------------------------
 
+first_line_of() {  # <haystack> <needle>: 1-based line of the first match, or 0
+  printf '%s\n' "$1" | grep -nF -- "$2" | head -n 1 | cut -d: -f1 | grep . || printf '0\n'
+}
+
 write_numbered_agents() {  # <file> <first-line> <line-51>
   local file=$1 first=$2 last=$3 i
   {
@@ -849,8 +856,105 @@ EOF
     "AGENTS.md did not take precedence over CLAUDE.md"
   assert_contains "$out" "(truncated; read the file for the rest)" \
     "a 51-line AGENTS.md did not disclose excerpt truncation"
+  assert_contains "$out" "Working project: $repo_root" \
+    "a launch inside a repository did not name it as the working project"
+
+  local identity_line fleet_line context_line excerpt_line
+  identity_line=$(first_line_of "$out" "Project instructions: $repo_root/AGENTS.md")
+  fleet_line=$(first_line_of "$out" "FLEET STATE")
+  context_line=$(printf '%s\n' "$out" | grep -nx 'CONTEXT' | head -n 1 | cut -d: -f1)
+  excerpt_line=$(first_line_of "$out" "LAUNCH_CONTEXT_AGENTS_FIRST unique marker")
+  [ "$identity_line" -gt 0 ] && [ "$fleet_line" -gt "$identity_line" ] \
+    || fail "LAUNCH CONTEXT identity lines did not precede the fleet state (identity=$identity_line fleet=$fleet_line)"
+  [ "${context_line:-0}" -gt "$fleet_line" ] && [ "$excerpt_line" -gt "$context_line" ] \
+    || fail "the instructions excerpt was not printed after the CONTEXT digest (fleet=$fleet_line context=${context_line:-none} excerpt=$excerpt_line)"
 
   pass "LAUNCH CONTEXT names a registered launch repo and a bounded AGENTS.md excerpt"
+}
+
+test_launch_context_excerpt_caps_long_lines() {
+  local rec root home fakebin proj out repo_root long
+  rec=$(new_world launch-long-lines)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+
+  proj="${home%/home}/wide"
+  fm_git_init_commit "$proj"
+  repo_root=$(cd "$proj" && pwd -P)
+  long="LONG_LINE_HEAD $(printf 'x%.0s' $(seq 1 3000)) LONG_LINE_TAIL_MUST_BE_CUT"
+  printf '%s\n' "$long" > "$proj/AGENTS.md"
+
+  out=$(run_session_start_launched_from "$home" "$root" "$fakebin:$BASE_PATH" "$repo_root")
+  assert_contains "$out" "LONG_LINE_HEAD" "a long AGENTS.md line was dropped instead of capped"
+  assert_contains "$out" "[truncated]" "a long AGENTS.md line was not marked truncated"
+  assert_not_contains "$out" "LONG_LINE_TAIL_MUST_BE_CUT" \
+    "a 3000-character AGENTS.md line was printed uncapped"
+
+  pass "LAUNCH CONTEXT excerpt caps each instruction line with the shared per-line cap"
+}
+
+test_launch_context_unreadable_registry_is_not_reported_unregistered() {
+  local rec root home fakebin proj out repo_root
+  rec=$(new_world launch-bad-registry)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+
+  proj="${home%/home}/demo"
+  fm_git_init_commit "$proj"
+  repo_root=$(cd "$proj" && pwd -P)
+  printf -- '- demo [local-only] - demo project (added 2026-09-19)\n' > "$home/data/projects.md"
+  printf 'not json\n' > "$home/data/project-paths.json"
+
+  out=$(run_session_start_launched_from "$home" "$root" "$fakebin:$BASE_PATH" "$repo_root")
+  assert_contains "$out" "Registry: unreadable (" \
+    "an unreadable registry was not reported as unreadable"
+  assert_contains "$out" "project-paths.json" "the unreadable-registry reason did not name the bad file"
+  assert_not_contains "$out" "Project alias: unregistered" \
+    "an unreadable registry labeled the launch repo unregistered"
+  assert_not_contains "$out" "does not auto-register" \
+    "an unreadable registry printed the unregistered registration advice"
+
+  pass "LAUNCH CONTEXT reports an unreadable registry instead of calling the repo unregistered"
+}
+
+test_launch_context_non_repo_launch_claims_no_working_project() {
+  local rec root home fakebin plain out
+  rec=$(new_world launch-non-repo)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+
+  plain="${home%/home}/plain"
+  mkdir -p "$plain"
+  plain=$(cd "$plain" && pwd -P)
+  if git -C "$plain" rev-parse --show-toplevel >/dev/null 2>&1; then
+    fail "fixture directory $plain is unexpectedly inside a git repository"
+  fi
+
+  out=$(run_session_start_launched_from "$home" "$root" "$fakebin:$BASE_PATH" "$plain")
+  assert_contains "$out" "LAUNCH CONTEXT" "a non-repo launch omitted the LAUNCH CONTEXT section"
+  assert_contains "$out" "Working project: none" "a non-repo launch claimed a working project"
+  assert_not_contains "$out" "Project alias:" "a non-repo launch printed a project alias"
+  assert_not_contains "$out" "does not auto-register" "a non-repo launch printed registration advice"
+  assert_contains "$out" "Launch instructions: none (no AGENTS.md or CLAUDE.md in the launch directory)" \
+    "a non-repo launch without instruction files did not say so"
+
+  printf 'PLAIN_DIR_CLAUDE_MARKER\n' > "$plain/CLAUDE.md"
+  out=$(run_session_start_launched_from "$home" "$root" "$fakebin:$BASE_PATH" "$plain")
+  assert_contains "$out" "Launch instructions: $plain/CLAUDE.md" \
+    "a non-repo launch did not surface the launch directory's CLAUDE.md"
+  assert_contains "$out" "PLAIN_DIR_CLAUDE_MARKER" "a non-repo launch omitted the launch-dir instructions excerpt"
+  assert_not_contains "$out" "Project instructions:" "a non-repo launch labeled launch-dir instructions as a project's"
+
+  pass "LAUNCH CONTEXT outside a repository claims no working project and surfaces launch-dir instructions"
 }
 
 test_launch_context_unregistered_repo_names_registration_and_absent_instructions() {
@@ -2820,6 +2924,9 @@ test_launch_context_omitted_without_launch_dir_or_at_install_root
 test_launch_context_registered_project_primes_agents_excerpt
 test_launch_context_unregistered_repo_names_registration_and_absent_instructions
 test_launch_context_uses_claude_md_when_agents_absent
+test_launch_context_excerpt_caps_long_lines
+test_launch_context_unreadable_registry_is_not_reported_unregistered
+test_launch_context_non_repo_launch_claims_no_working_project
 test_lock_refusal_read_only_path
 test_lock_write_failure_read_only_path
 test_trace_context_effective_state_is_frozen_after_lock
