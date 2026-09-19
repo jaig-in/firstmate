@@ -29,8 +29,8 @@
 #   1. launch-context - when FM_LAUNCH_DIR is inside a git repository other
 #                       than the install checkout, print the launch directory,
 #                       that repository as the working project, the registered
-#                       alias (a linked worktree resolves through its main
-#                       worktree), unregistered, or an unreadable registry, and
+#                       alias (a linked worktree resolves by its own path,
+#                       then its main worktree), unregistered, or an unreadable registry, and
 #                       the path of the AGENTS.md or CLAUDE.md whose bounded
 #                       excerpt the context digest carries. A direct harness
 #                       launch (no FM_LAUNCH_DIR) or a launch outside any git
@@ -385,13 +385,14 @@ subsection() { printf '\n%s\n%s\n' "$1" "$SUBRULE"; }
 # git repository other than the install checkout, emit the launch project's
 # identity lines and record its AGENTS.md or CLAUDE.md in LAUNCH_INSTR for
 # print_launch_instructions_excerpt. A linked worktree is named as the working
-# project but looked up in the registry by its main worktree. A launch outside
+# project and looked up in the registry by its own path, then by its main
+# worktree when its own path is not registered. A launch outside
 # any git repository, or within the install checkout, claims no project and
 # emits nothing, as does a direct harness launch (no FM_LAUNCH_DIR). Does not
 # register anything.
 LAUNCH_INSTR=
 print_launch_context() {
-  local launch_dir install_root repo_root registry_root common_dir project_alias registry_out
+  local launch_dir install_root repo_root main_root common_dir project_alias registry_out
   [ -n "${FM_LAUNCH_DIR:-}" ] || return 0
   [ -d "$FM_LAUNCH_DIR" ] || return 0
   launch_dir=$(CDPATH='' cd -- "$FM_LAUNCH_DIR" && pwd -P) || return 0
@@ -400,11 +401,11 @@ print_launch_context() {
   install_root=$(CDPATH='' cd -- "$FM_ROOT" && pwd -P) || install_root=$FM_ROOT
   [ "$repo_root" != "$install_root" ] || return 0
 
-  registry_root=$repo_root
+  main_root=$repo_root
   common_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || common_dir=
   case $common_dir in
     */.git)
-      common_dir=$(CDPATH='' cd -- "${common_dir%/.git}" 2>/dev/null && pwd -P) && registry_root=$common_dir
+      common_dir=$(CDPATH='' cd -- "${common_dir%/.git}" 2>/dev/null && pwd -P) && main_root=$common_dir
       ;;
   esac
 
@@ -412,7 +413,9 @@ print_launch_context() {
   printf 'Launch dir: %s\n' "$launch_dir"
   printf 'Repo root: %s\n' "$repo_root"
   printf 'Working project: %s\n' "$repo_root"
-  if registry_out=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$registry_root" 2>&1); then
+  if registry_out=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$repo_root" 2>&1) &&
+    { [ -n "$registry_out" ] || [ "$main_root" = "$repo_root" ] ||
+      registry_out=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$main_root" 2>&1); }; then
     project_alias=$registry_out
     if [ -n "$project_alias" ]; then
       printf 'Project alias: %s\n' "$project_alias"

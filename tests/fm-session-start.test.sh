@@ -8,9 +8,9 @@
 #     the install root or inside it, and outside any git repository (whose
 #     instruction file is never read); registered vs unregistered vs
 #     unreadable-registry launch repos; a linked worktree resolves its alias
-#     through the main worktree; AGENTS.md excerpt (line- and width-bounded,
-#     printed after the CONTEXT digest) vs CLAUDE.md fallback vs absent
-#     instructions
+#     by its own path, then through the main worktree; AGENTS.md excerpt
+#     (line- and width-bounded, printed after the CONTEXT digest) vs
+#     CLAUDE.md fallback vs absent instructions
 #   - absent-file markers vs empty-but-present files in the context digest
 #   - the lock-refusal read-only path: banner leads, every mutating step is
 #     skipped (including bootstrap's seven mutating sweeps, verified by their
@@ -983,7 +983,13 @@ EOF
   assert_contains "$out" "Project instructions: $wt/AGENTS.md" "a worktree launch did not name the worktree's AGENTS.md"
   assert_contains "$out" "WORKTREE_AGENTS_MARKER" "a worktree launch omitted the worktree's instructions excerpt"
 
-  pass "LAUNCH CONTEXT resolves a linked worktree's registry alias through its main worktree"
+  printf -- '- demo-feat [local-only] - worktree project (added 2026-09-19)\n' > "$home/data/projects.md"
+  printf '{"demo-feat": "%s"}\n' "$wt" > "$home/data/project-paths.json"
+  out=$(run_session_start_launched_from "$home" "$root" "$fakebin:$BASE_PATH" "$wt")
+  assert_contains "$out" "Project alias: demo-feat" "a worktree registered at its own path did not resolve its alias"
+  assert_not_contains "$out" "Project alias: unregistered" "a worktree registered at its own path was labeled unregistered"
+
+  pass "LAUNCH CONTEXT resolves a linked worktree's alias by its own path, then its main worktree"
 }
 
 test_launch_context_unregistered_repo_names_registration_and_absent_instructions() {
