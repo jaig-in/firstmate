@@ -28,9 +28,11 @@
 #
 #   1. launch-context - when FM_LAUNCH_DIR is set and is not the install
 #                       root, print the launch directory, its enclosing git
-#                       repository, the registered alias or unregistered, and
-#                       a bounded excerpt of that repository's AGENTS.md or
-#                       CLAUDE.md. A direct harness launch (no FM_LAUNCH_DIR)
+#                       repository as the working project (or none outside a
+#                       repository), the registered alias, unregistered, or an
+#                       unreadable registry, and the path of the AGENTS.md or
+#                       CLAUDE.md whose bounded excerpt the context digest
+#                       carries. A direct harness launch (no FM_LAUNCH_DIR)
 #                       omits this section. An unregistered repository is
 #                       named, never auto-registered. Read-only local lookups
 #                       only; print_launch_context owns the section.
@@ -60,8 +62,9 @@
 #   8. network checks - the result of the deferred network stage started back at
 #                       lock, harvested WITHOUT waiting for it.
 #   9. context digest - data/projects.md, data/secondmates.md, data/captain.md,
-#                       data/captain-shared.md, data/learnings.md: read-only,
-#                       always safe, always runs.
+#                       data/captain-shared.md, data/learnings.md, then the
+#                       launch instructions excerpt when launch-context named
+#                       one: read-only, always safe, always runs.
 #  10. closing reminder - prints the context-specific watcher next step; this
 #                       script points back to the emitted harness supervision
 #                       block and deliberately never arms the watcher itself.
@@ -377,11 +380,15 @@ section() { printf '\n%s\n%s\n%s\n' "$RULE" "$1" "$RULE"; }
 subsection() { printf '\n%s\n%s\n' "$1" "$SUBRULE"; }
 
 # print_launch_context: when the launcher recorded a caller directory that is
-# not the install root, emit the launch project's identity and a bounded
-# excerpt of its AGENTS.md or CLAUDE.md. Absent FM_LAUNCH_DIR (a direct
-# harness launch) emits nothing. Does not register anything.
+# not the install root, emit the launch project's identity lines and record its
+# AGENTS.md or CLAUDE.md in LAUNCH_INSTR for print_launch_instructions_excerpt.
+# A launch inside a git repository names that repository as the working
+# project; a launch outside one claims no working project and looks for the
+# instruction file in the launch directory itself. Absent FM_LAUNCH_DIR (a
+# direct harness launch) emits nothing. Does not register anything.
+LAUNCH_INSTR=
 print_launch_context() {
-  local launch_dir install_root repo_root project_alias instr line count extra
+  local launch_dir install_root repo_root project_alias registry_out instr_dir instr_label instr_where
   [ -n "${FM_LAUNCH_DIR:-}" ] || return 0
   if [ -d "$FM_LAUNCH_DIR" ]; then
     launch_dir=$(CDPATH='' cd -- "$FM_LAUNCH_DIR" && pwd -P) || launch_dir=$FM_LAUNCH_DIR
@@ -398,40 +405,54 @@ print_launch_context() {
   if [ -n "$repo_root" ] && [ -d "$repo_root" ]; then
     repo_root=$(CDPATH='' cd -- "$repo_root" && pwd -P) || true
     printf 'Repo root: %s\n' "$repo_root"
+    printf 'Working project: %s\n' "$repo_root"
+    if registry_out=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$repo_root" 2>&1); then
+      project_alias=$registry_out
+      if [ -n "$project_alias" ]; then
+        printf 'Project alias: %s\n' "$project_alias"
+        printf 'Registry: registered in this home\n'
+      else
+        printf 'Project alias: unregistered\n'
+        printf 'Registry: not registered in this home\n'
+        printf 'This launch is inside a repository this home has not registered. Run firstmate init in the repository for a per-project home, or add the project to data/projects.md (and data/project-paths.json when it lives outside the projects root). Firstmate does not auto-register it.\n'
+      fi
+    else
+      registry_out=${registry_out%%$'\n'*}
+      fm_cap_line_var "${registry_out#error: }"
+      printf 'Project alias: unknown\n'
+      printf 'Registry: unreadable (%s)\n' "${FM_LINE_CAP_LINE:-no reason given}"
+    fi
+    instr_dir=$repo_root
+    instr_label='Project instructions'
+    instr_where='at the repo root'
   else
-    repo_root=
     printf 'Repo root: (not inside a git repository)\n'
+    printf 'Working project: none (the launch directory is not inside a git repository)\n'
+    instr_dir=$launch_dir
+    instr_label='Launch instructions'
+    instr_where='in the launch directory'
   fi
 
-  project_alias=
-  if [ -n "$repo_root" ]; then
-    project_alias=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$repo_root" 2>/dev/null) || project_alias=
+  if [ -f "$instr_dir/AGENTS.md" ]; then
+    LAUNCH_INSTR="$instr_dir/AGENTS.md"
+  elif [ -f "$instr_dir/CLAUDE.md" ]; then
+    LAUNCH_INSTR="$instr_dir/CLAUDE.md"
   fi
-  if [ -n "$project_alias" ]; then
-    printf 'Project alias: %s\n' "$project_alias"
-    printf 'Registry: registered in this home\n'
-  else
-    printf 'Project alias: unregistered\n'
-    printf 'Registry: not registered in this home\n'
-    if [ -n "$repo_root" ]; then
-      printf 'This launch is inside a repository this home has not registered. Run firstmate init in the repository for a per-project home, or add the project to data/projects.md (and data/project-paths.json when it lives outside the projects root). Firstmate does not auto-register it.\n'
-    fi
-  fi
-
-  instr=
-  if [ -n "$repo_root" ]; then
-    if [ -f "$repo_root/AGENTS.md" ]; then
-      instr="$repo_root/AGENTS.md"
-    elif [ -f "$repo_root/CLAUDE.md" ]; then
-      instr="$repo_root/CLAUDE.md"
-    fi
-  fi
-  if [ -z "$instr" ]; then
-    printf 'Project instructions: none (no AGENTS.md or CLAUDE.md at the repo root)\n'
+  if [ -z "$LAUNCH_INSTR" ]; then
+    printf '%s: none (no AGENTS.md or CLAUDE.md %s)\n' "$instr_label" "$instr_where"
     return 0
   fi
-  printf 'Project instructions: %s\n' "$instr"
-  printf 'Excerpt (first 50 lines):\n'
+  printf '%s: %s\n' "$instr_label" "$LAUNCH_INSTR"
+  printf 'Excerpt: LAUNCH INSTRUCTIONS EXCERPT, after the CONTEXT digest below\n'
+}
+
+# print_launch_instructions_excerpt: the first 50 lines of LAUNCH_INSTR, each
+# through the shared per-line cap. Placed with the CONTEXT digest because it is
+# recoverable with one read of the path LAUNCH CONTEXT already printed.
+print_launch_instructions_excerpt() {
+  local line count extra
+  [ -n "$LAUNCH_INSTR" ] || return 0
+  subsection "LAUNCH INSTRUCTIONS EXCERPT - $LAUNCH_INSTR (first 50 lines)"
   extra=0
   count=0
   while IFS= read -r line || [ -n "$line" ]; do
@@ -440,8 +461,9 @@ print_launch_context() {
       break
     fi
     count=$((count + 1))
-    printf '  %s\n' "$line"
-  done < "$instr"
+    fm_cap_line_var "$line"
+    printf '  %s\n' "$FM_LINE_CAP_LINE"
+  done < "$LAUNCH_INSTR"
   if [ "$extra" -eq 1 ]; then
     printf '  (truncated; read the file for the rest)\n'
   fi
@@ -1033,6 +1055,7 @@ print_file_or_absent "$DATA/secondmates.md" "data/secondmates.md"
 print_file_or_absent "$DATA/captain.md" "data/captain.md"
 print_file_or_absent "$DATA/captain-shared.md" "data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)"
 print_file_or_absent "$DATA/learnings.md" "data/learnings.md"
+print_launch_instructions_excerpt
 
 # --- 10. closing reminder ----------------------------------------------
 stage next-step
