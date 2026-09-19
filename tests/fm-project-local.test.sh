@@ -10,6 +10,8 @@
 #     (or the install root when that is absent); a cwd inside a git repo with
 #     no .firstmate/ ancestor refuses to guess. The harness execs from the
 #     install root with FM_LAUNCH_DIR recording the caller's directory.
+#     Session-start digest priming of that launch directory (LAUNCH CONTEXT)
+#     lives in tests/fm-session-start.test.sh.
 #     Ancestor-discovered homes must carry the init-written .fm-home trust
 #     marker; config/primary-harness accepts only verified primary adapters;
 #     a relative FM_HOME is canonicalized before export.

@@ -17,8 +17,9 @@
 #            and `firstmate --global`.
 #       The harness runs with cwd = install root so AGENTS.md, hooks, and
 #       extensions load exactly as they do from a checkout today; the caller's
-#       directory is preserved in FM_LAUNCH_DIR and printed by the
-#       session-start digest. Harness selection: --harness, then the resolved
+#       directory is preserved in FM_LAUNCH_DIR. When that directory differs
+#       from the install root, the session-start digest emits a LAUNCH CONTEXT
+#       section (bin/fm-session-start.sh). Harness selection: --harness, then the resolved
 #       home's config/primary-harness, then claude; whichever source supplies
 #       it must be a primary-capable adapter name. Pi, pi-signed, and omp get
 #       their launch-boundary identity marker (FM_PI_HARNESS / FM_OMP_HARNESS)
