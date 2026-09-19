@@ -33,7 +33,10 @@ The two are independent: `FM_HOME` selects the home and `FM_ROOT_OVERRIDE` (or t
 
 The `firstmate` launcher (`bin/firstmate`, intended on `PATH`) resolves the home for a primary session, then `cd`s to the install root and execs the harness so instructions, hooks, and extensions load exactly as they do from a checkout.
 Home resolution order: an explicit `FM_HOME` always wins; otherwise the nearest `.firstmate/` ancestor of the caller's directory (a nested `.firstmate/` shadows an outer org home); otherwise, outside any git repository or with `--global`, the global home (`$HOME/.firstmate` when it exists, else the install root); a directory inside a git repository with no `.firstmate/` ancestor refuses to guess and names the init commands.
-The caller's directory is exported as `FM_LAUNCH_DIR` and printed by the session-start digest.
+The caller's directory is exported as `FM_LAUNCH_DIR`.
+When it differs from the install root, `bin/fm-session-start.sh` emits a LAUNCH CONTEXT section naming the launch directory, the enclosing git repository, the registered alias or `unregistered`, and a bounded excerpt of that repository's `AGENTS.md` or `CLAUDE.md`.
+An unregistered repository is named, not auto-registered.
+A direct harness launch with no `FM_LAUNCH_DIR` omits the section.
 The harness is `--harness <name>`, then the home's `config/primary-harness` (one token), then `claude`; remaining arguments pass through to the harness.
 Whichever source supplies it, the harness name must be a primary-capable adapter (`claude codex opencode pi pi-signed grok cursor omp`; the crew-only adapters `muse gemini rovo agy` are refused, and `kimi` is refused because it is verified as a crewmate harness but sits outside the primary turn-end guard scope), and any other value - including a symlinked `config/primary-harness` file or a value with interior whitespace - fails loudly at launch.
 That whitelist keeps a home config or flag from naming an arbitrary binary or a harness with no primary supervision protocol; [README requirements](../README.md#requirements) own the harnesses supported for a primary session.
