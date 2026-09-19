@@ -35,7 +35,7 @@ The `firstmate` launcher (`bin/firstmate`, intended on `PATH`) resolves the home
 Home resolution order: an explicit `FM_HOME` always wins; otherwise the nearest `.firstmate/` ancestor of the caller's directory (a nested `.firstmate/` shadows an outer org home); otherwise, outside any git repository or with `--global`, the global home (`$HOME/.firstmate` when it exists, else the install root); a directory inside a git repository with no `.firstmate/` ancestor refuses to guess and names the init commands.
 The caller's directory is exported as `FM_LAUNCH_DIR`.
 When it lies inside a git repository other than the install checkout, `bin/fm-session-start.sh` emits a LAUNCH CONTEXT section naming the launch directory, the enclosing git repository as the working project, the registered alias, `unregistered`, or an unreadable registry, and the path of that repository's `AGENTS.md` or `CLAUDE.md`; a bounded, per-line-capped excerpt of that file follows the CONTEXT digest.
-A launch from a linked worktree names the worktree as the working project and resolves its registry alias through the main worktree.
+A launch from a linked worktree names the worktree as the working project and resolves its registry alias by its own path, falling back to the main worktree.
 A launch outside any git repository claims no working project and omits the section, so no launch-directory instruction file is read.
 Secondmate launches clear `FM_LAUNCH_DIR`, so a secondmate never inherits its primary's launch context.
 An unregistered repository is named, not auto-registered.
