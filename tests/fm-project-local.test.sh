@@ -8,8 +8,9 @@
 #     .firstmate/ ancestor; a nested .firstmate/ shadows an outer org home;
 #     --global and a cwd outside any git repo fall back to $HOME/.firstmate
 #     (or the install root when that is absent); a cwd inside a git repo with
-#     no .firstmate/ ancestor refuses to guess. The harness execs from the
-#     install root with FM_LAUNCH_DIR recording the caller's directory.
+#     no .firstmate/ ancestor refuses to guess. An install-mode harness execs
+#     from the install root with FM_LAUNCH_DIR recording the caller's
+#     directory (launch-mode selection lives in tests/fm-view.test.sh).
 #     Session-start digest priming of that launch directory (LAUNCH CONTEXT)
 #     lives in tests/fm-session-start.test.sh.
 #     Ancestor-discovered homes must carry the init-written .fm-home trust
@@ -28,7 +29,9 @@
 #   - a bare-name refresh argument keeps its registry alias as the label, so a
 #     manifest-registered project outside the projects root still resolves its
 #     registered posture (local-only is skipped, not fetched).
-#   - org-shaped secondmate seed registers siblings instead of cloning them.
+#   - org-shaped secondmate seed registers siblings instead of cloning them,
+#     and a path-registered alias carries its path mapping, delivery mode, and
+#     alias into the child.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -85,7 +88,7 @@ test_launcher_resolution() {
 
   # Nearest .firstmate/ ancestor wins from a deep cwd.
   (cd "$nested/sub/dir" && env -u FM_HOME \
-    FM_FAKE_HARNESS_OUT="$base/out1" PATH="$fakebin:$PATH" "$ROOT/bin/firstmate")
+    FM_FAKE_HARNESS_OUT="$base/out1" PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" --mode install)
   assert_grep "FM_HOME=$nested/.firstmate" "$base/out1" "nested .firstmate did not shadow the org home"
   assert_grep "FM_LAUNCH_DIR=$nested/sub/dir" "$base/out1" "FM_LAUNCH_DIR did not record the caller cwd"
   assert_grep "PWD=$ROOT" "$base/out1" "harness did not exec from the install root"
@@ -96,7 +99,7 @@ test_launcher_resolution() {
   mkdir -p "$linkbin"
   ln -s "$ROOT/bin/firstmate" "$linkbin/firstmate"
   (cd "$nested/sub/dir" && env -u FM_HOME \
-    FM_FAKE_HARNESS_OUT="$base/out-link" PATH="$linkbin:$fakebin:$PATH" firstmate) \
+    FM_FAKE_HARNESS_OUT="$base/out-link" PATH="$linkbin:$fakebin:$PATH" firstmate --mode install) \
     || fail "launcher invoked through a PATH symlink failed"
   assert_grep "PWD=$ROOT" "$base/out-link" "symlinked launcher did not exec from the install root"
   assert_grep "FM_HOME=$nested/.firstmate" "$base/out-link" "symlinked launcher resolved the wrong home"
@@ -890,6 +893,88 @@ test_org_seed() {
   pass "org seed: siblings registered not cloned, unregistered refused, registered path owns the source"
 }
 
+# --- org seed of path-registered aliases (review finding W4) ------------------
+
+# A project registered through data/project-paths.json - with or without a
+# data/projects.md line - seeds into an org-shaped child at its registered
+# path, and the child inherits the path mapping, the delivery mode, and the
+# alias, so the child resolves and treats it exactly as the parent does.
+test_org_seed_path_registered() {
+  local base parent org child ext ship out
+  base=$(new_dir)
+  parent="$base/parent"
+  org="$base/org"
+  child="$org/.firstmate-mate"
+  mkdir -p "$parent/projects" "$parent/data" "$parent/state" "$org"
+
+  # ext: registered ONLY by path, outside the org root.
+  ext="$base/outside/ext"
+  fm_git_init_commit "$ext"
+  fm_git_add_origin "$ext" "$base/remotes/ext.git"
+  ext=$(cd "$ext" && pwd -P)
+  # ship: a registry line with a posture plus a path outside the org root.
+  ship="$base/outside/ship"
+  fm_git_init_commit "$ship"
+  fm_git_add_origin "$ship" "$base/remotes/ship.git"
+  ship=$(cd "$ship" && pwd -P)
+  printf -- '- ship [direct-PR +yolo] - ship project (added 2026-09-24)\n' > "$parent/data/projects.md"
+  printf '{\n  "ext": "%s",\n  "ship": "%s"\n}\n' "$ext" "$ship" > "$parent/data/project-paths.json"
+
+  scaffold_secondmate_charter "$parent" mate 'mate charter' ext ship \
+    || fail "charter scaffold failed"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" ext ship \
+    --projects-root "$org" >/dev/null 2>"$base/err-seed" \
+    || fail "org seed of path-registered aliases failed: $(cat "$base/err-seed")"
+
+  # The alias and the delivery mode.
+  assert_grep "- ext [no-mistakes] - registered by path in the parent home" "$child/data/projects.md" \
+    "a path-only alias did not carry the parent's resolved delivery mode"
+  assert_grep "- ship [direct-PR +yolo] - ship project" "$child/data/projects.md" \
+    "a path-registered alias lost its registry line"
+  assert_no_grep "cloned project" "$child/data/projects.md" "a registered-in-place alias was described as cloned"
+  assert_equals "no-mistakes off" "$(FM_HOME="$child" "$ROOT/bin/fm-project-mode.sh" ext 2>/dev/null)" \
+    "the child resolves a different posture for ext than the parent"
+  assert_equals "$(FM_HOME="$parent" "$ROOT/bin/fm-project-mode.sh" ship 2>/dev/null)" \
+    "$(FM_HOME="$child" "$ROOT/bin/fm-project-mode.sh" ship 2>/dev/null)" \
+    "the child resolves a different posture for ship than the parent"
+  # The path mapping.
+  assert_equals "$ext" "$(FM_HOME="$child" "$ROOT/bin/fm-projects.sh" resolve ext)" \
+    "the child did not inherit ext's path mapping"
+  assert_equals "$ship" "$(FM_HOME="$child" "$ROOT/bin/fm-projects.sh" resolve ship)" \
+    "the child did not inherit ship's path mapping"
+  out=$(FM_HOME="$child" "$ROOT/bin/fm-projects.sh" aliases)
+  assert_contains "$out" "ext" "the child does not register ext"
+  # Registered in place: nothing cloned, the real repositories untouched.
+  assert_absent "$child/projects" "an org seed created a projects/ dir"
+  assert_absent "$org/ext" "an org seed cloned a path-registered alias into the org root"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" validate >/dev/null \
+    || fail "registry validation failed after the path-registered org seed"
+
+  # Reseeding keeps the child's other mappings and replaces a stale one.
+  printf '{"keep": "/somewhere/keep", "ext": "/stale/ext"}\n' > "$child/data/project-paths.json"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" ext ship \
+    --projects-root "$org" >/dev/null 2>"$base/err-reseed" \
+    || fail "reseed failed: $(cat "$base/err-reseed")"
+  assert_equals "/somewhere/keep" "$(FM_HOME="$child" "$ROOT/bin/fm-projects.sh" resolve keep)" \
+    "reseeding dropped the child's own mapping"
+  assert_equals "$ext" "$(FM_HOME="$child" "$ROOT/bin/fm-projects.sh" resolve ext)" \
+    "reseeding did not replace the child's stale mapping"
+
+  # A path-registered alias whose repository is gone is refused, and the
+  # refused seed leaves no child manifest behind.
+  printf '{"ghost": "%s"}\n' "$base/outside/ghost" > "$parent/data/project-paths.json"
+  scaffold_secondmate_charter "$parent" mate2 'mate2 charter' ghost \
+    || fail "charter scaffold failed"
+  if FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate2 "$base/child2" ghost \
+      --projects-root "$org" >/dev/null 2>"$base/err-ghost"; then
+    fail "an org seed accepted a path-registered alias whose repository is missing"
+  fi
+  assert_grep "not found at $base/outside/ghost" "$base/err-ghost" "the missing-repository refusal did not name the registered path"
+  assert_absent "$base/child2" "a refused seed left a home behind"
+
+  pass "org seed: a path-registered alias carries its path mapping, delivery mode, and alias into the child"
+}
+
 # --- a bare alias keeps its registry label in a legacy home ------------------
 
 # Regression: a single-argument refresh of a manifest-registered alias in a
@@ -936,5 +1021,6 @@ test_manifest_reader_without_jq
 test_manifest_alias_label
 test_spawn_refusal
 test_org_seed
+test_org_seed_path_registered
 
 printf 'all project-local tests passed\n'

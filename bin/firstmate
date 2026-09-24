@@ -2,9 +2,8 @@
 # firstmate - project-local launcher and home scaffold.
 #
 # Usage:
-#   firstmate [--global] [--harness <name>] [harness args...]
-#       Resolve this launch's Firstmate home, then exec the harness from the
-#       install root (the git clone this script lives in):
+#   firstmate [--global] [--harness <name>] [--mode project|install] [harness args...]
+#       Resolve this launch's Firstmate home, then exec the harness:
 #         1. explicit $FM_HOME always wins;
 #         2. the nearest .firstmate/ ancestor of the caller's cwd, walking no
 #            higher than below $HOME and carrying an untracked .fm-home marker;
@@ -15,15 +14,34 @@
 #            refuses to guess and names `firstmate init` (per-project home at
 #            the repo root), `firstmate init --org` (org home at an org root),
 #            and `firstmate --global`.
-#       The harness runs with cwd = install root so AGENTS.md, hooks, and
-#       extensions load exactly as they do from a checkout today; the caller's
-#       directory is preserved in FM_LAUNCH_DIR. When that directory is inside a
-#       git repository other than the install checkout, the session-start
-#       digest emits a LAUNCH CONTEXT section (bin/fm-session-start.sh). Harness selection: --harness, then the resolved
-#       home's config/primary-harness, then claude; whichever source supplies
-#       it must be a primary-capable adapter name. Pi, pi-signed, and omp get
-#       their launch-boundary identity marker (FM_PI_HARNESS / FM_OMP_HARNESS)
-#       set for this launch. Remaining args pass through to the harness verbatim.
+#       Launch modes (docs/configuration.md "Launch modes" owns the contract):
+#         project - the harness runs with cwd = the launch root (the enclosing
+#                   git work tree, else the org root holding the org home)
+#                   inside a per-session Firstmate view (bin/fm-view.sh), so
+#                   every harness discovers Firstmate natively from there;
+#         install - the harness runs with cwd = the install root, primed with
+#                   the launch project through the session-start digest.
+#       --mode, then the home's config/launch-mode (one token), selects the
+#       mode; unset means project where the host can build the view, else
+#       install with a one-line notice naming the reason (exported as
+#       FM_LAUNCH_NOTICE for the session-start digest to repeat). An explicit
+#       project mode that cannot be built refuses with the reason. A launch
+#       with no project or org root, or inside the install checkout, runs in
+#       install mode; a launch root that is itself another Firstmate checkout
+#       runs as its own install root unless install mode is explicit.
+#       Exports FM_HOME, FM_ROOT_OVERRIDE, FM_LAUNCH_DIR (the caller's
+#       directory), FM_LAUNCH_MODE, and FM_LAUNCH_ROOT (when there is one);
+#       the session-start digest emits a LAUNCH CONTEXT section for a launch in
+#       a project or org (bin/fm-session-start.sh). Harness selection:
+#       --harness, then the resolved home's config/primary-harness, then
+#       claude; whichever source supplies it must be a primary-capable adapter
+#       name. Pi, pi-signed, and omp get their launch-boundary identity marker
+#       (FM_PI_HARNESS / FM_OMP_HARNESS) set for this launch; cursor resolves
+#       its agent CLI as fm-spawn.sh does; codex is launched with
+#       -c project_doc_max_bytes=262144 so the whole contract loads; a claude
+#       project-mode launch sets CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 because its
+#       per-directory auto-memory would be shared with plain sessions in the
+#       project. Remaining args pass through to the harness verbatim.
 #   firstmate init [--org]
 #       Scaffold a .firstmate/ home. --org creates it at the current directory
 #       (an org root whose sibling directories are the projects); without
@@ -60,10 +78,12 @@ SCRIPT_DIR="$(launcher_script_dir "${BASH_SOURCE[0]}")"
 INSTALL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # shellcheck source=bin/fm-projects-lib.sh
 . "$SCRIPT_DIR/fm-projects-lib.sh"
+# shellcheck source=bin/fm-cursor-lib.sh
+. "$SCRIPT_DIR/fm-cursor-lib.sh"
 
 usage() {
   cat >&2 <<'EOF'
-usage: firstmate [--global] [--harness <name>] [harness args...]
+usage: firstmate [--global] [--harness <name>] [--mode project|install] [harness args...]
        firstmate init [--org]
 EOF
 }
@@ -83,6 +103,11 @@ HOME_MARKER=".fm-home"
 # can name an arbitrary binary or a harness with no primary supervision protocol.
 # README's Requirements own the supported primary set.
 VERIFIED_PRIMARY_HARNESSES="claude codex opencode pi pi-signed grok cursor omp"
+
+# Codex's project-instruction cap for a launched primary: the default 32 KiB
+# truncates AGENTS.md, so the launcher raises it (docs/configuration.md
+# "Launch modes").
+CODEX_PROJECT_DOC_MAX_BYTES=262144
 
 # nearest_firstmate_home <dir>: print the nearest .firstmate/ ancestor, or
 # nothing. The walk stops below $HOME: $HOME/.firstmate is the global home,
@@ -224,8 +249,44 @@ cmd_init() {
   echo "firstmate: run \`firstmate\` from anywhere under $target to launch against this home"
 }
 
+# read_one_token_config <file> <what>: print the first line of a home config
+# file trimmed, or nothing when absent; a symlinked file fails loudly.
+read_one_token_config() {
+  local file=$1
+  if [ -L "$file" ]; then
+    die "$2 must be a regular file, not a symlink: $file"
+  elif [ -f "$file" ]; then
+    sed -n '1p' "$file" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+  fi
+}
+
+# launch_root <launch-dir> <home>: the directory a project-mode session is
+# rooted at - the enclosing git work tree, else the org root (the directory
+# holding an org home's .firstmate/) when the caller is at or under it - or
+# nothing when the launch has no project or org. The global $HOME/.firstmate
+# home is never an org home.
+launch_root() {
+  local dir=$1 home=$2 top org home_dir=''
+  if top=$(repo_top "$dir"); then
+    (cd "$top" && pwd -P)
+    return 0
+  fi
+  [ "$(basename "$home")" = .firstmate ] || return 0
+  org=$(cd "$(dirname "$home")" && pwd -P) || return 0
+  [ -z "${HOME:-}" ] || home_dir=$(cd "$HOME" 2>/dev/null && pwd -P) || home_dir=''
+  [ "$org" != "$home_dir" ] || return 0
+  case "$dir/" in
+    "$org"/*) printf '%s\n' "$org" ;;
+  esac
+}
+
+# is_firstmate_checkout <dir>: true when <dir> is itself a Firstmate code root.
+is_firstmate_checkout() {
+  [ -f "$1/AGENTS.md" ] && [ -f "$1/bin/firstmate" ] && [ -f "$1/bin/fm-session-start.sh" ]
+}
+
 cmd_launch() {
-  local global=0 harness='' harness_set=0
+  local global=0 harness='' harness_set=0 mode_req=''
   while [ $# -gt 0 ]; do
     case "$1" in
       --global) global=1 ;;
@@ -238,6 +299,14 @@ cmd_launch() {
       --harness=*)
         harness=${1#--harness=}
         harness_set=1
+        ;;
+      --mode)
+        [ $# -ge 2 ] || die "--mode requires a value (project or install)"
+        mode_req=$2
+        shift
+        ;;
+      --mode=*)
+        mode_req=${1#--mode=}
         ;;
       -h | --help) usage; exit 0 ;;
       *) break ;;
@@ -266,33 +335,85 @@ cmd_launch() {
   # explicit FM_HOME and the global home are trusted by provenance.
   [ "$ancestor_home" -eq 0 ] || require_trusted_home "$home"
   # Canonicalize before export: a relative FM_HOME would otherwise resolve
-  # against the install root after the cd below, silently the wrong home.
+  # against the session's working directory, silently the wrong home.
   home=$(cd "$home" && pwd -P) || die "cannot resolve home: $home"
 
   if [ "$harness_set" -eq 0 ]; then
-    if [ -L "$home/config/primary-harness" ]; then
-      die "config/primary-harness must be a regular file, not a symlink: $home/config/primary-harness"
-    elif [ -f "$home/config/primary-harness" ]; then
-      harness=$(sed -n '1p' "$home/config/primary-harness" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
-    fi
+    harness=$(read_one_token_config "$home/config/primary-harness" config/primary-harness)
     [ -n "$harness" ] || harness=claude
   fi
   case " $VERIFIED_PRIMARY_HARNESSES " in
     *" $harness "*) ;;
     *) die "harness is not primary-capable: $harness (primary-capable: $VERIFIED_PRIMARY_HARNESSES)" ;;
   esac
-  command -v "$harness" >/dev/null 2>&1 || die "harness not found on PATH: $harness"
+  local harness_bin=$harness
+  local harness_args=()
+  case $harness in
+    # `cursor` is Cursor's IDE shim, not the agent CLI; resolve the CLI the way
+    # fm-spawn.sh does.
+    cursor) harness_bin=$(fm_cursor_resolve_binary) || die "harness not found: cursor (no verified cursor-agent CLI)" ;;
+    # Codex reads at most 32 KiB of project instructions by default, which
+    # truncates the contract; raise the cap for this launch only.
+    codex) harness_args=(-c "project_doc_max_bytes=$CODEX_PROJECT_DOC_MAX_BYTES") ;;
+  esac
+  command -v "$harness_bin" >/dev/null 2>&1 || die "harness not found on PATH: $harness_bin"
+
+  [ -n "$mode_req" ] || mode_req=$(read_one_token_config "$home/config/launch-mode" config/launch-mode)
+  case "$mode_req" in
+    '' | project | install) ;;
+    *) die "launch mode must be project or install, not: $mode_req" ;;
+  esac
+
+  local launch_dir root code_root=$INSTALL_ROOT mode reason='' notice=''
+  launch_dir=$(pwd -P)
+  root=$(launch_root "$launch_dir" "$home")
+  if [ -z "$root" ]; then
+    [ "$mode_req" != project ] || die "project mode unavailable: $launch_dir is inside no git repository and no org home"
+    mode=install
+  elif [ "$root" = "$INSTALL_ROOT" ] || case "$root/" in "$INSTALL_ROOT"/*) true ;; *) false ;; esac; then
+    # The install checkout is its own project: an install-mode session already
+    # runs there natively.
+    mode=install
+  elif is_firstmate_checkout "$root" && [ "$mode_req" != install ]; then
+    # Viewing a Firstmate checkout would compose two contracts; it runs as its
+    # own install root instead.
+    code_root=$root
+    mode=install
+    echo "firstmate: $root is a Firstmate checkout; running it as its own install root" >&2
+  elif [ "$mode_req" = install ]; then
+    mode=install
+  elif reason=$("$SCRIPT_DIR/fm-view.sh" probe --install "$INSTALL_ROOT" --launch "$root" --home "$home"); then
+    mode=project
+  elif [ "$mode_req" = project ]; then
+    die "project mode unavailable: $reason"
+  else
+    mode=install
+    notice="project mode unavailable ($reason); running in install mode from $INSTALL_ROOT"
+    echo "firstmate: notice: $notice" >&2
+  fi
 
   export FM_HOME=$home
-  export FM_ROOT_OVERRIDE=$INSTALL_ROOT
-  FM_LAUNCH_DIR=$(pwd -P)
-  export FM_LAUNCH_DIR
+  export FM_ROOT_OVERRIDE=$code_root
+  export FM_LAUNCH_DIR=$launch_dir
+  export FM_LAUNCH_MODE=$mode
+  # Start from a clean slate: these describe THIS launch only.
+  unset FM_LAUNCH_ROOT FM_LAUNCH_NOTICE FM_VIEW FM_VIEW_ROOT FM_LAUNCH_REAL FM_LAUNCH_REAL_RW
+  [ -z "$root" ] || export FM_LAUNCH_ROOT=$root
+  [ -z "$notice" ] || export FM_LAUNCH_NOTICE=$notice
   case $harness in
     pi | pi-signed) export FM_PI_HARNESS=$harness ;;
     omp) export FM_OMP_HARNESS=omp ;;
   esac
-  cd "$INSTALL_ROOT"
-  exec "$harness" "$@"
+  if [ "$mode" = project ]; then
+    # Claude keys auto-memory by working directory, so a view session would
+    # share it with the captain's plain sessions in this project; a Firstmate
+    # session keeps its memory in the home instead.
+    [ "$harness" != claude ] || export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
+    exec "$SCRIPT_DIR/fm-view.sh" run --install "$INSTALL_ROOT" --launch "$root" -- \
+      "$harness_bin" ${harness_args[@]+"${harness_args[@]}"} "$@"
+  fi
+  cd "$code_root"
+  exec "$harness_bin" ${harness_args[@]+"${harness_args[@]}"} "$@"
 }
 
 case "${1:-}" in

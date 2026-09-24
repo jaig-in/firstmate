@@ -54,7 +54,7 @@ Use `gh-axi` for GitHub, `chrome-devtools-axi` for browser work, and compatible 
 
 `docs/configuration.md` is the single owner of the top-level operational-home layout and configuration schemas; each producing script's header and help own exact child fields and mutation mechanics.
 `FM_HOME` selects an instance's private `data/`, `state/`, `config/`, and `projects/`, while scripts continue to come from their tracked code root.
-The `firstmate` launcher resolves `FM_HOME` from the caller's directory (explicit `FM_HOME`, then the nearest `.firstmate/` ancestor, then the global home) and runs the harness from the install root; `docs/configuration.md` owns home discovery, `config/projects-root`, and the discovery-is-not-authority contract.
+The `firstmate` launcher resolves `FM_HOME` from the caller's directory (explicit `FM_HOME`, then the nearest `.firstmate/` ancestor, then the global home) and runs the harness inside the launch project or org through a per-session Firstmate view, or from the install root where the host cannot build one; `docs/configuration.md` owns home discovery, launch modes, `config/projects-root`, and the discovery-is-not-authority contract.
 Each secondmate has a persistent isolated `FM_HOME`, including its own state, backlog, projects, and session lock.
 `bin/fm-send.sh` fails closed unless `FM_HOME` is explicit, so a steer cannot silently resolve against another home.
 
@@ -76,7 +76,7 @@ Treat `data/captain.md` as the domain-local record of captain preferences, optio
 - Run-tier harness surfaces run this command for you at session open while the rest only nudge it, so confirm the digest is present in this session and run it yourself when it is not; `docs/sessionstart-nudge.md` owns adapter tiers, source routing, and compatibility.
 
 Read the complete digest once and trust it as this turn's startup and recovery input.
-When the digest's LAUNCH CONTEXT section names a working project, that launch repository is this session's working project: read its named instruction file as the project contract, and remain a firstmate supervisor rather than a project-local coding session.
+When the digest's LAUNCH CONTEXT section names a working project, that launch repository is this session's working project: its own instructions are the project contract (already loaded in a project-mode session, otherwise the instruction file the section names), and you remain a firstmate supervisor rather than a project-local coding session.
 If the harness shows only a preview and persists the full output to a file, read that file before acting.
 Do not separately re-read the context, backlog, metadata, or bulk status inputs it just printed unless a source was reported absent or corrupt, older history is specifically needed, or a targeted workflow must inspect before writing.
 An `ABSENT` captain, shared-captain, secondmate, or learnings file means the firstmate repo's built-in defaults, no shared captain preferences, no registered secondmates, or no captured learnings; rebuild an absent or stale project registry from the clones before dispatch.

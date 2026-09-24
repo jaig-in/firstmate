@@ -48,6 +48,7 @@ config/watched-tools.json  optional list of the tools this home depends on, read
 config/x-mode.env    generated Relay watcher cadence; LOCAL, gitignored; source before arming watcher when present
 config/projects-root  optional one-line projects root (relative to the home or absolute); LOCAL, gitignored by default but committable under the .firstmate/.gitignore whitelist; written by `firstmate init` as `..` for org and per-project homes; absent = $FM_HOME/projects; see docs/configuration.md "Project-local homes"
 config/primary-harness  optional one-token harness the `firstmate` launcher execs when --harness is absent; LOCAL, gitignored by default, committable under the whitelist; primary-capable harness adapter names only (crew-only adapters and kimi refused) and anything else fails at launch; absent = claude; see docs/configuration.md "Project-local homes"
+config/launch-mode  optional one-token default launch mode (`project` or `install`) the `firstmate` launcher uses when --mode is absent; LOCAL, gitignored by default, committable under the whitelist; absent = project where the host can build the view, else install with a notice; see docs/configuration.md "Launch modes"
 data/                personal fleet records; LOCAL, gitignored as a whole
   backlog.md         task queue, dependencies, history
   captain.md         this home's domain-local captain preferences and working style; LOCAL, gitignored, canonical even if harness memory mirrors it, and updated with inspect-then-update

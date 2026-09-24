@@ -3650,7 +3650,7 @@ EOF
 else
   case "$BACKEND" in
   tmux)
-    SES=$(fm_backend_tmux_container_ensure)
+    SES=$(fm_backend_tmux_container_ensure) || exit 1
     T="$SES:$W"
     # #134 robustness (tmux): fm_backend_tmux_create_task captures a stable window
     # id and pins the window name (automatic-rename/allow-rename off) so a captain's
@@ -5214,7 +5214,7 @@ if [ "$KIND" = secondmate ]; then
   # not enable them across the launch boundary (bin/fm-trace-context-lib.sh header).
   # Reuse the single frozen decision from the carrier resolution above so the
   # injected carrier and this on/off snapshot are guaranteed to agree.
-  LAUNCH="FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE= FM_CONFIG_OVERRIDE= FM_LAUNCH_DIR= FM_PUBLIC_FOLLOWUP_PRIMARY_HOME=$sq_primary_home FM_HOME=$sq_home FM_TRACE_CONTEXT=$SPAWN_TRACE_EFFECTIVE FM_SUPERVISION_MODEL=$supervision_model $LAUNCH"
+  LAUNCH="FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE= FM_CONFIG_OVERRIDE= FM_LAUNCH_DIR= FM_LAUNCH_ROOT= FM_LAUNCH_MODE= FM_LAUNCH_NOTICE= FM_VIEW= FM_VIEW_ROOT= FM_LAUNCH_REAL= FM_LAUNCH_REAL_RW= FM_PUBLIC_FOLLOWUP_PRIMARY_HOME=$sq_primary_home FM_HOME=$sq_home FM_TRACE_CONTEXT=$SPAWN_TRACE_EFFECTIVE FM_SUPERVISION_MODEL=$supervision_model $LAUNCH"
 fi
 # Pane-scoped override: git in this worker reads our commit-msg strip without
 # rewriting the project's core.hooksPath. GIT_CONFIG_* takes precedence over

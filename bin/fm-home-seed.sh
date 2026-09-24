@@ -9,10 +9,12 @@
 #       no live process and is never recycled until the lease is released with
 #       "treehouse return". Projects are cloned from wherever this home's
 #       registry resolves each name (bin/fm-projects-lib.sh) into the
-#       secondmate home's projects/ directory. A name registered solely in
-#       data/project-paths.json carries no delivery mode and is refused, and in
-#       a config/projects-root home only a project this home has registered may
-#       be seeded at all.
+#       secondmate home's projects/ directory. In a config/projects-root home
+#       only a project this home has registered may be seeded at all. The
+#       child's data/projects.md line is this home's line for the alias; a name
+#       registered solely in data/project-paths.json gets a line carrying the
+#       delivery mode and yolo this home resolves for it
+#       (bin/fm-project-mode.sh), so the child inherits the same posture.
 #       That project list is non-exclusive provisioning data. Pass --no-projects
 #       instead of a project list to seed a project-less home for a domain whose
 #       subject is the firstmate repo itself; it is mutually exclusive with a
@@ -34,8 +36,12 @@
 #       live as siblings under <dir> (recorded as an absolute path in the
 #       child's config/projects-root), no
 #       projects/ directory is required or created, each named project must be
-#       registered in this home and already exist as a sibling git repo and is REGISTERED into the child's
-#       data/projects.md instead of cloned, and no-mistakes initialization is
+#       registered in this home and already exist as a git repo - at the path
+#       this home's data/project-paths.json names for it, else as a sibling
+#       under <dir> - and is REGISTERED into the child's data/projects.md
+#       instead of cloned; a path-registered alias also carries its
+#       data/project-paths.json entry into the child, so the child resolves the
+#       same repository under the same alias. No-mistakes initialization is
 #       left to that project's own tasks. A preexisting child
 #       config/projects-root selects the same mode and must agree with the
 #       flag. Discovery is not authority: only the named projects are
@@ -503,12 +509,17 @@ require_registered_project() {
 
 # seed_project_source <project>: print the source directory for a seed
 # project. Ordinary seeds clone from wherever this home's registry resolves the
-# alias; an org-shaped seed (SEED_PROJECTS_ROOT set) registers the child's
-# sibling instead.
+# alias; an org-shaped seed (SEED_PROJECTS_ROOT set) registers the path this
+# home's data/project-paths.json names for the alias, else the child's sibling.
 seed_project_source() {
-  local project=$1 resolved
+  local project=$1 resolved mapped
   if [ -n "${SEED_PROJECTS_ROOT:-}" ]; then
-    printf '%s/%s\n' "$SEED_PROJECTS_ROOT" "$project"
+    mapped=$(fm_project_manifest_lookup "$DATA" "$project") || return 1
+    if [ -n "$mapped" ]; then
+      printf '%s\n' "$mapped"
+    else
+      printf '%s/%s\n' "$SEED_PROJECTS_ROOT" "$project"
+    fi
     return 0
   fi
   resolved=$(fm_project_resolve "$FM_HOME" "$CONFIG" "$DATA" "$project") || return 1
@@ -520,10 +531,11 @@ seed_project_source() {
 }
 
 # register_org_project <project>: the org-mode counterpart of clone_project.
-# The project must be registered in this (parent) home, and the sibling must
-# already exist as the root of its own git work tree; nothing
-# is cloned, created, or initialized - registration in the child's
-# data/projects.md (sync_project_registry) is the whole operation.
+# The project must be registered in this (parent) home, and its source
+# (seed_project_source) must already exist as the root of its own git work
+# tree; nothing is cloned, created, or initialized - registration in the
+# child's data/projects.md (sync_project_registry) and, for a path-registered
+# alias, data/project-paths.json (sync_project_paths) is the whole operation.
 register_org_project() {
   local project=$1 src top parent_path
   require_registered_project "$project" || return 1
@@ -580,20 +592,11 @@ EOF
 }
 
 validate_seed_project() {
-  local project=$1 src mode url mode_line manifest_path
+  local project=$1 src mode url mode_line
   # In a config/projects-root home every sibling is a user working copy, so
   # only a registered alias may be seeded; legacy homes keep clone-root rules.
   if fm_projects_root_is_custom "$CONFIG"; then
     require_registered_project "$project" || return 1
-  fi
-  # A project registered only through data/project-paths.json carries a path
-  # but no delivery mode, and the child registry format needs one; refuse
-  # manifest-only aliases loudly rather than seeding a wrong entry.
-  manifest_path=$(fm_project_manifest_lookup "$DATA" "$project") || return 1
-  if [ -n "$manifest_path" ] \
-      && ! awk -v n="$project" '$1=="-" && $2==n { found=1 } END { exit !found }' "$DATA/projects.md" 2>/dev/null; then
-    echo "error: project $project is registered only in data/project-paths.json; manifest aliases are not seedable - register it in $DATA/projects.md with a delivery mode first" >&2
-    return 1
   fi
   src=$(seed_project_source "$project") || return 1
   [ -d "$src" ] || { echo "error: project $project not found at $src" >&2; return 1; }
@@ -637,6 +640,7 @@ SEED_PARENT_BRIEF=
 SEED_PARENT_BRIEF_CREATED=0
 SEED_PARENT_BRIEF_DIR_CREATED=0
 SEED_SUB_REG_EXISTED=0
+SEED_SUB_PATHS_EXISTED=0
 SEED_CHARTER_EXISTED=0
 SEED_MARKER_EXISTED=0
 SEED_PARENT_MARKER_EXISTED=0
@@ -765,6 +769,7 @@ seed_rollback() {
         restore_seed_file "$SEED_PARENT_MARKER_EXISTED" "$SEED_BACKUP_DIR/parent-marker" "$SEED_HOME/$SUB_HOME_PARENT_MARKER"
         restore_seed_file "$SEED_CHARTER_EXISTED" "$SEED_BACKUP_DIR/charter.md" "$SEED_HOME/data/charter.md"
         restore_seed_file "$SEED_SUB_REG_EXISTED" "$SEED_BACKUP_DIR/sub-projects.md" "$SEED_HOME/data/projects.md"
+        restore_seed_file "$SEED_SUB_PATHS_EXISTED" "$SEED_BACKUP_DIR/sub-project-paths.json" "$SEED_HOME/data/project-paths.json"
       fi
     fi
   fi
@@ -775,12 +780,67 @@ seed_rollback() {
   fi
 }
 
+# registry_line_for_project <project>: the child's data/projects.md line for a
+# seeded alias - this home's own line when it has one, else, for an alias
+# registered only in data/project-paths.json, a line carrying the delivery
+# mode and yolo this home resolves for it, so the child's posture matches the
+# parent's rather than silently becoming the unannotated default. Fails for a
+# name this home does not register at all.
 registry_line_for_project() {
-  local project=$1 line
-  [ -f "$DATA/projects.md" ] || return 1
-  line=$(awk -v n="$project" '$1=="-" && $2==n { print; exit }' "$DATA/projects.md")
-  [ -n "$line" ] || return 1
-  printf '%s\n' "$line"
+  local project=$1 line mode yolo manifest_path
+  if [ -f "$DATA/projects.md" ]; then
+    line=$(awk -v n="$project" '$1=="-" && $2==n { print; exit }' "$DATA/projects.md")
+    if [ -n "$line" ]; then
+      printf '%s\n' "$line"
+      return 0
+    fi
+  fi
+  manifest_path=$(fm_project_manifest_lookup "$DATA" "$project") || return 1
+  [ -n "$manifest_path" ] || return 1
+  read -r mode yolo <<EOF
+$(FM_HOME="$FM_HOME" FM_DATA_OVERRIDE="$DATA" "$FM_ROOT/bin/fm-project-mode.sh" --raw "$project" 2>/dev/null)
+EOF
+  [ -n "$mode" ] || return 1
+  [ "$yolo" != on ] || mode="$mode +yolo"
+  printf -- '- %s [%s] - registered by path in the parent home (added %s)\n' "$project" "$mode" "$(date +%F)"
+}
+
+# sync_project_paths <home> <project>...: carry this home's
+# data/project-paths.json entry for each named alias into the child's
+# data/project-paths.json, replacing a same-named child entry and keeping the
+# child's others. Written only for an org-shaped seed, whose child resolves the
+# alias in place; a cloned project lives under the child's own projects/.
+sync_project_paths() {
+  local home=$1 project mapped pairs existing key val tmp out first=1
+  shift
+  pairs=''
+  for project in "$@"; do
+    mapped=$(fm_project_manifest_lookup "$DATA" "$project") || return 1
+    [ -n "$mapped" ] || continue
+    pairs="$pairs$project"$'\t'"$mapped"$'\n'
+  done
+  [ -n "$pairs" ] || return 0
+  out="$home/data/project-paths.json"
+  existing=$(fm_project_manifest_pairs "$home/data") || return 1
+  tmp="$out.tmp.$$"
+  {
+    printf '{\n'
+    while IFS=$'\t' read -r key val; do
+      [ -n "$key" ] || continue
+      printf '%s\n' "$pairs" | cut -f1 | grep -Fxq -- "$key" && continue
+      [ "$first" -eq 1 ] || printf ',\n'
+      printf '  "%s": "%s"' "$key" "$val"
+      first=0
+    done <<< "$existing"
+    while IFS=$'\t' read -r key val; do
+      [ -n "$key" ] || continue
+      [ "$first" -eq 1 ] || printf ',\n'
+      printf '  "%s": "%s"' "$key" "$val"
+      first=0
+    done <<< "$pairs"
+    printf '\n}\n'
+  } > "$tmp" || { rm -f -- "$tmp"; return 1; }
+  mv -- "$tmp" "$out"
 }
 
 project_mode_in_home() {
@@ -1013,6 +1073,7 @@ seed_home() {
   SEED_PARENT_BRIEF_CREATED=0
   SEED_PARENT_BRIEF_DIR_CREATED=0
   SEED_SUB_REG_EXISTED=0
+  SEED_SUB_PATHS_EXISTED=0
   SEED_CHARTER_EXISTED=0
   SEED_MARKER_EXISTED=0
   SEED_PROJECTS_ROOT_CREATED=0
@@ -1070,6 +1131,10 @@ seed_home() {
     SEED_SUB_REG_EXISTED=1
     cp "$home/data/projects.md" "$SEED_BACKUP_DIR/sub-projects.md"
   fi
+  if [ -f "$home/data/project-paths.json" ]; then
+    SEED_SUB_PATHS_EXISTED=1
+    cp "$home/data/project-paths.json" "$SEED_BACKUP_DIR/sub-project-paths.json"
+  fi
   if [ -f "$home/data/charter.md" ]; then
     SEED_CHARTER_EXISTED=1
     cp "$home/data/charter.md" "$SEED_BACKUP_DIR/charter.md"
@@ -1113,11 +1178,12 @@ seed_home() {
   }
 
   if [ -n "$SEED_PROJECTS_ROOT" ]; then
-    # Org-shaped seed: siblings are registered, never cloned or initialized.
+    # Org-shaped seed: projects are registered, never cloned or initialized.
     for project in "$@"; do
       register_org_project "$project"
     done
     sync_project_registry "$home" "$@"
+    sync_project_paths "$home" "$@"
   else
     for project in "$@"; do
       project_dst=$(validate_project_destination "$home" "$project") || return 1
