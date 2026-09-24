@@ -28,15 +28,21 @@
 #
 #   1. launch-context - when FM_LAUNCH_DIR is inside a git repository other
 #                       than the install checkout, print the launch directory,
-#                       that repository as the working project, the registered
-#                       alias (a linked worktree resolves by its own path,
-#                       then its main worktree), unregistered, or an
-#                       unreadable registry, and the path of the AGENTS.md or
-#                       CLAUDE.md whose bounded excerpt the context digest
-#                       carries. A direct harness launch (no FM_LAUNCH_DIR)
-#                       or a launch outside any git repository omits this
-#                       section. An unregistered repository is named, never
-#                       auto-registered. Read-only local lookups only;
+#                       that repository as the working project, the launch
+#                       mode and any fallback notice (bin/firstmate), the
+#                       registered alias (a linked worktree resolves by its
+#                       own path, then its main worktree), unregistered, or an
+#                       unreadable registry, and then either the path of the
+#                       AGENTS.md or CLAUDE.md whose bounded excerpt the
+#                       context digest carries (install mode) or the entries
+#                       a project-mode view shadows (the view loads the
+#                       project's instructions natively). An org launch
+#                       (FM_LAUNCH_ROOT set, the caller in no repository)
+#                       names the org root and points at the ORG PROJECTS
+#                       summary. A direct harness launch (no FM_LAUNCH_DIR)
+#                       or any other launch outside a git repository omits
+#                       this section. An unregistered repository is named,
+#                       never auto-registered. Read-only local lookups only;
 #                       print_launch_context owns the section.
 #   2. lock          - acquire the per-home session lock FIRST, before any
 #                       mutating step runs.
@@ -66,7 +72,9 @@
 #   9. context digest - data/projects.md, data/secondmates.md, data/captain.md,
 #                       data/captain-shared.md, data/learnings.md, then the
 #                       launch instructions excerpt when launch-context named
-#                       one: read-only, always safe, always runs.
+#                       one and the ORG PROJECTS summary for an org launch
+#                       (bin/fm-projects.sh summary): read-only, always safe,
+#                       always runs.
 #  10. closing reminder - prints the context-specific watcher next step; this
 #                       script points back to the emitted harness supervision
 #                       block and deliberately never arms the watcher itself.
@@ -381,24 +389,82 @@ SUBRULE='-----------------------------------------------------------------------
 section() { printf '\n%s\n%s\n%s\n' "$RULE" "$1" "$RULE"; }
 subsection() { printf '\n%s\n%s\n' "$1" "$SUBRULE"; }
 
+# print_launch_mode_lines: the launch mode the launcher chose and, when it fell
+# back from project mode, its one-line notice (bin/firstmate owns both). A
+# direct harness launch carries no FM_LAUNCH_MODE and prints nothing.
+print_launch_mode_lines() {
+  case "${FM_LAUNCH_MODE:-}" in
+    project)
+      printf 'Launch mode: project (the session runs at %s through a Firstmate view; that directory is read-only here except its .firstmate/)\n' \
+        "${FM_VIEW_ROOT:-${FM_LAUNCH_ROOT:-unknown}}"
+      ;;
+    install)
+      printf 'Launch mode: install (the session runs at the install root %s)\n' "$FM_ROOT"
+      ;;
+  esac
+  if [ -n "${FM_LAUNCH_NOTICE:-}" ]; then
+    fm_cap_line_var "$FM_LAUNCH_NOTICE"
+    printf 'Launch notice: %s\n' "$FM_LINE_CAP_LINE"
+  fi
+}
+
+# print_view_lines: under a project-mode view, say where the
+# launch directory's instructions come from and list the real entries the view
+# shadows, each with its path under FM_LAUNCH_REAL (bin/fm-view.sh shadowed
+# owns the list).
+print_view_lines() {
+  local real=${FM_LAUNCH_REAL:-} name how any=0
+  printf 'Project instructions: loaded natively through the Firstmate view (the composed AGENTS.md carries the Firstmate contract, then the launch directory'"'"'s own AGENTS.md/CLAUDE.md)\n'
+  [ -n "$real" ] && [ -d "$real" ] || return 0
+  while IFS=$'\t' read -r name how; do
+    [ -n "$name" ] || continue
+    if [ "$any" -eq 0 ]; then
+      printf 'Shadowed launch-directory entries (the real ones are readable under FM_LAUNCH_REAL=%s):\n' "$real"
+      any=1
+    fi
+    case "$how" in
+      merged) printf '  %s/ - merged with Firstmate'"'"'s (Firstmate wins a same-named entry): %s/%s\n' "$name" "$real" "$name" ;;
+      folded) printf '  %s - folded into the composed AGENTS.md: %s/%s\n' "$name" "$real" "$name" ;;
+      hidden) printf '  %s - hidden from the supervisor: %s/%s\n' "$name" "$real" "$name" ;;
+      *) printf '  %s - Firstmate'"'"'s own shown instead: %s/%s\n' "$name" "$real" "$name" ;;
+    esac
+  done < <("$SCRIPT_DIR/fm-view.sh" shadowed "$real" 2>/dev/null)
+}
+
 # print_launch_context: when the launcher recorded a caller directory inside a
 # git repository other than the install checkout, emit the launch project's
-# identity lines and record its AGENTS.md or CLAUDE.md in LAUNCH_INSTR for
-# print_launch_instructions_excerpt. A linked worktree is named as the working
-# project and looked up in the registry by its own path, then by its main
-# worktree when its own path is not registered. A launch outside any git
-# repository, or within the install checkout, claims no project and emits
-# nothing, as does a direct harness launch (no FM_LAUNCH_DIR). Does not
-# register anything.
+# identity lines and, in install mode, record its AGENTS.md or CLAUDE.md in
+# LAUNCH_INSTR for print_launch_instructions_excerpt; a project-mode view loads
+# those instructions natively, so it lists the shadowed entries instead. A
+# linked worktree is named as the working project and looked up in the
+# registry by its own path, then by its main worktree when its own path is not
+# registered. An org launch (FM_LAUNCH_ROOT set, the caller inside no git
+# repository) names the org root and sets LAUNCH_ORG for the ORG PROJECTS
+# summary. Any other launch outside a git repository, or within the install
+# checkout, claims no project and emits nothing, as does a direct harness
+# launch (no FM_LAUNCH_DIR). Does not register anything.
 LAUNCH_INSTR=
+LAUNCH_ORG=
 print_launch_context() {
-  local launch_dir install_root repo_root main_root common_dir project_alias registry_out
+  local launch_dir install_root repo_root main_root common_dir project_alias registry_out org_root
   [ -n "${FM_LAUNCH_DIR:-}" ] || return 0
   [ -d "$FM_LAUNCH_DIR" ] || return 0
   launch_dir=$(CDPATH='' cd -- "$FM_LAUNCH_DIR" && pwd -P) || return 0
-  repo_root=$(git -C "$launch_dir" rev-parse --show-toplevel 2>/dev/null) || return 0
-  repo_root=$(CDPATH='' cd -- "$repo_root" && pwd -P) || return 0
   install_root=$(CDPATH='' cd -- "$FM_ROOT" && pwd -P) || install_root=$FM_ROOT
+  if ! repo_root=$(git -C "$launch_dir" rev-parse --show-toplevel 2>/dev/null); then
+    [ -n "${FM_LAUNCH_ROOT:-}" ] && [ -d "$FM_LAUNCH_ROOT" ] || return 0
+    org_root=$(CDPATH='' cd -- "$FM_LAUNCH_ROOT" && pwd -P) || return 0
+    case "$launch_dir/" in "$org_root"/*) ;; *) return 0 ;; esac
+    section "LAUNCH CONTEXT"
+    printf 'Launch dir: %s\n' "$launch_dir"
+    print_launch_mode_lines
+    printf 'Org root: %s\n' "$org_root"
+    printf 'Org projects: ORG PROJECTS, after the CONTEXT digest below\n'
+    LAUNCH_ORG=1
+    [ "${FM_VIEW:-}" != 1 ] || print_view_lines
+    return 0
+  fi
+  repo_root=$(CDPATH='' cd -- "$repo_root" && pwd -P) || return 0
   [ "$repo_root" != "$install_root" ] || return 0
 
   main_root=$repo_root
@@ -413,6 +479,7 @@ print_launch_context() {
   printf 'Launch dir: %s\n' "$launch_dir"
   printf 'Repo root: %s\n' "$repo_root"
   printf 'Working project: %s\n' "$repo_root"
+  print_launch_mode_lines
   if registry_out=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$repo_root" 2>&1) &&
     { [ -n "$registry_out" ] || [ "$main_root" = "$repo_root" ] ||
       registry_out=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$main_root" 2>&1); }; then
@@ -432,6 +499,10 @@ print_launch_context() {
     printf 'Registry: unreadable (%s)\n' "${FM_LINE_CAP_LINE:-no reason given}"
   fi
 
+  if [ "${FM_VIEW:-}" = 1 ]; then
+    print_view_lines
+    return 0
+  fi
   if [ -f "$repo_root/AGENTS.md" ]; then
     LAUNCH_INSTR="$repo_root/AGENTS.md"
   elif [ -f "$repo_root/CLAUDE.md" ]; then
@@ -443,6 +514,18 @@ print_launch_context() {
   fi
   printf 'Project instructions: %s\n' "$LAUNCH_INSTR"
   printf 'Excerpt: LAUNCH INSTRUCTIONS EXCERPT, after the CONTEXT digest below\n'
+}
+
+# print_org_projects: the derived per-project org summary for an org launch
+# (bin/fm-projects.sh summary owns its content and bound). Placed with the
+# CONTEXT digest because it is recoverable with one run of that command.
+print_org_projects() {
+  [ -n "$LAUNCH_ORG" ] || return 0
+  subsection "ORG PROJECTS - derived at this session start (bin/fm-projects.sh summary)"
+  "$SCRIPT_DIR/fm-projects.sh" summary 2>&1 | while IFS= read -r line || [ -n "$line" ]; do
+    fm_cap_line_var "$line"
+    printf '  %s\n' "$FM_LINE_CAP_LINE"
+  done
 }
 
 # print_launch_instructions_excerpt: the first 50 lines of LAUNCH_INSTR, each
@@ -1055,6 +1138,7 @@ print_file_or_absent "$DATA/captain.md" "data/captain.md"
 print_file_or_absent "$DATA/captain-shared.md" "data/captain-shared.md (shared, main-authoritative, read-only in secondmate homes)"
 print_file_or_absent "$DATA/learnings.md" "data/learnings.md"
 print_launch_instructions_excerpt
+print_org_projects
 
 # --- 10. closing reminder ----------------------------------------------
 stage next-step

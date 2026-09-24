@@ -10,7 +10,11 @@
 #     unreadable-registry launch repos; a linked worktree resolves its alias
 #     by its own path, then through the main worktree; AGENTS.md excerpt
 #     (line- and width-bounded, printed after the CONTEXT digest) vs
-#     CLAUDE.md fallback vs absent instructions
+#     CLAUDE.md fallback vs absent instructions; the launch mode and a
+#     repeated fallback notice; an org launch's bounded ORG PROJECTS summary
+#     (mode, language, in-flight work, first instruction line, unregistered
+#     siblings); a project-mode view lists shadowed entries instead of an
+#     excerpt
 #   - absent-file markers vs empty-but-present files in the context digest
 #   - the lock-refusal read-only path: banner leads, every mutating step is
 #     skipped (including bootstrap's seven mutating sweeps, verified by their
@@ -1044,6 +1048,130 @@ EOF
     "a present CLAUDE.md was reported as absent"
 
   pass "LAUNCH CONTEXT falls back to CLAUDE.md when AGENTS.md is absent"
+}
+
+# run_session_start_launched_with <home> <root> <path> <launch-dir> [VAR=value...]:
+# a launched session start carrying the launcher's extra exports.
+run_session_start_launched_with() {
+  local home=$1 root=$2 path=$3 launch_dir=$4
+  shift 4
+  env -u CLAUDECODE -u PI_CODING_AGENT -u FM_PI_HARNESS -u GROK_AGENT \
+    -u FM_VIEW -u FM_VIEW_ROOT -u FM_LAUNCH_REAL -u FM_LAUNCH_REAL_RW \
+    -u FM_LAUNCH_ROOT -u FM_LAUNCH_MODE -u FM_LAUNCH_NOTICE \
+    FM_HOME="$home" FM_ROOT_OVERRIDE="$root" PATH="$path" \
+    FM_LAUNCH_DIR="$launch_dir" "$@" \
+    "$SESSION_START"
+}
+
+test_launch_context_org_launch_summarizes_projects() {
+  local rec root home fakebin org out
+  rec=$(new_world launch-org)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+
+  org="${home%/home}/org"
+  mkdir -p "$org"
+  org=$(cd "$org" && pwd -P)
+  printf '%s\n' "$org" > "$home/config/projects-root"
+  # alpha: registered, Python, its own AGENTS.md, one task in flight.
+  mkdir -p "$org/alpha/pkg"
+  printf '# alpha service\nMore text.\n' > "$org/alpha/AGENTS.md"
+  printf 'print(1)\n' > "$org/alpha/pkg/a.py"
+  printf 'print(2)\n' > "$org/alpha/pkg/b.py"
+  printf 'echo\n' > "$org/alpha/run.sh"
+  git -C "$org/alpha" init -q -b main
+  git -C "$org/alpha" add -A
+  git -C "$org/alpha" commit -qm alpha
+  # beta: registered by path only, outside the org, CLAUDE.md instructions.
+  fm_git_init_commit "${home%/home}/elsewhere/beta"
+  printf 'Beta is the billing API.\n' > "${home%/home}/elsewhere/beta/CLAUDE.md"
+  printf 'package main\n' > "${home%/home}/elsewhere/beta/main.go"
+  git -C "${home%/home}/elsewhere/beta" add -A
+  git -C "${home%/home}/elsewhere/beta" commit -qm beta
+  # gamma and delta: discoverable, unregistered siblings.
+  fm_git_init_commit "$org/gamma"
+  fm_git_init_commit "$org/delta"
+  printf -- '- alpha [direct-PR +yolo] - alpha (added 2026-09-24)\n' > "$home/data/projects.md"
+  printf '{"beta": "%s"}\n' "$(cd "${home%/home}/elsewhere/beta" && pwd -P)" > "$home/data/project-paths.json"
+  fm_write_meta "$home/state/fix-alpha.meta" "kind=ship" "project=$org/alpha" "project_name=alpha" "window=fm:fix-alpha"
+
+  out=$(run_session_start_launched_with "$home" "$root" "$fakebin:$BASE_PATH" "$org" \
+    FM_LAUNCH_ROOT="$org" FM_LAUNCH_MODE=install \
+    FM_LAUNCH_NOTICE="project mode unavailable (TEST_REASON); running in install mode from $root")
+  assert_contains "$out" "LAUNCH CONTEXT" "an org launch omitted the LAUNCH CONTEXT section"
+  assert_contains "$out" "Org root: $org" "an org launch did not name the org root"
+  assert_contains "$out" "Launch mode: install (the session runs at the install root $root)" \
+    "an org launch did not name its launch mode"
+  assert_contains "$out" "Launch notice: project mode unavailable (TEST_REASON)" \
+    "the digest did not repeat the launcher's fallback notice"
+  assert_contains "$out" "ORG PROJECTS" "an org launch omitted the org summary"
+  assert_contains "$out" "- alpha [direct-PR +yolo] - Python - in flight: 1 (fix-alpha)" \
+    "the org summary did not name alpha's mode, language, and in-flight work"
+  assert_contains "$out" "AGENTS.md: # alpha service" "the org summary did not carry alpha's first instruction line"
+  assert_contains "$out" "- beta [unrecorded] - Go - in flight: none" \
+    "the org summary did not carry a path-registered project"
+  assert_contains "$out" "CLAUDE.md: Beta is the billing API." "the org summary did not fall back to CLAUDE.md"
+  assert_contains "$out" "offer the captain to register them" "the org summary did not offer registration"
+  assert_contains "$out" "delta, gamma" "the org summary did not list the unregistered siblings"
+  assert_not_contains "$out" "LAUNCH INSTRUCTIONS EXCERPT" "an org launch printed a repo instructions excerpt"
+  local context_line summary_line
+  context_line=$(printf '%s\n' "$out" | grep -nx 'CONTEXT' | head -n 1 | cut -d: -f1)
+  summary_line=$(first_line_of "$out" "ORG PROJECTS - derived")
+  [ "${context_line:-0}" -gt 0 ] && [ "$summary_line" -gt "$context_line" ] \
+    || fail "the org summary was not printed after the CONTEXT digest"
+
+  # Bounded: a smaller cap lists the first projects and names the remainder.
+  out=$(run_session_start_launched_with "$home" "$root" "$fakebin:$BASE_PATH" "$org" \
+    FM_LAUNCH_ROOT="$org" FM_PROJECTS_SUMMARY_MAX=1)
+  assert_contains "$out" "- alpha " "the capped summary dropped the first project"
+  assert_not_contains "$out" "- beta " "the capped summary exceeded its bound"
+  assert_contains "$out" "and 1 more registered" "the capped summary did not name the remainder"
+  assert_contains "$out" "delta, ... and 1 more" "the capped unregistered list did not name its remainder"
+
+  pass "an org launch carries a bounded per-project summary and offers to register unregistered siblings"
+}
+
+test_launch_context_view_lists_shadowed_entries_instead_of_excerpt() {
+  local rec root home fakebin proj real out repo_root
+  rec=$(new_world launch-view)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+
+  proj="${home%/home}/demo"
+  fm_git_init_commit "$proj"
+  repo_root=$(cd "$proj" && pwd -P)
+  printf 'VIEW_PROJECT_AGENTS_MARKER\n' > "$proj/AGENTS.md"
+  mkdir -p "$proj/bin" "$proj/.claude"
+  : > "$proj/bin/serve.sh"
+  : > "$proj/.mcp.json"
+  # The view's read-only alias of the real tree; a plain directory stands in.
+  real="$proj"
+  printf -- '- demo [local-only] - demo (added 2026-09-24)\n' > "$home/data/projects.md"
+  printf '{"demo": "%s"}\n' "$repo_root" > "$home/data/project-paths.json"
+
+  out=$(run_session_start_launched_with "$home" "$root" "$fakebin:$BASE_PATH" "$repo_root" \
+    FM_VIEW=1 FM_LAUNCH_MODE=project FM_VIEW_ROOT="$repo_root" FM_LAUNCH_ROOT="$repo_root" FM_LAUNCH_REAL="$real")
+  assert_contains "$out" "Launch mode: project (the session runs at $repo_root through a Firstmate view" \
+    "a view launch did not name project mode"
+  assert_contains "$out" "Project instructions: loaded natively through the Firstmate view" \
+    "a view launch did not say the instructions load natively"
+  assert_contains "$out" "AGENTS.md - folded into the composed AGENTS.md: $real/AGENTS.md" \
+    "a view launch did not list the folded AGENTS.md"
+  assert_contains "$out" "bin/ - merged with Firstmate's" "a view launch did not list the merged bin/"
+  assert_contains "$out" ".claude - Firstmate's own shown instead: $real/.claude" \
+    "a view launch did not list the shadowed .claude"
+  assert_contains "$out" ".mcp.json - hidden from the supervisor" "a view launch did not list the hidden .mcp.json"
+  assert_not_contains "$out" "LAUNCH INSTRUCTIONS EXCERPT" "a view launch still printed the excerpt"
+  assert_not_contains "$out" "VIEW_PROJECT_AGENTS_MARKER" "a view launch re-printed the project instructions"
+  assert_not_contains "$out" "Launch notice:" "a launch without a notice printed one"
+
+  pass "a project-mode view lists the shadowed entries instead of an instructions excerpt"
 }
 
 # --- lock refusal: read-only path --------------------------------------------
@@ -2988,6 +3116,8 @@ test_launch_context_omitted_without_launch_dir_or_at_install_root
 test_launch_context_registered_project_primes_agents_excerpt
 test_launch_context_unregistered_repo_names_registration_and_absent_instructions
 test_launch_context_uses_claude_md_when_agents_absent
+test_launch_context_org_launch_summarizes_projects
+test_launch_context_view_lists_shadowed_entries_instead_of_excerpt
 test_launch_context_excerpt_caps_long_lines
 test_launch_context_unreadable_registry_is_not_reported_unregistered
 test_launch_context_non_repo_launch_omits_section_and_instructions
