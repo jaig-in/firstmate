@@ -243,6 +243,7 @@ bless_existing_home() {
       [ -f "$f" ] && cfg+=("config/$(basename "$f")")
     done
   fi
+  [ -f "$home/.tasks.toml" ] && cfg+=(.tasks.toml)
   scaffold_home "$home" "$([ "$org" -eq 0 ] && echo --register-self)"
   if [ "${#cfg[@]}" -gt 0 ]; then
     echo "firstmate: existing home $home is now trusted; it will honour its config: ${cfg[*]}"

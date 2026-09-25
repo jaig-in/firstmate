@@ -406,6 +406,7 @@ test_init_bless() {
   out=$(cd "$clone" && "$ROOT/bin/firstmate" init) || fail "init failed on a cloned home"
   assert_contains "$out" "now trusted" "init did not report the blessing"
   assert_contains "$out" "config/primary-harness" "init did not name the committed config it will honour"
+  assert_not_contains "$out" ".tasks.toml" "init named a .tasks.toml it created itself as pre-existing config"
   assert_present "$clone/.firstmate/.fm-home" "init wrote no marker into the cloned home"
   assert_equals "codex" "$(cat "$clone/.firstmate/config/primary-harness")" "init changed committed config"
   assert_equals "*
@@ -458,6 +459,15 @@ config/*
   assert_contains "$out" "now trusted" "org home was not blessed"
   assert_present "$org/.firstmate/.fm-home" "org home got no marker"
   assert_absent "$org/.firstmate/data/projects.md" "blessing an org home registered a project"
+
+  # A home carrying only a .tasks.toml names it: it can pick the task backend.
+  local tasks="$base/tasks"
+  fm_git_init_commit "$tasks"
+  mkdir -p "$tasks/.firstmate"
+  printf 'backend = "beads"\n' > "$tasks/.firstmate/.tasks.toml"
+  out=$(cd "$tasks" && "$ROOT/bin/firstmate" init) || fail "init failed on a home with only .tasks.toml"
+  assert_contains "$out" "it will honour its config: .tasks.toml" "init did not name the pre-existing .tasks.toml"
+  assert_equals 'backend = "beads"' "$(cat "$tasks/.firstmate/.tasks.toml")" "init changed the pre-existing .tasks.toml"
 
   # A symlinked .firstmate/ is refused and nothing behind it is written.
   local link="$base/linked" target="$base/elsewhere"
