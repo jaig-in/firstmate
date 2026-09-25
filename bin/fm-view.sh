@@ -301,15 +301,15 @@ desired_top() {
   printf 'CLAUDE.md\tfile\t%s\tro\n' "$RUN/CLAUDE.md"
 }
 
-# desired_merged <name>: Firstmate entries as symlinks into the install root
-# (coherent), project entries as read-only binds; Firstmate wins an exact-name
+# desired_merged <name>: Firstmate entries as symlinks into the read-only
+# install alias (coherent), project entries as read-only binds; Firstmate wins an exact-name
 # collision.
 desired_merged() {
   local name=$1 e kind
   while IFS= read -r e; do
     [ -n "$e" ] || continue
     case "$e" in *$'\t'*) continue ;; esac
-    printf '%s\tfmlink\t%s\tro\n' "$e" "$INSTALL/$name/$e"
+    printf '%s\tfmlink\t%s\tro\n' "$e" "$INSTALL_SRC/$name/$e"
   done < <(ls -A -- "$INSTALL_SRC/$name")
   while IFS= read -r e; do
     [ -n "$e" ] || continue
