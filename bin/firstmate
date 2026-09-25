@@ -41,7 +41,8 @@
 #       -c project_doc_max_bytes=262144 so the whole contract loads; a claude
 #       launch in either mode sets CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 because its
 #       per-directory auto-memory would be shared across homes launched from
-#       the install root, or with plain sessions in the project. Remaining args pass through to the harness verbatim.
+#       the install root, or with plain sessions in the project. Remaining
+#       args pass through to the harness verbatim.
 #   firstmate init [--org]
 #       Scaffold a .firstmate/ home. --org creates it at the current directory
 #       (an org root whose sibling directories are the projects); without
