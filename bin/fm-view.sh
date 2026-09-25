@@ -408,6 +408,19 @@ keeper() {
 
 # ---------------------------------------------------------------- host side
 
+# cleanup_run <run>: host-side cleanup of a session's own runtime dir, named
+# files only.
+cleanup_run() {
+  local run=$1
+  rm -f -- "$run/state/top" "$run/state/compose" "$run/state"/merged.* "$run/AGENTS.md" \
+    "$run/CLAUDE.md" "$run/git-shim" "$run/git.real"
+  if [ -n "${FM_VIEW_KEEP_LOG:-}" ] && [ -s "$run/keeper.log" ]; then
+    mv -- "$run/keeper.log" "$run.keeper.log"
+  fi
+  rm -f -- "$run/keeper.log"
+  rmdir -- "$run/state" "$run/rw" "$run/ro" "$run/install" "$run" 2>/dev/null || true
+}
+
 cmd_run() {
   local install='' launch_dir='' reason git_real unshare_bin run rc=0
   while [ $# -gt 0 ]; do
@@ -430,6 +443,10 @@ cmd_run() {
   run="$(runtime_base)/firstmate-view.$$"
   [ ! -e "$run" ] || die "runtime dir already exists: $run"
   mkdir -m 700 -- "$run"
+  # A closed terminal hangs up this process too: clean up before dying.
+  trap "cleanup_run $(printf %q "$run"); exit 129" HUP
+  trap "cleanup_run $(printf %q "$run"); exit 130" INT
+  trap "cleanup_run $(printf %q "$run"); exit 143" TERM
   mkdir -- "$run/state"
   compose_agents "$install" "$launch_dir" "$launch_dir" "$run/AGENTS.md"
   cp -- "$install/CLAUDE.md" "$run/CLAUDE.md"
@@ -451,14 +468,8 @@ SHIM
   FM_VIEW_UID=$(id -u) FM_VIEW_GID=$(id -g) \
   FM_VIEW=1 FM_VIEW_ROOT=$launch_dir FM_LAUNCH_REAL=$run/ro FM_LAUNCH_REAL_RW=$run/rw \
     "$unshare_bin" --user --map-root-user --mount --propagation private -- "$0" __keeper "$@" || rc=$?
-  # Host-side cleanup of this session's own runtime dir: named files only.
-  rm -f -- "$run/state/top" "$run/state/compose" "$run/state"/merged.* "$run/AGENTS.md" \
-    "$run/CLAUDE.md" "$run/git-shim" "$run/git.real"
-  if [ -n "${FM_VIEW_KEEP_LOG:-}" ] && [ -s "$run/keeper.log" ]; then
-    mv -- "$run/keeper.log" "$run.keeper.log"
-  fi
-  rm -f -- "$run/keeper.log"
-  rmdir -- "$run/state" "$run/rw" "$run/ro" "$run/install" "$run" 2>/dev/null || true
+  trap - HUP INT TERM
+  cleanup_run "$run"
   return "$rc"
 }
 

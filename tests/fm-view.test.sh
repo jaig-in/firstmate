@@ -498,6 +498,32 @@ SH
   pass "worker placement: servers started inside a view are refused; outside a view the guard is inert"
 }
 
+# --- runtime dir cleanup --------------------------------------------------------
+
+test_view_cleanup_on_hangup() {
+  local base install proj pid i left
+  skip_without_view "view cleanup on hangup" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+
+  # A closed terminal hangs up the whole session's process group at once.
+  (cd "$proj" && FM_HOME="$proj/.firstmate" exec setsid "$ROOT/bin/fm-view.sh" run \
+    --install "$install" --launch "$proj" -- bash -c 'touch "$FM_LAUNCH_REAL_RW/.firstmate/started"; sleep 60') &
+  pid=$!
+  for i in $(seq 1 50); do [ -e "$proj/.firstmate/started" ] && break; sleep 0.2; done
+  [ -e "$proj/.firstmate/started" ] || fail "the view session did not start"
+  kill -HUP -- "-$pid"
+  wait "$pid" 2>/dev/null || true
+  left=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -name 'firstmate-view.*')
+  [ -z "$left" ] || fail "a hung-up session left its runtime dir behind: $left"
+  rm -f "$proj/.firstmate/started"
+
+  pass "cleanup: a hung-up session removes its runtime dir"
+}
+
 test_mode_fallback_and_refusal
 test_mode_project_default
 test_view_layout_and_read_only
@@ -505,5 +531,6 @@ test_view_git_shim
 test_view_falsification
 test_view_keeper_refresh
 test_worker_placement_guard
+test_view_cleanup_on_hangup
 
 printf 'all view tests passed\n'
