@@ -13,6 +13,9 @@
 #     is another Firstmate checkout runs as its own install root; a bad mode
 #     value fails loudly.
 #   - codex is launched with -c project_doc_max_bytes=262144 in either mode.
+#   - a claude launch has auto-memory switched off
+#     (CLAUDE_CODE_DISABLE_AUTO_MEMORY=1) in install mode too, so homes
+#     launched from the install root share no per-directory store.
 #   - on a host that can build the view, an unset mode runs the harness at the
 #     launch root (the repo top, or the org root) inside the view, and a claude
 #     launch there has auto-memory switched off (CLAUDE_CODE_DISABLE_AUTO_MEMORY=1),
@@ -156,8 +159,7 @@ test_mode_fallback_and_refusal() {
   assert_contains "$err" "firstmate: notice: project mode unavailable" "fallback printed no launch notice"
   assert_equals 1 "$(grep -c 'notice' "$base/err1")" "fallback notice was not one line"
   assert_grep "ROOT=$proj" "$base/out1" "fallback did not export the launch root"
-  assert_grep "MEMORY_OFF=" "$base/out1" "install mode must not change claude auto-memory"
-  assert_no_grep "MEMORY_OFF=1" "$base/out1" "install mode switched claude auto-memory off"
+  assert_grep "MEMORY_OFF=1" "$base/out1" "a claude install-mode session left auto-memory on"
 
   # Explicit project mode there refuses with the reason; the harness never runs.
   rm -f "$base/out2"
@@ -181,6 +183,7 @@ test_mode_fallback_and_refusal() {
     PATH="$nounshare:$fakebin:$PATH" "$ROOT/bin/firstmate" --mode install 2>"$base/err4") \
     || fail "--mode install did not override config/launch-mode"
   assert_grep "PWD=$ROOT" "$base/out4" "--mode install did not run from the install root"
+  assert_grep "MEMORY_OFF=1" "$base/out4" "an explicit install-mode claude session left auto-memory on"
   assert_no_grep "notice" "$base/err4" "an explicit install mode printed a fallback notice"
   printf 'sideways\n' > "$proj/.firstmate/config/launch-mode"
   if (cd "$proj" && env -u FM_HOME PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" 2>"$base/err5"); then
@@ -198,6 +201,7 @@ test_mode_fallback_and_refusal() {
     || fail "codex launch failed"
   assert_grep "ARGS=-c project_doc_max_bytes=262144 resume" "$base/out6" \
     "codex was not launched with the raised project_doc_max_bytes"
+  assert_no_grep "MEMORY_OFF=1" "$base/out6" "a codex launch was given claude's auto-memory switch"
 
   # No project or org root: install mode without a notice; project refuses.
   local bare="$base/bare" globalhome="$base/globalhome"
@@ -227,7 +231,7 @@ test_mode_fallback_and_refusal() {
   assert_grep "CODE_ROOT=$other" "$base/out9" "a Firstmate checkout was not its own code root"
   assert_grep "MODE=install" "$base/out9" "a Firstmate checkout was viewed"
 
-  pass "launch modes: fallback notice, explicit refusal, config default, codex cap, no-project and self-checkout launches"
+  pass "launch modes: fallback notice, explicit refusal, config default, install-mode auto-memory off, codex cap, no-project and self-checkout launches"
 }
 
 test_mode_project_default() {

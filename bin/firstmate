@@ -39,9 +39,9 @@
 #       (FM_PI_HARNESS / FM_OMP_HARNESS) set for this launch; cursor resolves
 #       its agent CLI as fm-spawn.sh does; codex is launched with
 #       -c project_doc_max_bytes=262144 so the whole contract loads; a claude
-#       project-mode launch sets CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 because its
-#       per-directory auto-memory would be shared with plain sessions in the
-#       project. Remaining args pass through to the harness verbatim.
+#       launch in either mode sets CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 because its
+#       per-directory auto-memory would be shared across homes launched from
+#       the install root, or with plain sessions in the project. Remaining args pass through to the harness verbatim.
 #   firstmate init [--org]
 #       Scaffold a .firstmate/ home. --org creates it at the current directory
 #       (an org root whose sibling directories are the projects); without
@@ -455,11 +455,12 @@ cmd_launch() {
     pi | pi-signed) export FM_PI_HARNESS=$harness ;;
     omp) export FM_OMP_HARNESS=omp ;;
   esac
+  # Claude keys auto-memory by working directory, so a session would share it
+  # with every other home launched from the same root (the install root in
+  # install mode, the project in project mode); a Firstmate session keeps its
+  # memory in the home instead.
+  [ "$harness" != claude ] || export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
   if [ "$mode" = project ]; then
-    # Claude keys auto-memory by working directory, so a view session would
-    # share it with the captain's plain sessions in this project; a Firstmate
-    # session keeps its memory in the home instead.
-    [ "$harness" != claude ] || export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
     exec "$SCRIPT_DIR/fm-view.sh" run --install "$INSTALL_ROOT" --launch "$root" -- \
       "$harness_bin" ${harness_args[@]+"${harness_args[@]}"} "$@"
   fi
