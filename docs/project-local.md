@@ -519,6 +519,9 @@ $ touch .firstmate/state/ok      # works: the home is writable
 | `$FM_LAUNCH_REAL` | Your real project, read-only |
 | `$FM_LAUNCH_REAL_RW` | Your real project, writable, reserved for an edit you approve in the moment |
 
+The presented Firstmate surface is read-only everywhere in the session, including Firstmate's scripts merged into your own `bin/` or `docs/`: writing through `bin/fm-spawn.sh` fails like any other write.
+The Firstmate install root itself stays writable, because the global home can live there and self-update replaces it; only Firstmate's own scripts reach it, through `FM_ROOT_OVERRIDE`, never a path presented in the session.
+
 Why: Firstmate's first rule is that the first mate never writes to a project; workers change code in isolated copies and deliver it through the project's delivery mode.
 Project mode turns that rule from a promise into a guarantee against accidents.
 It is a guard against mistakes, not a sandbox against a determined program: git and `$FM_LAUNCH_REAL_RW` still reach the real files.

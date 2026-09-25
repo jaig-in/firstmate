@@ -298,6 +298,7 @@ test_view_layout_and_read_only() {
     { echo x >> src/app.js; } 2>/dev/null || echo "project_file_ro=yes"
     touch .claude/new 2>/dev/null || echo "surface_ro=yes"
     touch .agents/new 2>/dev/null || echo "agents_ro=yes"
+    { echo x >> bin/fm-session-start.sh; } 2>/dev/null || echo "merged_fm_ro=yes"
     touch .firstmate/state/probe && echo "home_rw=yes"
     echo written > "$FM_LAUNCH_REAL_RW/approved.txt" && echo "real_rw=yes"
     [ -e "$FM_LAUNCH_REAL/.mcp.json" ] && echo "real_ro_readable=yes"
@@ -318,6 +319,7 @@ test_view_layout_and_read_only() {
   assert_contains "$out" "project_file_ro=yes" "a project file was writable"
   assert_contains "$out" "surface_ro=yes" "the Firstmate .claude/ surface was writable"
   assert_contains "$out" "agents_ro=yes" "the Firstmate .agents/ surface was writable"
+  assert_contains "$out" "merged_fm_ro=yes" "a Firstmate script in the merged bin/ was writable"
   assert_contains "$out" "home_rw=yes" "the project's .firstmate/ home was not writable"
   assert_contains "$out" "real_rw=yes" "FM_LAUNCH_REAL_RW was not writable"
   assert_contains "$out" "real_ro_readable=yes" "FM_LAUNCH_REAL did not expose the real tree"
@@ -329,6 +331,7 @@ test_view_layout_and_read_only() {
   assert_absent "$proj/newfile" "a view write reached the real tree"
   assert_absent "$proj/.agents" "the view leaked Firstmate's surface into the real tree"
   assert_absent "$install/.claude/new" "a view write reached the install surface"
+  assert_equals '#!/bin/sh' "$(cat "$install/bin/fm-session-start.sh")" "a write through the merged bin/ changed the install"
   assert_equals '# demo project' "$(head -n 1 "$proj/AGENTS.md")" "the real AGENTS.md changed"
   assert_equals 'app' "$(cat "$proj/src/app.js")" "a project file changed"
   if command -v findmnt >/dev/null 2>&1; then
