@@ -884,7 +884,7 @@ test_malformed_projects_root_is_reported_not_fatal() {
 
   rc=0
   out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$home" \
-    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_FAKE_LAVISH_AXI_VERSION=0.1.46 \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
     "$ROOT/bin/fm-bootstrap.sh" lavish-compatible 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "a malformed projects-root made lavish-compatible fail: $out"
 
