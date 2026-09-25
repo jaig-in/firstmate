@@ -444,8 +444,11 @@ cmd_run() {
   [ ! -e "$run" ] || die "runtime dir already exists: $run"
   mkdir -m 700 -- "$run"
   # A closed terminal hangs up this process too: clean up before dying.
+  # shellcheck disable=SC2064 # $run is local: expand now, while it is set.
   trap "cleanup_run $(printf %q "$run"); exit 129" HUP
+  # shellcheck disable=SC2064
   trap "cleanup_run $(printf %q "$run"); exit 130" INT
+  # shellcheck disable=SC2064
   trap "cleanup_run $(printf %q "$run"); exit 143" TERM
   mkdir -- "$run/state"
   compose_agents "$install" "$launch_dir" "$launch_dir" "$run/AGENTS.md"
