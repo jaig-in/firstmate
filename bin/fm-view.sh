@@ -20,7 +20,7 @@
 #       1). Both aliases exist only inside the session.
 #   fm-view.sh shadowed <real-launch-dir>
 #       Print "<name><TAB><how>" for every real top-level entry the view does
-#       not present at its own path (how = merged, firstmate, or hidden).
+#       not present at its own path (how = folded, merged, firstmate, or hidden).
 #
 # View of <dir> inside the namespace:
 #   AGENTS.md          composed, read-only: Firstmate's AGENTS.md, then a
@@ -33,8 +33,9 @@
 #                      directory (Firstmate wins an exact-name collision)
 #   .agents/ .claude/ .codex/ .cursor/ .grok/ .opencode/ .pi/ .omp/
 #                      Firstmate's, read-only, as at the install root
-#   AGENTS.override.md .mcp.json opencode.json opencode.jsonc
+#   AGENTS.override.md CLAUDE.local.md .mcp.json opencode.json opencode.jsonc
 #                      hidden: each would override or extend the supervisor
+#                      (the two instruction files load only through AGENTS.md)
 #   .firstmate/        the project's own home, read-write
 #   everything else    the project's real entries, read-only
 # Git always runs against the REAL tree at the same path: a shim bound over the
@@ -58,7 +59,7 @@ set -eu
 # The one owner of the view's layout; `shadowed` and the keeper both read it.
 FM_DIRS="bin docs .agents .claude .codex .cursor .grok .opencode .pi .omp"
 MERGE_DIRS="bin docs"
-HIDE="AGENTS.override.md .mcp.json opencode.json opencode.jsonc"
+HIDE="AGENTS.override.md CLAUDE.local.md .mcp.json opencode.json opencode.jsonc"
 RW_ENTRIES=".firstmate"
 INSTR_FILES="AGENTS.md AGENTS.override.md CLAUDE.md CLAUDE.local.md .claude/CLAUDE.md"
 POLL=${FM_VIEW_POLL:-2}
@@ -205,7 +206,7 @@ cmd_shadowed() {
   for name in AGENTS.md CLAUDE.md $HIDE; do
     [ -e "$real/$name" ] || [ -L "$real/$name" ] || continue
     case "$name" in
-      AGENTS.md | CLAUDE.md | AGENTS.override.md) printf '%s\tfolded\n' "$name" ;;
+      AGENTS.md | CLAUDE.md | AGENTS.override.md | CLAUDE.local.md) printf '%s\tfolded\n' "$name" ;;
       *) printf '%s\thidden\n' "$name" ;;
     esac
   done
