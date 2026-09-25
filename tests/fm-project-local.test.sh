@@ -366,6 +366,129 @@ test_init() {
   pass "init: org scaffold, per-project registration, repo-root landing, outside-repo refusal"
 }
 
+# --- firstmate init blessing an existing home ---------------------------------
+
+# snapshot_tree <dir>: one line per file, path plus content hash, so a before
+# and after comparison shows any modified, added, or deleted file.
+snapshot_tree() {
+  (cd "$1" && find . -type f -o -type l | LC_ALL=C sort | while IFS= read -r f; do
+    printf '%s %s\n' "$f" "$(cksum < "$f")"
+  done)
+}
+
+test_init_bless() {
+  local base fakebin src clone out
+  base=$(new_dir)
+  fakebin=$(make_fake_harness "$base/fakebin")
+  cp "$fakebin/claude" "$fakebin/codex"
+
+  # A shared home committed upstream and cloned: the clone has the committed
+  # config but no marker, so the committed harness is refused before init.
+  src="$base/src"
+  fm_git_init_commit "$src"
+  mkdir -p "$src/.firstmate/config"
+  printf 'codex\n' > "$src/.firstmate/config/primary-harness"
+  printf '*\n!config/\nconfig/*\n!config/primary-harness\n' > "$src/.firstmate/.gitignore"
+  git -C "$src" add -f .firstmate/.gitignore .firstmate/config/primary-harness
+  git -C "$src" commit -q -m "share home"
+  clone="$base/clone"
+  git clone -q "$src" "$clone"
+  if (cd "$clone" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out-pre" \
+      PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err-pre"); then
+    fail "cloned home was honoured before init"
+  fi
+  assert_grep "untrusted" "$base/err-pre" "pre-init refusal did not name the home untrusted"
+  assert_grep "firstmate init" "$base/err-pre" "refusal did not name firstmate init"
+  assert_absent "$base/out-pre" "the harness launched before the home was blessed"
+
+  local before
+  before=$(snapshot_tree "$clone/.firstmate")
+  out=$(cd "$clone" && "$ROOT/bin/firstmate" init) || fail "init failed on a cloned home"
+  assert_contains "$out" "now trusted" "init did not report the blessing"
+  assert_contains "$out" "config/primary-harness" "init did not name the committed config it will honour"
+  assert_present "$clone/.firstmate/.fm-home" "init wrote no marker into the cloned home"
+  assert_equals "codex" "$(cat "$clone/.firstmate/config/primary-harness")" "init changed committed config"
+  assert_equals "*
+!config/
+config/*
+!config/primary-harness" "$(cat "$clone/.firstmate/.gitignore")" "init overwrote the committed .gitignore"
+  # Only files that were absent may differ: everything in the snapshot is intact.
+  local line
+  while IFS= read -r line; do
+    printf '%s\n' "$(snapshot_tree "$clone/.firstmate")" | grep -qxF -- "$line" \
+      || fail "init modified or deleted an existing file: $line"
+  done <<< "$before"
+  assert_present "$clone/.firstmate/data" "init did not create the missing data dir"
+  assert_present "$clone/.firstmate/.tasks.toml" "init did not create the missing .tasks.toml"
+  [ -z "$(git -C "$clone" status --porcelain)" ] || fail "blessing left the clone dirty"
+  (cd "$clone" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out-post" \
+    PATH="$fakebin:$PATH" "$ROOT/bin/firstmate") || fail "blessed clone did not launch"
+  assert_grep "FM_HOME=$clone/.firstmate" "$base/out-post" "blessed clone did not resolve its home"
+
+  # A second run reports the home already trusted, exit 0, and changes nothing.
+  before=$(snapshot_tree "$clone/.firstmate")
+  out=$(cd "$clone" && "$ROOT/bin/firstmate" init) || fail "re-running init on a trusted home failed"
+  assert_contains "$out" "already trusted" "re-run did not report already trusted"
+  assert_equals "$before" "$(snapshot_tree "$clone/.firstmate")" "already-trusted re-run changed files"
+
+  # A pre-marker home (older scaffold, hand-written notes) is blessed without
+  # touching what it holds, and the repo registers nothing over existing data.
+  local pre="$base/pre"
+  fm_git_init_commit "$pre"
+  mkdir -p "$pre/.firstmate/data" "$pre/.firstmate/config"
+  printf 'keep me\n' > "$pre/.firstmate/data/projects.md"
+  printf '..\n' > "$pre/.firstmate/config/projects-root"
+  printf 'my own ignore\n' > "$pre/.firstmate/.gitignore"
+  before=$(snapshot_tree "$pre/.firstmate")
+  out=$(cd "$pre" && "$ROOT/bin/firstmate" init) || fail "init failed on a pre-marker home"
+  assert_contains "$out" "now trusted" "pre-marker home was not blessed"
+  assert_present "$pre/.firstmate/.fm-home" "pre-marker home got no marker"
+  assert_equals "keep me" "$(cat "$pre/.firstmate/data/projects.md")" "init overwrote existing projects.md"
+  assert_equals "my own ignore" "$(cat "$pre/.firstmate/.gitignore")" "init overwrote existing .gitignore"
+  while IFS= read -r line; do
+    printf '%s\n' "$(snapshot_tree "$pre/.firstmate")" | grep -qxF -- "$line" \
+      || fail "init modified or deleted an existing pre-marker file: $line"
+  done <<< "$before"
+  assert_present "$pre/.firstmate/.tasks.toml" "pre-marker home got no .tasks.toml"
+
+  # --org blesses an existing org home the same way.
+  local org="$base/org"
+  mkdir -p "$org/.firstmate"
+  out=$(cd "$org" && "$ROOT/bin/firstmate" init --org) || fail "init --org failed on an existing home"
+  assert_contains "$out" "now trusted" "org home was not blessed"
+  assert_present "$org/.firstmate/.fm-home" "org home got no marker"
+  assert_absent "$org/.firstmate/data/projects.md" "blessing an org home registered a project"
+
+  # A symlinked .firstmate/ is refused and nothing behind it is written.
+  local link="$base/linked" target="$base/elsewhere"
+  fm_git_init_commit "$link"
+  mkdir -p "$target"
+  ln -s "$target" "$link/.firstmate"
+  if (cd "$link" && "$ROOT/bin/firstmate" init >/dev/null 2>"$base/err-link"); then
+    fail "init blessed a symlinked .firstmate"
+  fi
+  assert_grep "symlink" "$base/err-link" "symlink refusal did not say why"
+  assert_absent "$target/.fm-home" "init wrote through a symlinked .firstmate"
+  # A non-directory .firstmate is refused too.
+  local file="$base/filed"
+  fm_git_init_commit "$file"
+  printf 'x\n' > "$file/.firstmate"
+  if (cd "$file" && "$ROOT/bin/firstmate" init >/dev/null 2>&1); then
+    fail "init blessed a non-directory .firstmate"
+  fi
+  # A symlinked scaffold piece inside a real home is refused as well.
+  local piece="$base/piece"
+  fm_git_init_commit "$piece"
+  mkdir -p "$piece/.firstmate" "$base/outside"
+  ln -s "$base/outside" "$piece/.firstmate/data"
+  if (cd "$piece" && "$ROOT/bin/firstmate" init >/dev/null 2>&1); then
+    fail "init blessed a home with a symlinked data dir"
+  fi
+  assert_absent "$piece/.firstmate/.fm-home" "refused bless still wrote a marker"
+
+  pass "init: blesses cloned and pre-marker homes without modifying files, already-trusted re-run, unsafe homes refused"
+}
+
 # --- projects-root resolution and validation ---------------------------------
 
 test_projects_root() {
@@ -1014,6 +1137,7 @@ test_manifest_alias_label() {
 test_launcher_resolution
 test_launcher_trust
 test_init
+test_init_bless
 test_projects_root
 test_discovery_authority
 test_resolver_fails_closed

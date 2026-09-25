@@ -51,7 +51,13 @@
 #       .fm-home trust marker, and a whitelist-style .firstmate/.gitignore. The home is never added to the
 #       enclosing repository's .git/info/exclude: git would then never read
 #       the whitelist negations, and the .gitignore's `*` already keeps the
-#       rest of the home private.
+#       rest of the home private. Run in a directory whose .firstmate/ already
+#       exists (a cloned shared home, or one that predates the marker), init
+#       blesses it instead: it writes the missing untracked marker and only
+#       the missing scaffold pieces, never overwrites or deletes a file, names
+#       the committed config the home will now honour, and reports "already
+#       trusted" when the marker is present. It refuses a symlinked or
+#       non-directory .firstmate/ (or scaffold piece) and a git-tracked marker.
 set -eu
 
 # The launcher is installed by symlinking it onto PATH, so its own directory is
@@ -158,7 +164,7 @@ require_trusted_home() {
   A .firstmate/ directory can carry committed config (harness, backlog
   backend), so the launcher refuses to honor one it did not create; a
   $HOME_MARKER committed to git does not count.
-  Bless it by running 'firstmate init' there, or knowingly: touch '$home/$HOME_MARKER'"
+  Bless it by running 'firstmate init' there (it writes the marker and reports the config the home will honour)."
 }
 
 # repo_top <dir>: print the enclosing git worktree root, or nothing.
@@ -167,17 +173,21 @@ repo_top() {
 }
 
 # scaffold_home <dir> [--register-self]: create the .firstmate/ layout.
+# Create-only: each piece is written only when absent, so blessing an
+# existing home never overwrites or deletes a file.
 scaffold_home() {
   local home=$1 register=${2:-}
   mkdir -p "$home/data" "$home/state" "$home/config"
-  printf '..\n' > "$home/config/projects-root"
-  if [ -f "$INSTALL_ROOT/.tasks.toml" ]; then
-    cp "$INSTALL_ROOT/.tasks.toml" "$home/.tasks.toml"
-  else
-    printf 'backend = "markdown"\n\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\ndone_keep = 10\n' > "$home/.tasks.toml"
+  [ -e "$home/config/projects-root" ] || printf '..\n' > "$home/config/projects-root"
+  if [ ! -e "$home/.tasks.toml" ]; then
+    if [ -f "$INSTALL_ROOT/.tasks.toml" ]; then
+      cp "$INSTALL_ROOT/.tasks.toml" "$home/.tasks.toml"
+    else
+      printf 'backend = "markdown"\n\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\ndone_keep = 10\n' > "$home/.tasks.toml"
+    fi
   fi
-  : > "$home/$HOME_MARKER"
-  cat > "$home/.gitignore" <<'EOF'
+  [ -e "$home/$HOME_MARKER" ] || : > "$home/$HOME_MARKER"
+  [ -e "$home/.gitignore" ] || cat > "$home/.gitignore" <<'EOF'
 # .firstmate/ is private operational state and stays uncommitted by default.
 # To share a config item with the team, append a negation for its exact path
 # below the config/* line, e.g.:
@@ -199,8 +209,45 @@ EOF
     else
       mode="local-only"
     fi
-    printf -- '- %s [%s] - this repository (added %s)\n' "$name" "$mode" "$(date +%F)" \
-      > "$home/data/projects.md"
+    [ -e "$home/data/projects.md" ] ||
+      printf -- '- %s [%s] - this repository (added %s)\n' "$name" "$mode" "$(date +%F)" \
+        > "$home/data/projects.md"
+  fi
+}
+
+# bless_existing_home <home> <org>: `firstmate init` on a directory whose
+# .firstmate/ already exists (a cloned shared home, or one created before the
+# marker). Writes the missing untracked marker and any missing scaffold piece,
+# never overwriting or deleting a file, and names the committed config the
+# home will now honour so blessing is an informed act.
+bless_existing_home() {
+  local home=$1 org=$2 p f cfg=() unsafe=''
+  [ -d "$home" ] && [ ! -L "$home" ] || die "$home exists but is not a plain directory (symlink or non-directory); refusing to bless it"
+  for p in data state config config/projects-root .tasks.toml .gitignore data/projects.md "$HOME_MARKER"; do
+    if [ -L "$home/$p" ]; then unsafe=$p; break; fi
+  done
+  [ -z "$unsafe" ] || die "$home/$unsafe is a symlink; refusing to bless $home"
+  for p in data state config; do
+    [ ! -e "$home/$p" ] || [ -d "$home/$p" ] || die "$home/$p exists but is not a directory; refusing to bless $home"
+  done
+  if [ -e "$home/$HOME_MARKER" ]; then
+    if home_is_trusted "$home"; then
+      echo "firstmate: $home is already trusted"
+      return 0
+    fi
+    die "$home/$HOME_MARKER is tracked by git, so it proves nothing on this machine.
+  Untrack it ('git rm --cached $home/$HOME_MARKER'), then run 'firstmate init' again."
+  fi
+  if [ -d "$home/config" ]; then
+    for f in "$home"/config/*; do
+      [ -f "$f" ] && cfg+=("config/$(basename "$f")")
+    done
+  fi
+  scaffold_home "$home" "$([ "$org" -eq 0 ] && echo --register-self)"
+  if [ "${#cfg[@]}" -gt 0 ]; then
+    echo "firstmate: existing home $home is now trusted; it will honour its config: ${cfg[*]}"
+  else
+    echo "firstmate: existing home $home is now trusted; it carries no config beyond the scaffold"
   fi
 }
 
@@ -222,7 +269,10 @@ cmd_init() {
     target=$(repo_top .) || die "firstmate init must run inside a git repository (or use --org at an org root)"
   fi
   home="$target/.firstmate"
-  [ -e "$home" ] && die "$home already exists"
+  if [ -e "$home" ] || [ -L "$home" ]; then
+    bless_existing_home "$home" "$org"
+    return
+  fi
   existing=$(nearest_firstmate_home "$(dirname "$target")" || true)
 
   scaffold_home "$home" "$([ "$org" -eq 0 ] && echo --register-self)"

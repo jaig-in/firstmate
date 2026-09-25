@@ -107,11 +107,16 @@ The launcher honors a `.firstmate/` it finds above you only when that marker is 
 
 Why: a `.firstmate/` can carry settings, such as which program to launch or where the backlog lives.
 If a repository you clone came with a committed `.firstmate/`, those settings would otherwise take effect the moment you typed `firstmate` inside it.
-With the marker rule, a committed `.firstmate/` does nothing on your machine until you bless it once:
+With the marker rule, a committed `.firstmate/` does nothing on your machine until you bless it once by running `firstmate init` in that repository:
 
 ```sh
-touch .firstmate/.fm-home
+firstmate init
 ```
+
+On a folder that already has `.firstmate/`, `init` changes nothing that exists.
+It writes the missing marker, creates only the scaffold pieces that are absent, and prints which committed settings, such as `config/primary-harness`, the home will now honour.
+Running it again reports that the home is already trusted.
+It refuses a `.firstmate/` that is a symlink or not a folder.
 
 A marker that was committed to git does not count, because it proves nothing about your machine.
 An explicit `FM_HOME=...` and the global home need no marker.
@@ -129,7 +134,7 @@ git add -f .firstmate/.gitignore .firstmate/config/primary-harness
 git commit -m "Share the Firstmate harness choice"
 ```
 
-Each teammate then runs `touch .firstmate/.fm-home` once after cloning.
+Each teammate then runs `firstmate init` once after cloning; until they do, the shared setting is ignored and the launcher refuses the home.
 `data/` and `state/` are never shared.
 [docs/configuration.md](configuration.md#initialization-the-projects-root-and-discovery) owns the whitelist rules.
 
@@ -551,12 +556,12 @@ Run `firstmate init` for this repository, `firstmate init --org` in the folder t
 
 **`firstmate: untrusted home: <home> has no local (untracked) .fm-home marker.`**
 The `.firstmate/` above you was not created on this machine, usually because it came with a clone.
-If you trust it, run `touch <home>/.fm-home`.
-`firstmate init` does not help here, because it refuses a folder that already has `.firstmate/`.
+If you trust it, run `firstmate init` there; it writes the marker and lists the committed settings the home will honour.
+A `.fm-home` that is tracked by git does not count: untrack it, then run `firstmate init` again.
 
-**`firstmate: <dir>/.firstmate already exists`**
-`firstmate init` never overwrites a home.
-Launch with `firstmate`, or bless a cloned home with `touch .firstmate/.fm-home`.
+**`firstmate: <dir>/.firstmate exists but is not a plain directory`** (or a piece of it is a symlink)
+`firstmate init` never overwrites a home and refuses to bless a symlinked one.
+Replace the symlink with a real folder, or launch with an explicit `FM_HOME`.
 
 **`firstmate: firstmate init must run inside a git repository (or use --org at an org root)`**
 Plain `init` makes a per-project home at a repository root.
