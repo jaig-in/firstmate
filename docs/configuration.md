@@ -131,6 +131,8 @@ While tasks are in flight, dispatch shared-repo edits to a crewmate.
 
 ## Project-local homes, the launcher, and the projects root
 
+[Project Local](project-local.md) is the task-oriented guide to everything in this section, with worked examples and troubleshooting; this section owns the contracts it links to.
+
 A Firstmate home is the directory holding `data/`, `state/`, `config/`, and the `.tasks.toml` backlog config; the tracked code root supplies `AGENTS.md`, `bin/`, skills, and docs.
 The two are independent: `FM_HOME` selects the home and `FM_ROOT_OVERRIDE` (or the script's own location) selects the code root, so one global install can serve many homes.
 
@@ -149,6 +151,7 @@ The caller's directory is exported as `FM_LAUNCH_DIR`, the launch root as `FM_LA
 `firstmate --mode project|install`, then the home's `config/launch-mode` (one token, `project` or `install`, a regular file; any other value fails loudly), selects the mode.
 Unset, the launcher uses project mode where the host can build the view and otherwise falls back to install mode, printing one `firstmate: notice:` line that names the concrete reason and exporting it as `FM_LAUNCH_NOTICE`, which the session-start digest repeats.
 An explicit project mode that cannot be built refuses with the same reason rather than falling back.
+The guide's [troubleshooting section](project-local.md#troubleshooting) lists every notice and refusal line with its fix.
 The view needs Linux with unprivileged user and mount namespaces and util-linux 2.38 or newer (`unshare --map-user`); macOS, native Ubuntu 23.10+ with `kernel.apparmor_restrict_unprivileged_userns=1`, and containers under the default seccomp profile cannot build it.
 A launch root that contains your home directory, the view's runtime directory, or a Firstmate home outside its `.firstmate/` is not viewed either.
 A launch with no project or org root, or one inside the install checkout, runs in install mode without a notice, and a launch root that is itself another Firstmate checkout runs as its own install root unless install mode is explicit.
@@ -183,6 +186,7 @@ Home trust: `firstmate init` writes an empty `.firstmate/.fm-home` marker into e
 A home discovered by walking `.firstmate/` ancestors is honored only when it carries that marker and git does not track it (init never commits the marker, so a committed one proves nothing, and a git error while checking - a corrupt index, say - inside a work tree fails closed; repository ownership checks are deliberately bypassed so a home inside another user's repository can be read at all, and it is the marker's tracked state, never ownership, that decides); the launcher refuses an unmarked one and names the blessing (`firstmate init`, or a knowing `touch .firstmate/.fm-home`), so a `.firstmate/` committed into a repository cannot inject a hostile `config/primary-harness` or `.tasks.toml` into launches beneath it.
 The ancestor walk stops below `$HOME`, so `$HOME/.firstmate` is only ever reached as the global home, never as an ancestor.
 An explicit `FM_HOME` and the global home are trusted by provenance and need no marker, and the resolved home is canonicalized (`cd` + `pwd -P`) before `FM_HOME` is exported.
+The guide's [trust marker walkthrough](project-local.md#the-one-time-trust-marker) shows blessing a cloned home and sharing config with a team.
 
 ### Initialization, the projects root, and discovery
 
