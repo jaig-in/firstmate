@@ -137,7 +137,7 @@ firstmate init
 ```
 
 On a folder that already has `.firstmate/`, `init` changes nothing that exists.
-It writes the missing marker, creates only the scaffold pieces that are absent, and prints which committed settings, such as `config/primary-harness`, the home will now honour.
+It writes the missing marker, creates only the scaffold pieces that are absent, and prints which committed settings, such as `config/primary-harness` or a `.tasks.toml` backlog setting, the home will now honour.
 Running it again reports that the home is already trusted.
 It refuses a `.firstmate/` that is a symlink or not a folder.
 
