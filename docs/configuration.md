@@ -160,7 +160,7 @@ Inside a project-mode session the launch directory is read-only apart from its `
 Git works normally at the launch path: a shim runs every git call against the real tree, so `git status` stays clean and no view file can be added or committed.
 The real tree is readable at `$FM_LAUNCH_REAL`, and a concrete captain-approved project operation under hard rule 1 writes through `$FM_LAUNCH_REAL_RW`; both exist only inside the session.
 Workers must run from a multiplexer server started outside the session - a supervisor launched from the captain's own tmux, zellij, or Herdr pane already is - because a server started inside would hand workers the view; `bin/fm-view-lib.sh` makes a spawn refuse that case.
-A claude project-mode launch sets `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, because Claude keys auto-memory by working directory and would otherwise share it with plain sessions in the project; a Firstmate session keeps its memory in its home.
+A claude launch in either mode sets `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, because Claude keys auto-memory by working directory: in install mode every home launched from the install root would share one store, and in project mode a session would share it with plain sessions in the project. A Firstmate session keeps its memory in its home instead. A claude session started without the launcher is unchanged.
 A codex launch in either mode passes `-c project_doc_max_bytes=262144`, because codex otherwise reads only the first 32 KiB of `AGENTS.md`.
 Harness per-directory state - transcripts, `--continue`, trust - is keyed by the launch root in project mode, so each harness asks its one-time workspace or hook trust question once per project.
 

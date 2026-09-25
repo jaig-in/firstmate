@@ -560,7 +560,7 @@ $ git show HEAD:AGENTS.md     # your real AGENTS.md
 Memory:
 
 - The first mate keeps what it learns about you and your projects in the home's `data/captain.md` and `data/learnings.md`, so each project or org has its own.
-- Claude Code's automatic per-folder memory is turned off in project mode, because it would be shared with your plain Claude Code sessions in the same folder.
+- Claude Code's automatic per-folder memory is turned off for every session the `firstmate` launcher starts, in both modes. Claude keys that memory by folder, so in install mode every org and project would share one memory under the install directory, and in project mode it would be shared with your plain Claude Code sessions in the same folder. A Claude Code session you start without the launcher keeps its usual memory.
 - Your agent tool's own per-folder history (transcripts, "continue last session") is keyed by the project folder in project mode and by the Firstmate clone in install mode.
   A plain `claude --continue` in your project can therefore pick up a first-mate conversation, and it will run without the Firstmate rules.
 
