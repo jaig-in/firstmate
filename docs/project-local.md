@@ -490,7 +490,7 @@ Only the session sees this; your editor, other terminals, workers, and CI keep s
 | `CLAUDE.md` | Firstmate's one-line pointer to `AGENTS.md` |
 | `bin/`, `docs/` | Firstmate's, merged with yours; Firstmate wins a same-named file |
 | `.agents/ .claude/ .codex/ .cursor/ .grok/ .opencode/ .pi/ .omp/` | Firstmate's |
-| `.mcp.json`, `opencode.json`, `opencode.jsonc`, `AGENTS.override.md` | Hidden |
+| `.mcp.json`, `opencode.json`, `opencode.jsonc`, `AGENTS.override.md`, `CLAUDE.local.md` | Hidden (the two instruction files still reach every tool once, folded into `AGENTS.md`) |
 | `.firstmate/` | Your home, writable |
 | Everything else | Your real files, read-only |
 

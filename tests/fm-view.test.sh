@@ -22,7 +22,8 @@
 #     so it can land neither in the shared install .claude/ nor in a
 #     per-directory store shared with plain sessions.
 #   - the view: composed AGENTS.md (contract first, then the project's own),
-#     merged bin/, Firstmate winning a docs/ collision, hidden .mcp.json; the
+#     merged bin/, Firstmate winning a docs/ collision, hidden .mcp.json and
+#     CLAUDE.local.md (folded, never native); the
 #     project and the Firstmate surface are read-only while .firstmate/ and
 #     FM_LAUNCH_REAL_RW are writable; the host sees no view file.
 #   - the git shim: clean status, `git add -A` stages nothing, the top level is
@@ -52,6 +53,7 @@ export XDG_RUNTIME_DIR="$TMP_ROOT/run"
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 unset FM_VIEW FM_VIEW_ROOT FM_LAUNCH_REAL FM_LAUNCH_REAL_RW FM_LAUNCH_ROOT FM_LAUNCH_MODE FM_LAUNCH_NOTICE
+unset CLAUDE_CODE_DISABLE_AUTO_MEMORY
 
 VIEW_OK=0
 if "$ROOT/bin/fm-view.sh" probe >/dev/null 2>&1; then
@@ -285,9 +287,13 @@ test_view_layout_and_read_only() {
   make_install "$install"
   proj="$base/demo"
   make_project "$proj"
+  printf 'ZQ_LOCAL_CLAUDE_MARKER\n' > "$proj/CLAUDE.local.md"
+  printf 'CLAUDE.local.md\n' >> "$proj/.git/info/exclude"
 
   out=$(view_run "$install" "$proj" '
     echo "cwd=$(pwd -P)"
+    grep -q ZQ_LOCAL_CLAUDE_MARKER AGENTS.md && echo "local_folded=yes"
+    [ -e CLAUDE.local.md ] || echo "local_hidden=yes"
     echo "agents_head=$(head -n 1 AGENTS.md)"
     grep -q ZQ_DEMO_PROJECT_MARKER AGENTS.md && echo "project_folded=yes"
     grep -q "FM_LAUNCH_REAL_RW" AGENTS.md && echo "rw_path_named=yes"
@@ -318,6 +324,10 @@ test_view_layout_and_read_only() {
   assert_contains "$out" "docs_conf=ZQ_FIRSTMATE_CONFIGURATION" "Firstmate did not win a docs/ collision"
   assert_contains "$out" "docs_notes=ZQ_PROJECT_NOTES" "a project-only docs/ entry was not presented"
   assert_contains "$out" "mcp_hidden=yes" "the project's .mcp.json was not hidden"
+  assert_contains "$out" "local_folded=yes" "the project's CLAUDE.local.md was not folded into AGENTS.md"
+  assert_contains "$out" "local_hidden=yes" "the project's CLAUDE.local.md was also presented natively"
+  assert_contains "$("$ROOT/bin/fm-view.sh" shadowed "$proj")" "$(printf 'CLAUDE.local.md\tfolded')" \
+    "shadowed did not report CLAUDE.local.md as folded"
   assert_contains "$out" "claude_settings_from={}" "the Firstmate .claude/ surface was not presented"
   assert_contains "$out" "root_ro=yes" "a new file could be created at the launch root"
   assert_contains "$out" "project_file_ro=yes" "a project file was writable"
