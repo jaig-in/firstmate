@@ -5,8 +5,31 @@ This page is the friendly walkthrough.
 Paths in the examples are shortened to `~/work/...`; files that must hold an absolute path show one.
 Exact schemas and contracts live in [docs/configuration.md](configuration.md#project-local-homes-the-launcher-and-the-projects-root), and this page links there instead of repeating them.
 
+## Quick start
+
+Three steps take you from nothing to a running session in one repository.
+
+```sh
+git clone https://github.com/kunchenguid/firstmate ~/firstmate && mkdir -p ~/.local/bin && ln -sf ~/firstmate/bin/firstmate ~/.local/bin/firstmate
+cd ~/work/myapp && firstmate init
+firstmate
+```
+
+The first step is a one-time install; skip it if `firstmate --help` already works.
+The second step prints this, confirming the repository now has its own home:
+
+```text
+firstmate: created ~/work/myapp/.firstmate
+firstmate: registered myapp in ~/work/myapp/.firstmate/data/projects.md
+```
+
+The third step opens your agent tool at the repository root, and its session start shows `Launch mode: project`.
+It needs `~/.local/bin` on your `PATH`, plus your agent tool and the other [README requirements](../README.md#requirements).
+Details are in [Install and set up](#install-and-set-up); for a folder of several repositories, follow [Example 2](#example-2-an-org-folder-of-several-repositories).
+
 ## Contents
 
+- [Quick start](#quick-start)
 - [What problem it solves](#what-problem-it-solves)
 - [Install and set up](#install-and-set-up)
 - [Example 1: a single repository](#example-1-a-single-repository)
@@ -372,6 +395,31 @@ Seeding refuses a project the org home has not registered, a `local-only` projec
 The first mate then launches and supervises the second mate for you; [docs/remote-secondmates.md](remote-secondmates.md) covers second mates on another machine.
 
 ## The two launch modes
+
+In project mode the same project path looks different depending on who is looking:
+
+```mermaid
+flowchart LR
+  subgraph real["Real project tree (never modified by the session)"]
+    R["~/work/myapp<br/>your files, git history"]
+  end
+  subgraph out["Outside the session"]
+    E["Your editor, terminal, workers"]
+  end
+  subgraph inside["Inside the session: same path, ~/work/myapp"]
+    V["Your project files: read-only"]
+    F["Firstmate rules and tools<br/>composed AGENTS.md, bin/, docs/, skills"]
+    H[".firstmate/ home: read-write"]
+  end
+  E -->|"sees the real tree, untouched"| R
+  R -->|"shown read-only"| V
+  F ---|"presented beside your files"| V
+  inside -->|"git runs through a shim on the REAL tree"| R
+  inside -->|"approved operation only: FM_LAUNCH_REAL_RW"| R
+```
+
+Ordinary writes to project files fail in the session; only `.firstmate/` is writable, and an approved operation writes through a separate writable alias of the real tree.
+Git commands go straight to the real tree, so `git status` stays clean and no view file can be added.
 
 | | Project mode | Install mode |
 |---|---|---|
