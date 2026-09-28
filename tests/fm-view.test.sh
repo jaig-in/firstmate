@@ -34,8 +34,10 @@
 #   - a project symlink resolving inside the launch tree is read-only in the
 #     view; one resolving outside it (top level or in a merged bin/) reaches
 #     its real target, which stays writable.
-#   - a nested mount inside a read-only project entry is read-only too, and
-#     capability probes leave no scratch directory behind.
+#   - a nested mount inside a read-only project entry is read-only too, a
+#     nested mount named with an embedded tab or newline stays read-only and
+#     does not abort startup, and capability probes leave no scratch
+#     directory behind.
 #   - worker placement: inside a view a process started in the view is
 #     "inside", the tmux container refuses to start a server there, and outside
 #     a view the guard is inert.
@@ -521,6 +523,63 @@ test_view_nested_mount_read_only() {
   pass "view: nested mounts inside read-only entries are read-only too"
 }
 
+# ro_tree decodes mountinfo's octal escapes before it has split the record,
+# so a nested mount whose directory name holds a real tab or newline used to
+# misparse the tab-delimited record ro_tree wrote and abort the remount
+# (PR #5677 review thread 4118410031). Each byte gets its own disposable
+# project so a failure in one case does not shadow the other.
+test_view_nested_mount_odd_name() {
+  local base install proj out
+  skip_without_view "view nested mount odd name" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+
+  proj="$base/demo-tab"
+  make_project "$proj"
+  out=$(unshare --user --map-root-user --mount -- bash -c '
+    nested=$(printf "nested\tdir")
+    mkdir -p "$1/src/$nested"
+    mount -t tmpfs fm-view-nested-fixture "$1/src/$nested" || { echo "fixture_mount_failed"; exit 0; }
+    echo seed > "$1/src/$nested/data.txt"
+    cd "$1" && FM_HOME="$1/.firstmate" FM_VIEW_POLL=1 "$2" run --install "$3" --launch "$1" -- bash -c '"'"'
+      nested=$(printf "nested\tdir")
+      cat "src/$nested/data.txt" 2>/dev/null && echo "nested_read=ok" || echo "nested_read=fail"
+      { echo x >> "src/$nested/data.txt"; } 2>/dev/null && echo "nested_view=rw" || echo "nested_view=ro"
+    '"'"'
+  ' fm-view-nested "$proj" "${FM_VIEW_SCRIPT:-$ROOT/bin/fm-view.sh}" "$install") \
+    || fail "nested-mount (tab-named) view run failed"
+  case "$out" in *fixture_mount_failed*)
+    printf 'ok - SKIP view nested mount odd name (tab): this host cannot mount the nested fixture\n' ;;
+  *)
+    assert_contains "$out" "nested_read=ok" "a nested mount named with an embedded tab could not be read through the view"
+    assert_contains "$out" "nested_view=ro" "a nested mount named with an embedded tab was writable" ;;
+  esac
+
+  proj="$base/demo-newline"
+  make_project "$proj"
+  out=$(unshare --user --map-root-user --mount -- bash -c '
+    nested=$(printf "nested\ndir")
+    mkdir -p "$1/src/$nested"
+    mount -t tmpfs fm-view-nested-fixture "$1/src/$nested" || { echo "fixture_mount_failed"; exit 0; }
+    echo seed > "$1/src/$nested/data.txt"
+    cd "$1" && FM_HOME="$1/.firstmate" FM_VIEW_POLL=1 "$2" run --install "$3" --launch "$1" -- bash -c '"'"'
+      nested=$(printf "nested\ndir")
+      cat "src/$nested/data.txt" 2>/dev/null && echo "nested_read=ok" || echo "nested_read=fail"
+      { echo x >> "src/$nested/data.txt"; } 2>/dev/null && echo "nested_view=rw" || echo "nested_view=ro"
+    '"'"'
+  ' fm-view-nested "$proj" "${FM_VIEW_SCRIPT:-$ROOT/bin/fm-view.sh}" "$install") \
+    || fail "nested-mount (newline-named) view run failed"
+  case "$out" in *fixture_mount_failed*)
+    printf 'ok - SKIP view nested mount odd name (newline): this host cannot mount the nested fixture\n' ;;
+  *)
+    assert_contains "$out" "nested_read=ok" "a nested mount named with an embedded newline could not be read through the view"
+    assert_contains "$out" "nested_view=ro" "a nested mount named with an embedded newline was writable" ;;
+  esac
+
+  pass "view: a nested mount named with an embedded tab or newline stays read-only and does not abort startup"
+}
+
 # Each capability probe mounts a tmpfs on a scratch directory; neither the
 # probe nor the one run repeats may leave that directory behind.
 test_view_probe_leaves_nothing() {
@@ -645,6 +704,7 @@ test_view_falsification
 test_view_keeper_refresh
 test_view_project_symlink_boundary
 test_view_nested_mount_read_only
+test_view_nested_mount_odd_name
 test_view_probe_leaves_nothing
 test_worker_placement_guard
 test_view_cleanup_on_hangup

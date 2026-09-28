@@ -240,7 +240,7 @@ ro_tree() {
   local mp target opts
   mp=$(cd -- "$1" && pwd -P) || return 1
   mount -o remount,bind,ro -- "$mp" || return 1
-  while IFS=$'\t' read -r target opts; do
+  while IFS= read -r -d '' target && IFS= read -r -d '' opts; do
     mount -o "remount,bind,$opts" -- "$target" || return 1
   done < <(FM_VIEW_RO_ROOT="$mp/" awk '
     BEGIN { root = ENVIRON["FM_VIEW_RO_ROOT"] }
@@ -250,7 +250,7 @@ ro_tree() {
       if (index(t, root) != 1) next
       o = $6
       if (o == "rw") o = "ro"; else if (substr(o, 1, 3) == "rw,") o = "ro" substr(o, 3)
-      print t "\t" o
+      printf "%s%c%s%c", t, 0, o, 0
     }' /proc/self/mountinfo)
 }
 
