@@ -519,7 +519,7 @@ $ touch .firstmate/state/ok      # works: the home is writable
 | `$FM_LAUNCH_REAL` | Your real project, read-only |
 | `$FM_LAUNCH_REAL_RW` | Your real project, writable, reserved for an edit you approve in the moment |
 
-A symlink in your project stays a symlink in the session. One whose target resolves inside the launch directory, such as `current -> src`, reaches that target through the view, so it is read-only too. One whose target resolves outside the launch directory, such as `shared -> ../other-repo`, reaches that real target, which is not part of the project and is not made read-only; the same holds for a project link inside a merged `bin/` or `docs/`.
+A symlink in your project stays a symlink in the session. One whose target resolves inside the launch directory, such as `current -> src`, reaches that target through the view, so it is read-only too, unless the target is in the writable `.firstmate/` home. One whose target resolves outside the launch directory, such as `shared -> ../other-repo`, reaches that real target, which is not part of the project and is not made read-only; the same holds for a project link inside a merged `bin/` or `docs/`.
 The presented Firstmate surface is read-only everywhere in the session, including Firstmate's scripts merged into your own `bin/` or `docs/`: writing through `bin/fm-spawn.sh` fails like any other write.
 The Firstmate install root itself stays writable, because the global home can live there and self-update replaces it; only Firstmate's own scripts reach it, through `FM_ROOT_OVERRIDE`, never a path presented in the session.
 
