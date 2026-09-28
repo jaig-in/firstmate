@@ -5164,6 +5164,15 @@ case "$LAUNCH" in
 esac
 case "$HARNESS" in
 claude | codex | opencode | pi | pi-signed | grok | kimi | gemini | muse | rovo | agy | devin)
+  # The launcher's CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 reaches panes only if its
+  # session started the multiplexer server, so state it per launch: a
+  # secondmate is a Firstmate session (memory in its home), a worker is not.
+  if [ "$HARNESS" = claude ]; then
+    case "$KIND" in
+    secondmate) LAUNCH="CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 $LAUNCH" ;;
+    *) LAUNCH="-u CLAUDE_CODE_DISABLE_AUTO_MEMORY $LAUNCH" ;;
+    esac
+  fi
   LAUNCH="env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI $LAUNCH"
   ;;
 esac
