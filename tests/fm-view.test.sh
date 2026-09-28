@@ -31,6 +31,8 @@
 #     the view then looks dirty, and removes the read-only remount and asserts a
 #     write then lands, each after asserting that its mutation applied.
 #   - the keeper presents a top-level entry created outside the session.
+#   - a nested mount inside a read-only project entry is read-only too, and
+#     capability probes leave no scratch directory behind.
 #   - worker placement: inside a view a process started in the view is
 #     "inside", the tmux container refuses to start a server there, and outside
 #     a view the guard is inert.
@@ -412,7 +414,7 @@ test_view_falsification() {
 
   # Without the read-only remount of project entries, a project write lands.
   mutated="$base/fm-view-rw.sh"
-  mutate "$ROOT/bin/fm-view.sh" "$mutated" '\[ "$mode" = rw \] || mount -o remount,bind,ro -- "$mp"'
+  mutate "$ROOT/bin/fm-view.sh" "$mutated" '\[ "$mode" = rw \] || ro_tree "$mp"'
   out=$(FM_VIEW_SCRIPT=$mutated view_run "$install" "$proj" 'echo mutated >> src/app.js && echo wrote') \
     || fail "falsification run without the read-only remount failed"
   assert_contains "$out" "wrote" "removing the read-only remount did not make the project writable; the read-only test proves nothing"
@@ -444,6 +446,59 @@ test_view_keeper_refresh() {
   rm -f "$proj/late.txt" "$proj/late.txt.sig"
 
   pass "keeper: a top-level entry created outside the session appears inside it"
+}
+
+# A recursive bind brings a project's nested mounts into the view; each of
+# them must be read-only too, not only the top bind. The nested mount is a
+# tmpfs made inside a disposable outer namespace around the whole session.
+test_view_nested_mount_read_only() {
+  local base install proj out
+  skip_without_view "view nested mount read-only" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+  mkdir -p "$proj/src/nested"
+
+  out=$(unshare --user --map-root-user --mount -- bash -c '
+    mount -t tmpfs fm-view-nested-fixture "$1/src/nested" || { echo "fixture_mount_failed"; exit 0; }
+    echo seed > "$1/src/nested/data.txt"
+    cd "$1" && FM_HOME="$1/.firstmate" FM_VIEW_POLL=1 "$2" run --install "$3" --launch "$1" -- bash -c '"'"'
+      { echo x >> src/nested/data.txt; } 2>/dev/null && echo "nested_view=rw" || echo "nested_view=ro"
+      { echo x >> "$FM_LAUNCH_REAL/src/nested/data.txt"; } 2>/dev/null && echo "nested_real=rw" || echo "nested_real=ro"
+      { echo x >> "$FM_LAUNCH_REAL_RW/src/nested/data.txt"; } 2>/dev/null && echo "nested_real_rw=rw" || echo "nested_real_rw=ro"
+    '"'"'
+  ' fm-view-nested "$proj" "${FM_VIEW_SCRIPT:-$ROOT/bin/fm-view.sh}" "$install") \
+    || fail "nested-mount view run failed"
+  case "$out" in *fixture_mount_failed*)
+    printf 'ok - SKIP view nested mount read-only: this host cannot mount the nested fixture\n'
+    return 0 ;;
+  esac
+  assert_contains "$out" "nested_view=ro" "a nested mount inside a read-only project entry was writable"
+  assert_contains "$out" "nested_real=ro" "a nested mount under FM_LAUNCH_REAL was writable"
+  assert_contains "$out" "nested_real_rw=rw" "a nested mount under FM_LAUNCH_REAL_RW lost its writability"
+
+  pass "view: nested mounts inside read-only entries are read-only too"
+}
+
+# Each capability probe mounts a tmpfs on a scratch directory; neither the
+# probe nor the one run repeats may leave that directory behind.
+test_view_probe_leaves_nothing() {
+  local base install proj
+  skip_without_view "view probe cleanup" && return 0
+  base=$(new_dir)
+  mkdir -p "$base/tmp"
+  TMPDIR="$base/tmp" "$ROOT/bin/fm-view.sh" probe >/dev/null || fail "probe failed on a capable host"
+  assert_equals "" "$(ls -A "$base/tmp")" "a capability probe left a scratch directory behind"
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+  TMPDIR="$base/tmp" view_run "$install" "$proj" 'true' || fail "view run failed"
+  assert_equals "" "$(ls -A "$base/tmp")" "a view run's capability probe left a scratch directory behind"
+
+  pass "probe: capability probes leave no scratch directory behind"
 }
 
 # --- worker placement ---------------------------------------------------------
@@ -549,6 +604,8 @@ test_view_layout_and_read_only
 test_view_git_shim
 test_view_falsification
 test_view_keeper_refresh
+test_view_nested_mount_read_only
+test_view_probe_leaves_nothing
 test_worker_placement_guard
 test_view_cleanup_on_hangup
 

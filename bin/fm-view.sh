@@ -122,6 +122,7 @@ probe_host() {
   # shim), and --map-user/--map-group (util-linux 2.38+, the harness drop).
   if ! err=$(unshare --user --map-root-user --mount -- sh -c '
       d=$(mktemp -d) || exit 1
+      trap "umount \"\$d\" 2>/dev/null; rmdir \"\$d\"" EXIT
       mount -t tmpfs fm-view-probe "$d" || exit 1
       unshare --user --map-root-user --mount -- true || { echo "nested namespace refused" >&2; exit 1; }
       unshare --user --map-user="$1" --map-group="$2" -- true || { echo "unshare lacks --map-user (util-linux 2.38+ needed)" >&2; exit 1; }
@@ -231,6 +232,28 @@ sig() { # sig <path>: identity used to detect replacement
 mp_rw() { mount -o remount,bind,rw -- "$1" 2>/dev/null || true; }
 mp_ro() { mount -o remount,bind,ro -- "$1" 2>/dev/null || true; }
 
+# ro_tree <dir-mountpoint>: remount a recursive bind read-only, nested mounts
+# included. A bind remount changes only the one mount it names, so every mount
+# beneath it is remounted too, each keeping its own other flags (a namespace
+# may not clear a locked nosuid or nodev). Fails when any remount fails.
+ro_tree() {
+  local mp target opts
+  mp=$(cd -- "$1" && pwd -P) || return 1
+  mount -o remount,bind,ro -- "$mp" || return 1
+  while IFS=$'\t' read -r target opts; do
+    mount -o "remount,bind,$opts" -- "$target" || return 1
+  done < <(FM_VIEW_RO_ROOT="$mp/" awk '
+    BEGIN { root = ENVIRON["FM_VIEW_RO_ROOT"] }
+    {
+      t = $5
+      gsub(/\\040/, " ", t); gsub(/\\011/, "\t", t); gsub(/\\012/, "\n", t); gsub(/\\134/, "\\", t)
+      if (index(t, root) != 1) next
+      o = $6
+      if (o == "rw") o = "ro"; else if (substr(o, 1, 3) == "rw,") o = "ro" substr(o, 3)
+      print t "\t" o
+    }' /proc/self/mountinfo)
+}
+
 drop_entry() { # drop_entry <mountpoint>
   # Never recursive: a mountpoint that failed to detach still exposes the
   # real tree underneath, so only an empty dir or a lone file/link is removed.
@@ -253,7 +276,8 @@ put_entry() { # put_entry <kind> <source> <mountpoint> <ro|rw>
     dir)
       mkdir -p -- "$mp"
       mount --rbind -- "$src" "$mp"
-      [ "$mode" = rw ] || mount -o remount,bind,ro -- "$mp"
+      # A tree that cannot be made wholly read-only is not presented at all.
+      [ "$mode" = rw ] || ro_tree "$mp" || { umount -R -l -- "$mp"; return 1; }
       ;;
     file)
       : > "$mp"
@@ -399,9 +423,9 @@ keeper() {
   #    covers the launch path (the install root may lie inside it).
   mount --rbind -- "$LAUNCH" "$RUN/rw"
   mount --rbind -- "$LAUNCH" "$RUN/ro"
-  mount -o remount,bind,ro -- "$RUN/ro"
+  ro_tree "$RUN/ro"
   mount --rbind -- "$INSTALL" "$RUN/install"
-  mount -o remount,bind,ro -- "$RUN/install"
+  ro_tree "$RUN/install"
   # 2. The git shim over the real git binary (every exec of git in the view).
   mount --bind -- "$GIT_REAL" "$RUN/git.real"
   mount --bind -- "$RUN/git-shim" "$GIT_REAL"
