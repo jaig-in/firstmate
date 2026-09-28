@@ -29,7 +29,8 @@
 # fm_project_resolve owns the central alias -> path contract:
 #   - an argument containing a slash other than the projects/<name> form is a
 #     path and passes through unchanged;
-#   - projects/<name> prefers the legacy <home>/projects/<name> clone, then
+#   - projects/<name> prefers the FM_PROJECTS_OVERRIDE root's <name> when that
+#     override is set, then the legacy <home>/projects/<name> clone, then
 #     resolves <name> as an alias;
 #   - a bare alias resolves through data/project-paths.json (non-sibling
 #     registrations), then - in a config/projects-root home - the projects
@@ -215,11 +216,13 @@ fm_project_resolve() {
   local home=$1 config=$2 data=$3 arg=$4 projects candidate mapped
   case "$arg" in
     projects/?*)
-      candidate="$home/projects/${arg#projects/}"
-      if [ -d "$candidate" ]; then
-        printf '%s\n' "$candidate"
-        return 0
-      fi
+      for candidate in ${FM_PROJECTS_OVERRIDE:+"$FM_PROJECTS_OVERRIDE/${arg#projects/}"} \
+          "$home/projects/${arg#projects/}"; do
+        if [ -d "$candidate" ]; then
+          printf '%s\n' "$candidate"
+          return 0
+        fi
+      done
       arg=${arg#projects/}
       ;;
     */*)
