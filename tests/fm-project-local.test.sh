@@ -22,10 +22,11 @@
 #   - projects root precedence: FM_PROJECTS_OVERRIDE > config/projects-root >
 #     $FM_HOME/projects; a malformed config/projects-root fails loudly.
 #   - discovery is not authority: fm-projects.sh discover lists every sibling
-#     repo, but a whole-fleet refresh touches only registered aliases.
+#     repo, but a whole-fleet refresh touches only registered aliases, and
+#     never prunes their branches or remote-tracking refs.
 #   - central resolver precedence: data/project-paths.json, then
 #     <projects-root>/<alias>, then $FM_HOME/projects/<alias>; projects/<name>
-#     prefers the legacy clone.
+#     prefers the legacy clone, except that FM_PROJECTS_OVERRIDE's root wins.
 #   - a bare-name refresh argument keeps its registry alias as the label, so a
 #     manifest-registered project outside the projects root still resolves its
 #     registered posture (local-only is skipped, not fetched).
@@ -588,6 +589,10 @@ test_discovery_authority() {
   mkdir -p "$home/projects/reg"
   assert_equals "$home/projects/reg" "$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve projects/reg)" "projects/<name> did not prefer the legacy clone"
   rmdir "$home/projects/reg"
+  # In a legacy home, FM_PROJECTS_OVERRIDE still selects the root
+  # projects/<name> resolves in, ahead of a same-named <home>/projects clone.
+  mkdir -p "$base/legacy/config" "$base/legacy/data" "$base/legacy/projects/dup" "$base/override/dup"
+  assert_equals "$base/override/dup" "$(FM_HOME="$base/legacy" FM_PROJECTS_OVERRIDE="$base/override" "$ROOT/bin/fm-projects.sh" resolve projects/dup)" "projects/<name> ignored FM_PROJECTS_OVERRIDE for a same-named legacy clone"
   # An unresolvable bare name passes through unchanged.
   assert_equals "ghost" "$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve ghost)" "unresolvable alias did not pass through"
 
@@ -619,10 +624,16 @@ test_discovery_authority() {
   git -C "$reg" show-ref --verify --quiet refs/heads/keepme \
     || fail "org-home refresh pruned a user branch"
 
-  # A user feature branch is skipped, never re-attached or reported STUCK.
+  # A user feature branch is skipped, never re-attached or reported STUCK,
+  # and the fetch never prunes the user's remote-tracking refs.
+  git -C "$w-reg" push -q origin HEAD:refs/heads/stale
+  git -C "$reg" fetch -q origin
+  git -C "$w-reg" push -q origin --delete stale
   git -C "$reg" checkout -q -b feature
   local out
   out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" 2>/dev/null)
+  git -C "$reg" show-ref --verify --quiet refs/remotes/origin/stale \
+    || fail "org-home refresh pruned a remote-tracking ref of a user's feature-branch checkout"
   assert_contains "$out" "reg: skipped: on branch feature" "org-home refresh did not skip a feature branch"
   case "$out" in *STUCK*) fail "org-home refresh reported a user branch as STUCK" ;; esac
   [ "$(git -C "$reg" symbolic-ref --short HEAD)" = feature ] || fail "org-home refresh moved the user's branch"
@@ -640,6 +651,8 @@ test_discovery_authority() {
   git -C "$reg" checkout -q main 2>/dev/null || git -C "$reg" checkout -q master
   FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" reg >/dev/null 2>&1 \
     || fail "single-arg refresh refused the registered sibling"
+  git -C "$reg" show-ref --verify --quiet refs/remotes/origin/stale \
+    || fail "org-home refresh of a clean default branch pruned a remote-tracking ref"
 
   # A registered alias that resolves nowhere is skipped, not treated as a cwd path.
   printf -- '- docs [direct-PR] - missing (added 2026-09-17)\n' >> "$home/data/projects.md"
