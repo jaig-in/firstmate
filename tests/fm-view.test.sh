@@ -31,6 +31,9 @@
 #     the view then looks dirty, and removes the read-only remount and asserts a
 #     write then lands, each after asserting that its mutation applied.
 #   - the keeper presents a top-level entry created outside the session.
+#   - a project symlink resolving inside the launch tree is read-only in the
+#     view; one resolving outside it (top level or in a merged bin/) reaches
+#     its real target, which stays writable.
 #   - a nested mount inside a read-only project entry is read-only too, and
 #     capability probes leave no scratch directory behind.
 #   - worker placement: inside a view a process started in the view is
@@ -448,6 +451,42 @@ test_view_keeper_refresh() {
   pass "keeper: a top-level entry created outside the session appears inside it"
 }
 
+# A project symlink stays a symlink in the view: a target inside the launch
+# tree is read-only through the view, and a target outside it is the real,
+# writable path, which is not part of the project. The outside target is a
+# disposable sibling of the fixture project.
+test_view_project_symlink_boundary() {
+  local base install proj ext out
+  skip_without_view "view project symlink boundary" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+  ext="$base/external"
+  mkdir -p "$ext"
+  printf 'seed\n' > "$ext/f"
+  ln -s src "$proj/inside"
+  ln -s ../external "$proj/up"
+  ln -s "$ext" "$proj/abs"
+  ln -s "$ext" "$proj/bin/ext"
+
+  out=$(view_run "$install" "$proj" '
+    { echo x >> inside/app.js; } 2>/dev/null && echo "inside=rw" || echo "inside=ro"
+    { echo up >> up/f; } 2>/dev/null && echo "up=rw" || echo "up=ro"
+    { echo abs >> abs/f; } 2>/dev/null && echo "abs=rw" || echo "abs=ro"
+    { echo bin >> bin/ext/f; } 2>/dev/null && echo "bin_ext=rw" || echo "bin_ext=ro"
+  ') || fail "symlink-boundary view run failed"
+  assert_contains "$out" "inside=ro" "a project link resolving inside the launch tree was writable"
+  assert_contains "$out" "up=rw" "a relative project link resolving outside the launch tree did not reach its real target"
+  assert_contains "$out" "abs=rw" "an absolute project link resolving outside the launch tree did not reach its real target"
+  assert_contains "$out" "bin_ext=rw" "a project link in the merged bin/ did not reach its real outside target"
+  assert_equals 'app' "$(cat "$proj/src/app.js")" "a write through an inside link changed the project"
+  assert_equals "$(printf 'seed\nup\nabs\nbin')" "$(cat "$ext/f")" "writes through outside links did not land on the real target"
+
+  pass "view: project links inside the launch tree are read-only; links outside it reach their real target"
+}
+
 # A recursive bind brings a project's nested mounts into the view; each of
 # them must be read-only too, not only the top bind. The nested mount is a
 # tmpfs made inside a disposable outer namespace around the whole session.
@@ -604,6 +643,7 @@ test_view_layout_and_read_only
 test_view_git_shim
 test_view_falsification
 test_view_keeper_refresh
+test_view_project_symlink_boundary
 test_view_nested_mount_read_only
 test_view_probe_leaves_nothing
 test_worker_placement_guard
