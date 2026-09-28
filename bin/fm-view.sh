@@ -236,6 +236,8 @@ mp_ro() { mount -o remount,bind,ro -- "$1" 2>/dev/null || true; }
 # included. A bind remount changes only the one mount it names, so every mount
 # beneath it is remounted too, each keeping its own other flags (a namespace
 # may not clear a locked nosuid or nodev). Fails when any remount fails.
+# Records are NUL-delimited because a decoded mountpoint may hold a tab or
+# newline; only NUL can never appear in a path.
 ro_tree() {
   local mp target opts
   mp=$(cd -- "$1" && pwd -P) || return 1
