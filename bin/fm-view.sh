@@ -373,6 +373,23 @@ sync_all() {
   fi
 }
 
+# forward_wait <cmd...>: run <cmd> on this terminal and wait for it, passing
+# HUP on as HUP and INT or TERM on as TERM. A foreground child would defer this
+# shell's traps until it exits, and a closed terminal signals only the session
+# leader, so a harness that outlives its dead tty would never hear the hangup.
+forward_wait() {
+  local child rc=0
+  "$@" <&0 &
+  child=$!
+  # shellcheck disable=SC2064 # $child is local: expand now.
+  trap "kill -HUP $child 2>/dev/null" HUP
+  # shellcheck disable=SC2064
+  trap "kill -TERM $child 2>/dev/null" INT TERM
+  wait "$child" || rc=$?
+  while kill -0 "$child" 2>/dev/null; do rc=0; wait "$child" || rc=$?; done
+  return "$rc"
+}
+
 keeper() {
   # Arguments arrive through the environment set by cmd_run.
   local poller rc=0
@@ -400,7 +417,7 @@ keeper() {
   # 4. The harness: back to the caller's uid, no capabilities.
   cd -- "$LAUNCH"
   unset RUN INSTALL INSTALL_SRC LAUNCH REALRW GIT_REAL HOST_UID_KEEPER HOST_GID_KEEPER
-  unshare --user --map-user="$FM_VIEW_UID" --map-group="$FM_VIEW_GID" -- "$@" || rc=$?
+  forward_wait unshare --user --map-user="$FM_VIEW_UID" --map-group="$FM_VIEW_GID" -- "$@" || rc=$?
   kill "$poller" 2>/dev/null || true
   wait "$poller" 2>/dev/null || true
   return "$rc"
@@ -470,7 +487,7 @@ SHIM
   RUN=$run INSTALL=$install INSTALL_SRC=$run/install LAUNCH=$launch_dir REALRW=$run/rw GIT_REAL=$git_real \
   FM_VIEW_UID=$(id -u) FM_VIEW_GID=$(id -g) \
   FM_VIEW=1 FM_VIEW_ROOT=$launch_dir FM_LAUNCH_REAL=$run/ro FM_LAUNCH_REAL_RW=$run/rw \
-    "$unshare_bin" --user --map-root-user --mount --propagation private -- "$0" __keeper "$@" || rc=$?
+    forward_wait "$unshare_bin" --user --map-root-user --mount --propagation private -- "$0" __keeper "$@" || rc=$?
   trap - HUP INT TERM
   cleanup_run "$run"
   return "$rc"

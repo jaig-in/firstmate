@@ -521,7 +521,26 @@ test_view_cleanup_on_hangup() {
   [ -z "$left" ] || fail "a hung-up session left its runtime dir behind: $left"
   rm -f "$proj/.firstmate/started"
 
-  pass "cleanup: a hung-up session removes its runtime dir"
+  # A closed terminal signals only the session leader, and a harness that
+  # ignores the dead tty (codex does) never exits on its own: the view must
+  # forward the hangup to it.
+  (cd "$proj" && FM_HOME="$proj/.firstmate" exec setsid "$ROOT/bin/fm-view.sh" run \
+    --install "$install" --launch "$proj" -- bash -c 'touch "$FM_LAUNCH_REAL_RW/.firstmate/started"; exec sleep 60') &
+  pid=$!
+  for i in $(seq 1 50); do [ -e "$proj/.firstmate/started" ] && break; sleep 0.2; done
+  [ -e "$proj/.firstmate/started" ] || fail "the view session did not start"
+  kill -HUP "$pid"
+  for i in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -KILL -- "-$pid" 2>/dev/null || true
+    fail "a hangup of the session leader alone did not end the harness"
+  fi
+  wait "$pid" 2>/dev/null || true
+  left=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -name 'firstmate-view.*')
+  [ -z "$left" ] || fail "a session whose leader alone hung up left its runtime dir behind: $left"
+  rm -f "$proj/.firstmate/started"
+
+  pass "cleanup: a hung-up session removes its runtime dir, and a leader-only hangup reaches the harness"
 }
 
 test_mode_fallback_and_refusal
