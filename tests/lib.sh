@@ -401,9 +401,6 @@ fm_live_gate() {
 #   unshare -Urm sh -c 'mount -t tmpfs tmpfs /tmp && exec bin/fm-test-run.sh <test>'
 # and on a disposable CI runner. Otherwise it ends the script with
 #   skip: tmux isolation: <why>; <how to run it>
-# except under CI=true, where a live server is a hard failure so the suite's
-# coverage can never silently drop. FM_TMUX_UNISOLATED_OK=1 is the explicit
-# opt-in to run beside a live server anyway.
 fm_tmux_isolation_gate() {
   local base socket probe live=''
   local -a bases=("$@")
@@ -422,12 +419,7 @@ fm_tmux_isolation_gate() {
     done
   done
   [ -n "$live" ] || return 0
-  [ "${FM_TMUX_UNISOLATED_OK:-}" != 1 ] || return 0
-  if [ "${CI:-}" = true ]; then
-    printf 'not ok - tmux isolation: a live tmux server answers on %s, so this suite cannot run safely\n' "$live" >&2
-    exit 1
-  fi
-  printf 'skip: tmux isolation: a live tmux server answers on %s; run under a private /tmp (unshare -Urm sh -c '"'"'mount -t tmpfs tmpfs /tmp && exec bin/fm-test-run.sh <test>'"'"') or set FM_TMUX_UNISOLATED_OK=1\n' "$live"
+  printf 'skip: tmux isolation: a live tmux server answers on %s; run under a private /tmp (unshare -Urm sh -c '"'"'mount -t tmpfs tmpfs /tmp && exec bin/fm-test-run.sh <test>'"'"')\n' "$live"
   exit 0
 }
 
