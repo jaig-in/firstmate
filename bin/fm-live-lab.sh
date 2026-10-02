@@ -101,8 +101,8 @@
 # the private tmux directory is gone.
 #
 # down refuses any path without the lab record up writes. It kills only the
-# lab's recorded private tmux server, and only when its socket exists, and
-# launch pane PIDs, and their descendants;
+# lab's recorded launch pane PIDs and their descendants, and the lab's private
+# tmux server, which it touches only while that server's socket exists;
 # runs bin/fm-lab-home.sh teardown; removes the task temp and launch dirs the
 # lab's spawns kept under /tmp, including a failed spawn's; removes every
 # project entry at or under <lab-root> from the recorded Claude store, following
