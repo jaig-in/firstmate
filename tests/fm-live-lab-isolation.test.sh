@@ -89,7 +89,7 @@ if [ -z "${FM_LAB_ISO_HOST_MARKER:-}" ]; then
   host_marker=$(mktemp /tmp/fm-lab-iso-host.XXXXXX) || fail "cannot mark the host /tmp"
   FM_TEST_CLEANUP_DIRS+=("$host_marker")
   # shellcheck disable=SC2016 # $0 expands in the namespaced shell.
-  FM_LAB_ISO_HOST_MARKER=$host_marker unshare -Urm bash -c 'mount -t tmpfs tmpfs /tmp && exec bash "$0"' "$ROOT/tests/fm-live-lab-isolation.test.sh"
+  FM_LAB_ISO_HOST_MARKER=$host_marker unshare -Urm bash -c 'mount -t tmpfs tmpfs /tmp && exec env -u TMPDIR -u TMP -u TMUX_TMPDIR bash "$0"' "$ROOT/tests/fm-live-lab-isolation.test.sh"
   exit $?
 fi
 
