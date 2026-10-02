@@ -424,6 +424,46 @@ fm_live_gate() {
   return 0
 }
 
+# fm_tmux_isolation_gate [<tmux-tmp-base>...] is the gate a test opens with
+# before it starts, kills, or cleans up a tmux server of its own. tmux resolves
+# its socket under TMUX_TMPDIR only while that directory exists and otherwise
+# silently falls back to /tmp, so one wrong tmux call reaches the user's own
+# server. The test runs only when no live tmux server answers on any socket in
+# <base>/tmux-<uid> for each base (default: /tmp, plus TMUX_TMPDIR when set),
+# which holds under a private /tmp such as
+#   unshare -Urm sh -c 'mount -t tmpfs tmpfs /tmp && exec bin/fm-test-run.sh <test>'
+# and on a disposable CI runner. Otherwise it ends the script with
+#   skip: tmux isolation: <why>; <how to run it>
+# except under CI=true, where a live server is a hard failure so the suite's
+# coverage can never silently drop. FM_TMUX_UNISOLATED_OK=1 is the explicit
+# opt-in to run beside a live server anyway.
+fm_tmux_isolation_gate() {
+  local base socket probe live=''
+  local -a bases=("$@")
+  if [ "${#bases[@]}" -eq 0 ]; then
+    bases=(/tmp)
+    [ -z "${TMUX_TMPDIR:-}" ] || bases+=("$TMUX_TMPDIR")
+  fi
+  for base in "${bases[@]}"; do
+    for socket in "${base%/}/tmux-$(id -u)"/*; do
+      [ -S "$socket" ] || continue
+      if probe=$(env -u TMUX tmux -S "$socket" list-sessions 2>&1 >/dev/null) \
+        || [ "${probe#*no server running}" = "$probe" ]; then
+        live=$socket
+        break 2
+      fi
+    done
+  done
+  [ -n "$live" ] || return 0
+  [ "${FM_TMUX_UNISOLATED_OK:-}" != 1 ] || return 0
+  if [ "${CI:-}" = true ]; then
+    printf 'not ok - tmux isolation: a live tmux server answers on %s, so this suite cannot run safely\n' "$live" >&2
+    exit 1
+  fi
+  printf 'skip: tmux isolation: a live tmux server answers on %s; run under a private /tmp (unshare -Urm sh -c '"'"'mount -t tmpfs tmpfs /tmp && exec bin/fm-test-run.sh <test>'"'"') or set FM_TMUX_UNISOLATED_OK=1\n' "$live"
+  exit 0
+}
+
 # --- fakebin / PATH shims ---------------------------------------------------
 #
 # fm_fakebin <dir> creates <dir>/fakebin and echoes it; prepend it to PATH to
