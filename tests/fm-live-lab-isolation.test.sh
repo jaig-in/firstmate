@@ -31,15 +31,50 @@ GATE_SOCKET="$TMP_ROOT/base/tmux-$(id -u)/default"
 DEFAULT_SOCKET="/tmp/tmux-$(id -u)/default"
 DECOY_PID=''
 
+# Poll steps (0.05s each) a process gets to exit after each escalation step.
+DECOY_POLLS=100
+
+# signal_decoy <signal> <pid>: one seam, so a case can stand in an unkillable process.
+signal_decoy() {
+  kill -"$1" "$2" 2>/dev/null
+}
+
+# wait_gone <pid> <polls>: succeeds once the process is gone, after at most <polls> polls.
+wait_gone() {
+  local pid=$1 polls=$2
+  while kill -0 "$pid" 2>/dev/null; do
+    [ "$polls" -gt 0 ] || return 1
+    polls=$((polls - 1))
+    sleep 0.05
+  done
+}
+
+# stop_decoy <pid> <socket> [polls]: stop the decoy server recorded at start.
+# kill-server on its own explicit socket first, then TERM, then KILL on the
+# recorded pid, each bounded; a decoy that survives all three is reported and
+# fails the call instead of stalling the suite on its pane's 600s sleep.
+stop_decoy() {
+  local pid=$1 socket=$2 polls=${3:-$DECOY_POLLS}
+  [ ! -S "$socket" ] || tmux -S "$socket" kill-server 2>/dev/null
+  wait_gone "$pid" "$polls" && return 0
+  signal_decoy TERM "$pid"
+  wait_gone "$pid" "$polls" && return 0
+  signal_decoy KILL "$pid"
+  wait_gone "$pid" "$polls" && return 0
+  echo "not ok - cleanup: decoy server $pid survived kill-server, TERM and KILL" >&2
+  return 1
+}
+
 isolation_cleanup() {
   # Only the servers this suite started, each by its own explicit socket, and
   # only while it is still there; the decoy is gone before the suite returns.
+  local rc=0
   [ ! -S "$GATE_SOCKET" ] || tmux -S "$GATE_SOCKET" kill-server 2>/dev/null
   if [ -n "$DECOY_PID" ]; then
-    [ ! -S "$DEFAULT_SOCKET" ] || tmux -S "$DEFAULT_SOCKET" kill-server 2>/dev/null
-    while kill -0 "$DECOY_PID" 2>/dev/null; do sleep 0.05; done
+    stop_decoy "$DECOY_PID" "$DEFAULT_SOCKET" || rc=1
   fi
   fm_test_cleanup
+  [ "$rc" -eq 0 ] || exit 1
 }
 trap isolation_cleanup EXIT
 
@@ -153,3 +188,32 @@ assert_absent "$LAB_ROOT" "down removed the lab root"
 kill -0 "$DECOY_PID" 2>/dev/null || fail "down killed the default tmux server"
 tmux -S "$DEFAULT_SOCKET" has-session -t firstmate 2>/dev/null || fail "the default server lost its session"
 pass "a lab aimed at a missing tmux directory never reaches the default tmux server"
+
+# ---- the decoy cleanup is bounded --------------------------------------------
+
+# No socket for kill-server to reach: TERM stops a plain process.
+victim=$(bash -c 'sleep 600 </dev/null >/dev/null 2>&1 & echo $!')
+start=$(date +%s)
+stop_decoy "$victim" "$TMP_ROOT/no-such-socket" 20 || fail "cleanup could not stop a process that exits on TERM"
+wait_gone "$victim" 0 || fail "cleanup returned success with the process still alive"
+[ $(($(date +%s) - start)) -lt 10 ] || fail "cleanup of a TERM-able process was not prompt"
+
+# A process that ignores TERM is stopped by the KILL step.
+victim=$(bash -c 'trap "" TERM; exec sleep 600 </dev/null >/dev/null 2>&1 & echo $!')
+stop_decoy "$victim" "$TMP_ROOT/no-such-socket" 20 || fail "cleanup could not stop a process that ignores TERM"
+wait_gone "$victim" 0 || fail "cleanup returned success with the TERM-ignoring process alive"
+
+# kill-server cannot stop it and neither signal lands: cleanup must return
+# within its poll budget, name the survivor, and report failure.
+victim=$(bash -c 'sleep 600 </dev/null >/dev/null 2>&1 & echo $!')
+signal_decoy() { :; }
+start=$(date +%s)
+out=$(stop_decoy "$victim" "$TMP_ROOT/no-such-socket" 10 2>&1)
+code=$?
+unset -f signal_decoy
+signal_decoy() { kill -"$1" "$2" 2>/dev/null; }
+kill -KILL "$victim" 2>/dev/null
+expect_code 1 "$code" "cleanup reports a decoy it cannot stop: $out"
+assert_contains "$out" "decoy server $victim survived" "the failure names the surviving decoy"
+[ $(($(date +%s) - start)) -lt 10 ] || fail "cleanup of an unstoppable decoy waited past its bound"
+pass "decoy cleanup is bounded, escalates to TERM and KILL, and reports a decoy it cannot stop"
