@@ -391,7 +391,7 @@ $ cat ~/work/mates/acme-web/data/project-paths.json
 }
 ```
 
-Seeding refuses a project the org home has not registered, a `local-only` project, and a `no-mistakes` project with no `origin` remote, each with a one-line reason ([Troubleshooting](#troubleshooting)).
+Seeding refuses a project the org home has not registered, a project whose repository under the new home's projects root is neither the home's registered copy nor a clone of that copy's `origin`, a `local-only` project, and a `no-mistakes` project with no `origin` remote, each with a one-line reason ([Troubleshooting](#troubleshooting)).
 The first mate then launches and supervises the second mate for you; [docs/remote-secondmates.md](remote-secondmates.md) covers second mates on another machine.
 
 ## The two launch modes
@@ -692,6 +692,10 @@ The repository was found in the org folder but not registered.
 
 **`error: project <name> is not registered in <home>/data/projects.md or project-paths.json; register it before seeding`**
 Register it in the org home first.
+
+**`error: project <name> is registered in this home at <path> ..., and <dir> is neither that directory nor a clone of its origin ...; seed only the registered repository`**
+The repository under the second mate's projects root is a different repository from the one the home registered under that name.
+Point `--projects-root` at a folder whose copy is the registered repository or a clone of the same `origin`.
 
 **`error: project <name> is local-only; secondmate routes support only no-mistakes and direct-PR projects`**
 Second mates work on projects that deliver through pull requests.

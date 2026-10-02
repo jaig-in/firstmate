@@ -31,6 +31,9 @@
 #     the view then looks dirty, and removes the read-only remount and asserts a
 #     write then lands, each after asserting that its mutation applied.
 #   - the keeper presents a top-level entry created outside the session.
+#   - a top-level file whose read-only remount fails is not presented (never
+#     left writable), and the next sync retries it rather than recording it as
+#     synchronized.
 #   - a project symlink resolving inside the launch tree is read-only in the
 #     view; one resolving outside it (top level or in a merged bin/) reaches
 #     its real target, which stays writable.
@@ -453,6 +456,54 @@ test_view_keeper_refresh() {
   pass "keeper: a top-level entry created outside the session appears inside it"
 }
 
+# A top-level file whose read-only remount fails is undone rather than left
+# writable at the launch path, and the keeper does not record it as
+# synchronized, so a later sync whose remount succeeds presents it read-only.
+# The failure comes from a PATH stub for mount, gated on a fixture flag file
+# the session removes.
+test_view_failed_remount_retried() {
+  local base install proj realmount stub out
+  skip_without_view "view failed remount retried" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+  printf 'guarded\n' > "$proj/zq-remount.txt"
+  realmount=$(command -v mount)
+  stub="$base/stub"
+  mkdir -p "$stub"
+  cat > "$stub/mount" <<SH
+#!/bin/sh
+if [ -e "$base/fail-remount" ] && [ "\$1" = -o ] && [ "\$2" = remount,bind,ro ]; then
+  case "\$4" in */zq-remount.txt) exit 32 ;; esac
+fi
+exec "$realmount" "\$@"
+SH
+  chmod +x "$stub/mount"
+  : > "$base/fail-remount"
+
+  out=$(ZQ_FLAG="$base/fail-remount" PATH="$stub:$PATH" view_run "$install" "$proj" '
+    if [ -e zq-remount.txt ]; then
+      { echo x >> zq-remount.txt; } 2>/dev/null && echo "failed=writable" || echo "failed=ro"
+    else
+      echo "failed=absent"
+    fi
+    rm -f "$ZQ_FLAG"
+    for i in $(seq 1 50); do [ -e zq-remount.txt ] && break; sleep 0.2; done
+    if [ -e zq-remount.txt ]; then
+      { echo x >> zq-remount.txt; } 2>/dev/null && echo "retried=writable" || echo "retried=ro"
+    else
+      echo "retried=absent"
+    fi
+  ') || fail "failed-remount view run failed"
+  assert_contains "$out" "failed=absent" "a file whose read-only remount failed was still presented"
+  assert_contains "$out" "retried=ro" "the keeper did not retry a file whose presentation failed"
+  assert_equals 'guarded' "$(cat "$proj/zq-remount.txt")" "a write through a failed remount reached the project"
+
+  pass "keeper: a file whose read-only remount fails is undone and retried, never left writable"
+}
+
 # A project symlink stays a symlink in the view: a target inside the launch
 # tree is read-only through the view, and a target outside it is the real,
 # writable path, which is not part of the project. The outside target is a
@@ -702,6 +753,7 @@ test_view_layout_and_read_only
 test_view_git_shim
 test_view_falsification
 test_view_keeper_refresh
+test_view_failed_remount_retried
 test_view_project_symlink_boundary
 test_view_nested_mount_read_only
 test_view_nested_mount_odd_name

@@ -14,7 +14,8 @@
 #     Session-start digest priming of that launch directory (LAUNCH CONTEXT)
 #     lives in tests/fm-session-start.test.sh.
 #     Ancestor-discovered homes must carry the init-written .fm-home trust
-#     marker; config/primary-harness accepts only verified primary adapters;
+#     marker, read from the repository's own index whatever git redirection
+#     the caller exports; config/primary-harness accepts only verified primary adapters;
 #     a relative FM_HOME is canonicalized before export.
 #   - `firstmate init`: --org scaffolds .firstmate/ at the cwd with
 #     config/projects-root=.. and no projects/ dir; without --org it scaffolds
@@ -31,8 +32,9 @@
 #     manifest-registered project outside the projects root still resolves its
 #     registered posture (local-only is skipped, not fetched).
 #   - org-shaped secondmate seed registers siblings instead of cloning them,
-#     and a path-registered alias carries its path mapping, delivery mode, and
-#     alias into the child.
+#     only when the sibling is the parent's registered copy or a clone of its
+#     origin, and a path-registered alias carries its path mapping, delivery
+#     mode, and alias into the child.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -189,6 +191,20 @@ test_launcher_trust() {
     fail "a git-tracked .fm-home marker blessed the home"
   fi
   assert_grep "untrusted" "$base/err-tracked" "tracked-marker refusal did not name the home untrusted"
+
+  # Caller-exported git redirection cannot hide the tracked marker: an
+  # alternate index, another repository, or a ceiling above the home would
+  # each make the check read some state other than this repository's own.
+  local alt="$base/alt" redirect
+  fm_git_init_commit "$alt"
+  for redirect in "GIT_INDEX_FILE=$base/alt-index" "GIT_DIR=$alt/.git" \
+      "GIT_COMMON_DIR=$alt/.git" "GIT_CEILING_DIRECTORIES=$repo"; do
+    if (cd "$repo/sub" && env -u FM_HOME "$redirect" FM_FAKE_HARNESS_OUT="$base/out-redirect" \
+        PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" >/dev/null 2>"$base/err-redirect"); then
+      fail "a tracked .fm-home marker blessed the home under $redirect"
+    fi
+    assert_grep "untrusted" "$base/err-redirect" "redirected refusal ($redirect) did not name the home untrusted"
+  done
   git -C "$repo" rm -q --cached .firstmate/.fm-home
 
   # A git failure while checking the marker fails closed, not open. Ownership
@@ -939,9 +955,11 @@ test_org_seed() {
   child="$org/.firstmate-mate"
   mkdir -p "$parent/projects" "$parent/data" "$parent/state" "$org"
 
-  # Parent registers alpha (sibling of the org root the child will share).
+  # Parent registers alpha at its own clone; the child's sibling under the org
+  # root is another clone of the same origin.
   fm_git_init_commit "$org/alpha"
   fm_git_add_origin "$org/alpha" "$base/remotes/alpha.git"
+  git clone --quiet "$(git -C "$org/alpha" remote get-url origin)" "$parent/projects/alpha"
   printf -- '- alpha [direct-PR] - alpha project (added 2026-09-17)\n' > "$parent/data/projects.md"
 
   scaffold_secondmate_charter "$parent" mate 'mate charter' alpha \
@@ -982,6 +1000,35 @@ test_org_seed() {
     fail "org seed accepted a projects root with whitespace"
   fi
   assert_grep "whitespace" "$base/err-space" "whitespace projects-root refusal did not name the cause"
+
+  # A legacy parent authorizes by repository too: a same-named sibling under
+  # the child's root that is neither the parent's registered copy nor a clone
+  # of its origin is refused, so the child cannot inherit the parent's posture
+  # for a different repository.
+  fm_git_init_commit "$parent/projects/webapp"
+  fm_git_add_origin "$parent/projects/webapp" "$base/remotes/webapp.git"
+  fm_git_init_commit "$org/webapp"
+  fm_git_add_origin "$org/webapp" "$base/remotes/other-webapp.git"
+  printf -- '- webapp [direct-PR] - webapp project (added 2026-10-02)\n' >> "$parent/data/projects.md"
+  scaffold_secondmate_charter "$parent" mate8 'mate8 charter' webapp \
+    || fail "charter scaffold failed"
+  if FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate8 "$base/child8" webapp \
+      --projects-root "$org" >/dev/null 2>"$base/err-webapp"; then
+    fail "org seed registered a different repository than the legacy parent's copy"
+  fi
+  assert_grep "registered in this home at" "$base/err-webapp" "repository refusal did not name the registered copy"
+  assert_absent "$base/child8" "refused seed left a home behind"
+  # A parent alias with no registered copy at all has nothing to bind to.
+  printf -- '- gamma [direct-PR] - gamma project (added 2026-10-02)\n' >> "$parent/data/projects.md"
+  fm_git_init_commit "$org/gamma"
+  fm_git_add_origin "$org/gamma" "$base/remotes/gamma.git"
+  scaffold_secondmate_charter "$parent" mate9 'mate9 charter' gamma \
+    || fail "charter scaffold failed"
+  if FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate9 "$base/child9" gamma \
+      --projects-root "$org" >/dev/null 2>"$base/err-gamma"; then
+    fail "org seed registered a sibling the parent has no registered copy of"
+  fi
+  assert_grep "no directory" "$base/err-gamma" "missing-copy refusal did not say the parent has no copy"
 
   # An org-shaped parent authorizes by location: its alias must name the
   # same repository the child's projects root holds.

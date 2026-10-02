@@ -537,7 +537,7 @@ seed_project_source() {
 # child's data/projects.md (sync_project_registry) and, for a path-registered
 # alias, data/project-paths.json (sync_project_paths) is the whole operation.
 register_org_project() {
-  local project=$1 src top parent_path
+  local project=$1 src top parent_path parent_url child_url
   require_registered_project "$project" || return 1
   src=$(seed_project_source "$project") || return 1
   [ -d "$src" ] || { echo "error: project $project not found at $src" >&2; return 1; }
@@ -549,17 +549,25 @@ register_org_project() {
     echo "error: project $project at $src is not the root of its own git work tree" >&2
     return 1
   }
-  # Authorization is by location, not only by name: when this home pins the
-  # alias to a place (an org-shaped home or a project-paths.json entry), the
-  # child's sibling must be that same repository.
-  if fm_projects_root_is_custom "$CONFIG" || [ -n "$(fm_project_manifest_lookup "$DATA" "$project")" ]; then
-    parent_path=$(fm_project_resolve "$FM_HOME" "$CONFIG" "$DATA" "$project") || return 1
+  # Authorization is by repository, not only by name: the child inherits this
+  # home's posture for the alias, so the child's copy must be this home's own
+  # registered directory, or a clone of the same origin as that directory.
+  parent_path=$(fm_project_resolve "$FM_HOME" "$CONFIG" "$DATA" "$project") || return 1
+  if [ "$parent_path" = "$project" ]; then
+    parent_path=
+  else
     parent_path=$(cd "$parent_path" 2>/dev/null && pwd -P) || parent_path=
-    [ "$parent_path" = "$top" ] || {
-      echo "error: project $project is registered in this home at ${parent_path:-no directory}, not at $src; seed only the registered repository" >&2
-      return 1
-    }
   fi
+  [ "$parent_path" != "$top" ] || return 0
+  if [ -n "$parent_path" ]; then
+    parent_url=$(git -C "$parent_path" remote get-url origin 2>/dev/null) &&
+      parent_url=$(normalize_origin_url "$parent_path" "$parent_url") || parent_url=
+    child_url=$(git -C "$top" remote get-url origin 2>/dev/null) &&
+      child_url=$(normalize_origin_url "$top" "$child_url") || child_url=
+    [ -z "$parent_url" ] || [ "$parent_url" != "$child_url" ] || return 0
+  fi
+  echo "error: project $project is registered in this home at ${parent_path:-no directory}${parent_url:+ (origin $parent_url)}, and $src is neither that directory nor a clone of its origin${child_url:+ (its origin is $child_url)}; seed only the registered repository" >&2
+  return 1
 }
 
 clone_project() {

@@ -270,25 +270,33 @@ drop_entry() { # drop_entry <mountpoint>
   fi
 }
 
-put_entry() { # put_entry <kind> <source> <mountpoint> <ro|rw>
+# put_entry <kind> <source> <mountpoint> <ro|rw>: present one entry, or fail
+# having undone it, so a later sync can retry it cleanly.
+put_entry() {
   local kind=$1 src=$2 mp=$3 mode=$4
   case "$kind" in
     link) ln -s -- "$(readlink -- "$src")" "$mp" ;;
     fmlink) ln -s -- "$src" "$mp" ;;
     dir)
-      mkdir -p -- "$mp"
-      mount --rbind -- "$src" "$mp"
+      mkdir -p -- "$mp" || return 1
+      mount --rbind -- "$src" "$mp" || { rmdir -- "$mp"; return 1; }
       # A tree that cannot be made wholly read-only is not presented at all.
       [ "$mode" = rw ] || ro_tree "$mp" || { umount -R -l -- "$mp"; return 1; }
       ;;
     file)
-      : > "$mp"
-      mount --bind -- "$src" "$mp"
-      [ "$mode" = rw ] || mount -o remount,bind,ro -- "$mp"
+      # Create-only: a leftover that failed to detach may be a writable bind of
+      # the real file, which truncating would empty.
+      (set -C; : > "$mp") 2>/dev/null || return 1
+      mount --bind -- "$src" "$mp" || { rm -f -- "$mp"; return 1; }
+      # Likewise a file that cannot be made read-only is not presented.
+      [ "$mode" = rw ] || mount -o remount,bind,ro -- "$mp" || {
+        umount -l -- "$mp" && rm -f -- "$mp"
+        return 1
+      }
       ;;
     merged)
-      mkdir -p -- "$mp"
-      mount -t tmpfs -o mode=0755,size=1m fm-view-merged "$mp"
+      mkdir -p -- "$mp" || return 1
+      mount -t tmpfs -o mode=0755,size=1m fm-view-merged "$mp" || { rmdir -- "$mp"; return 1; }
       ;;
   esac
 }
@@ -351,9 +359,10 @@ desired_merged() {
 # sync_level <view-dir> <state-file> <desired-fn> [fn-args...]: converge one
 # synthetic directory on its desired entry list. Records name, kind, source,
 # mode, and the source identity; a changed identity (a replaced file) is
-# re-bound.
+# re-bound. An entry that failed to present is not recorded, so the next sync
+# retries it.
 sync_level() {
-  local dir=$1 statef=$2 fn=$3 want name kind src mode id cur changed=0
+  local dir=$1 statef=$2 fn=$3 want name kind src mode id cur rec failed='' changed=0
   shift 3
   want=$("$fn" "$@" | while IFS=$'\t' read -r name kind src mode; do
     printf '%s\t%s\t%s\t%s\t%s\n' "$name" "$kind" "$src" "$mode" "$(sig "$src")"
@@ -371,13 +380,21 @@ sync_level() {
   # Add entries that are new or changed.
   while IFS=$'\t' read -r name kind src mode id; do
     [ -n "$name" ] || continue
-    printf '%s\n' "$cur" | grep -qxF -- "$(printf '%s\t%s\t%s\t%s\t%s' "$name" "$kind" "$src" "$mode" "$id")" && continue
-    put_entry "$kind" "$src" "$dir/$name" "$mode" || echo "fm-view: could not present $dir/$name" >&2
+    rec=$(printf '%s\t%s\t%s\t%s\t%s' "$name" "$kind" "$src" "$mode" "$id")
+    printf '%s\n' "$cur" | grep -qxF -- "$rec" && continue
+    if ! put_entry "$kind" "$src" "$dir/$name" "$mode"; then
+      echo "fm-view: could not present $dir/$name" >&2
+      failed="$failed$rec"$'\n'
+    fi
     [ "$kind" = merged ] && rm -f -- "$RUN/state/merged.$name"
     changed=1
   done <<< "$want"
   mp_ro "$dir"
-  printf '%s\n' "$want" > "$statef"
+  if [ -n "$failed" ]; then
+    printf '%s\n' "$want" | grep -vxF -- "${failed%$'\n'}" > "$statef" || true
+  else
+    printf '%s\n' "$want" > "$statef"
+  fi
   [ "$changed" -eq 0 ] || echo "$(date +%T) synced $dir" >> "$RUN/keeper.log"
 }
 
