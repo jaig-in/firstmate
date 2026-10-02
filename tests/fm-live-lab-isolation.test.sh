@@ -41,10 +41,22 @@ signal_decoy() {
   kill -"$1" "$2" 2>/dev/null
 }
 
+# pid_running <pid>: succeeds while the process exists and has not exited.
+# An exited but unreaped process (a zombie, state Z) still answers kill -0
+# when the runner's PID 1 does not reap orphans, so it counts as gone.
+pid_running() {
+  local state
+  kill -0 "$1" 2>/dev/null || return 1
+  state=$(ps -o stat= -p "$1" 2>/dev/null) || return 1
+  case $state in
+    "" | Z*) return 1 ;;
+  esac
+}
+
 # wait_gone <pid> <polls>: succeeds once the process is gone, after at most <polls> polls.
 wait_gone() {
   local pid=$1 polls=$2
-  while kill -0 "$pid" 2>/dev/null; do
+  while pid_running "$pid"; do
     [ "$polls" -gt 0 ] || return 1
     polls=$((polls - 1))
     sleep 0.05
@@ -143,6 +155,16 @@ if [ -z "${FM_LAB_ISO_HOST_MARKER:-}" ]; then
   expect_code 1 "$code" "cleanup reports a decoy it cannot stop: $out"
   assert_contains "$out" "decoy server $victim survived" "the failure names the surviving decoy"
   [ $(($(date +%s) - start)) -lt 10 ] || fail "cleanup of an unstoppable decoy waited past its bound"
+  # An exited decoy its parent never reaps stays a zombie that still answers
+  # kill -0: cleanup must count it as gone rather than report a failure.
+  bash -c 'sleep 0.2 </dev/null >/dev/null 2>&1 & echo $! $$; exec sleep 30 </dev/null >&3 2>/dev/null' 3>/dev/null >"$TMP_ROOT/zombie.pids" &
+  until [ -s "$TMP_ROOT/zombie.pids" ]; do sleep 0.05; done
+  read -r victim zombie_parent <"$TMP_ROOT/zombie.pids"
+  sleep 0.5
+  kill -0 "$victim" 2>/dev/null || fail "the zombie fixture was reaped, so the case would be vacuous"
+  stop_decoy "$victim" "$TMP_ROOT/no-such-socket" 10 || fail "cleanup reported failure for an exited, unreaped decoy"
+  { kill -KILL "$zombie_parent"; wait "$zombie_parent"; } 2>/dev/null
+
   pass "decoy cleanup is bounded, escalates to TERM and KILL, and reports a decoy it cannot stop"
 
   # The decoy cases run only in a private mount namespace with a fresh /tmp.
