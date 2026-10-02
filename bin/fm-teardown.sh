@@ -137,10 +137,11 @@
 # would have replaced it, so teardown warns and proceeds - but only while that
 # record's own endpoint reads dead or missing, because a claim is only as true
 # as the path the claiming spawn read, and a live agent behind the other record
-# means this task's claim may be the wrong one. Teardown also writes
-# slot_reassigned_to=<this task> into that stale record. Once this teardown
-# returns the slot, the claim is gone, and that mark counts as the claim: the
-# stale task's relaunch refuses and its own teardown releases nothing.
+# means this task's claim may be the wrong one. Once every refusal has passed,
+# teardown also writes slot_reassigned_to=<this task> into that stale record,
+# so a refused teardown leaves it unchanged. Once this teardown returns the
+# slot, the claim is gone, and that mark counts as the claim: the stale task's
+# relaunch refuses and its own teardown releases nothing.
 # Secondmate homes and Orca worktrees take no claim, so a record of either kind
 # still refuses. The same order applies to each child's slot when a secondmate
 # home is retired.
@@ -2387,6 +2388,11 @@ stale_slot_record_endpoint_state() {  # <meta-file>
 # the stale task's own again: a relaunch refuses on it (bin/fm-spawn.sh) and the
 # stale task's own teardown skips the slot's steps. The stale record's metadata
 # lock is taken unless this process already holds it as a descendant's.
+# The record scan only queues each mark; apply_stale_slot_record_marks writes
+# them once every refusal has passed, so a refused teardown leaves another
+# task's record untouched.
+STALE_SLOT_MARK_METAS=()
+STALE_SLOT_MARK_CLAIMANTS=()
 mark_stale_slot_record() {  # <meta-file> <claimant-id>
   local meta=$1 claimant=$2 lock current acquired=0 rc=0
   lock=$(fm_meta_lock_path "$meta") || return 1
@@ -2405,6 +2411,19 @@ mark_stale_slot_record() {  # <meta-file> <claimant-id>
   fi
   [ "$acquired" = 0 ] || fm_lock_release "$lock" || true
   return "$rc"
+}
+
+apply_stale_slot_record_marks() {
+  local i marked=''
+  for ((i=0; i < ${#STALE_SLOT_MARK_METAS[@]}; i++)); do
+    mark_stale_slot_record "${STALE_SLOT_MARK_METAS[$i]}" "${STALE_SLOT_MARK_CLAIMANTS[$i]}" || {
+      echo "REFUSED: task $(basename "${STALE_SLOT_MARK_METAS[$i]}" .meta)'s stale record could not be marked as having lost its pool slot to ${STALE_SLOT_MARK_CLAIMANTS[$i]} (its metadata may be changing); stopped before returning any slot or removing any record${marked:+, after marking$marked} - re-run teardown." >&2
+      return 1
+    }
+    marked="$marked $(basename "${STALE_SLOT_MARK_METAS[$i]}" .meta)"
+  done
+  STALE_SLOT_MARK_METAS=()
+  STALE_SLOT_MARK_CLAIMANTS=()
 }
 
 require_exclusive_worktree_slot_record() {
@@ -2448,10 +2467,8 @@ require_exclusive_worktree_slot_record() {
           other_endpoint=$(stale_slot_record_endpoint_state "$other")
           case "$other_endpoint" in
             dead|missing)
-              mark_stale_slot_record "$other" "$record_id" || {
-                echo "REFUSED: task $other_id's record also names worktree $slot and is stale, but it could not be marked as having lost that pool slot (its metadata may be changing); nothing was changed - re-run teardown." >&2
-                return 1
-              }
+              STALE_SLOT_MARK_METAS+=("$other")
+              STALE_SLOT_MARK_CLAIMANTS+=("$record_id")
               echo "warning: task $other_id's record also names worktree $slot, but that pool slot's claim names $record_id, which took it after $other_id's record was written, and $other_id's endpoint reads $other_endpoint; $other_id's record is stale and does not block this teardown (bin/fm-crew-state.sh $other_id)." >&2
               continue
               ;;
@@ -3495,6 +3512,9 @@ if [ "$KIND" = secondmate ]; then
 fi
 
 if [ "$KIND" = secondmate ] && [ "$FORCE" = "--force" ]; then
+  # Retiring the children is the first cleanup step on this path, so the
+  # stale records their slot scans passed over are marked just before it.
+  apply_stale_slot_record_marks || exit 1
   cleanup_firstmate_home_children "$HOME_PATH" || exit $?
 fi
 
@@ -3590,6 +3610,11 @@ if [ "$BACKEND" = herdr ]; then
   TEARDOWN_HERDR_SESSION=$FM_BACKEND_HERDR_SESSION
   TEARDOWN_HERDR_PANE=$FM_BACKEND_HERDR_PANE
 fi
+
+# Every refusal above has now passed, so the stale records the slot scan passed
+# over are marked here, before this task's own records are written and before
+# the slot goes back to the pool.
+apply_stale_slot_record_marks || exit 1
 
 BACKLOG_CLOSED=0
 BACKLOG_TRANSITION=$TEARDOWN_BACKLOG_TRANSITION

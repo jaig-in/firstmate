@@ -79,7 +79,10 @@
 #   slot-owner claim (bin/fm-wake-lib.sh) names another task or cannot be read,
 #   because that task's teardown treats this record as stale; no claim at all
 #   proceeds unless the record carries the slot_reassigned_to= mark that
-#   teardown left once it returned the slot.
+#   teardown left once it returned the slot. That check runs under the Treehouse
+#   project lock a fresh spawn takes, refusing on contention the same way, and
+#   the lock is held until the replacement's record is published, so no spawn
+#   can claim the slot between the check and the replacement occupying it.
 #   --harness <name> is the explicit per-spawn harness/profile adapter. The old
 #   positional harness arg still works for back-compat.
 #   --model <name> and --effort <low|medium|high|xhigh|max|ultra> are concrete profile
@@ -1802,8 +1805,21 @@ if [ "$RELAUNCH" -eq 1 ]; then
   # put an agent back into a slot another task has claimed since: that task's
   # teardown treats this record as stale and would return the slot under it.
   # Once that teardown has returned the slot its claim is gone, so the mark it
-  # left on this record stands in for the claim.
+  # left on this record stands in for the claim. The claim is read under the
+  # project lock slot allocation and return take, held like a fresh spawn's
+  # until the record is published, by which point the replacement's shell is
+  # proven inside the slot, so no spawn can claim it between this read and then.
   if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
+    RELAUNCH_PROJ=$(fm_meta_get "$RELAUNCH_META" project)
+    SPAWN_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$RELAUNCH_PROJ") || {
+      echo "error: could not resolve the shared Treehouse project lock for task $ID's recorded project '${RELAUNCH_PROJ:-none}'; refusing to relaunch" >&2
+      exit 1
+    }
+    if ! fm_lock_try_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK"; then
+      echo "error: another Treehouse slot allocation or return is in progress for $RELAUNCH_PROJ; refusing to race it" >&2
+      exit 1
+    fi
+    SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
     fm_treehouse_slot_owner_state "$RELAUNCH_WT" "$ID"
     RELAUNCH_SLOT_REASSIGNED_TO=$(fm_meta_get "$RELAUNCH_META" slot_reassigned_to)
     if [ "$FM_TREEHOUSE_SLOT_OWNER" = absent ] && [ -n "$RELAUNCH_SLOT_REASSIGNED_TO" ]; then

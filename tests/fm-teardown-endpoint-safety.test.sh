@@ -1184,6 +1184,83 @@ SH
   pass "fm-teardown: an own slot claim still refuses on a record whose endpoint is present"
 }
 
+# The stale-record mark is written only once every refusal has passed. Here the
+# record scan reaches an agent-less stale record first and a record whose
+# endpoint is present second, so the teardown refuses after it has already
+# judged the first one stale; that record must be left byte-identical.
+test_refused_claimant_teardown_leaves_a_stale_record_unmarked() {
+  local dir mine=mine-task stale=a-stale-task other=z-live-task before rc
+
+  dir=$(make_case slot-claim-refused-mark)
+  mark_case_as_treehouse_pool "$dir"
+  cat > "$dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+printf 'tmux' >> "\${FM_RUNTIME_LOG:?}"
+printf ' <%s>' "\$@" >> "\${FM_RUNTIME_LOG:?}"
+printf '\n' >> "\${FM_RUNTIME_LOG:?}"
+if [ "\${1:-}" = list-windows ]; then
+  printf '%s\n' "fm-$other"
+  exit 0
+fi
+[ "\${1:-}" != display-message ] || exit 1
+exit 0
+SH
+  chmod +x "$dir/fakebin/tmux"
+  fm_write_meta "$dir/home/state/$mine.meta" \
+    "window=firstmate:fm-$mine" "endpoint_task_id=$mine" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  fm_write_meta "$dir/home/state/$stale.meta" \
+    "window=firstmate:fm-$stale" "endpoint_task_id=$stale" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  fm_write_meta "$dir/home/state/$other.meta" \
+    "window=firstmate:fm-$other" "endpoint_task_id=$other" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  claim_pool_slot "$dir" "$mine" "$dir/home"
+  before=$(cat "$dir/home/state/$stale.meta")
+
+  set +e
+  run_case "$dir" "$mine" > "$dir/stdout" 2> "$dir/stderr"
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "an own claim returned a slot another record's present endpoint still names"
+  grep -Fq "$other's endpoint reads" "$dir/stderr" \
+    || fail "present-endpoint refusal missing: $(cat "$dir/stderr")"
+  [ "$(cat "$dir/home/state/$stale.meta")" = "$before" ] \
+    || fail "a refused teardown still marked the stale record: $(cat "$dir/home/state/$stale.meta")"
+  assert_present "$dir/pool/1/.fm-slot-owner" "refused teardown released the slot claim"
+  assert_present "$dir/worktree/sentinel" "refused teardown reset the slot"
+
+  # A refusal after the scan is held to the same rule: here the scan passes over
+  # the stale record and the worktree-safety check then refuses the claimant's
+  # unforced teardown over the slot's uncommitted work.
+  dir=$(make_case slot-claim-refused-safety)
+  mark_case_as_treehouse_pool "$dir"
+  fm_write_meta "$dir/home/state/$mine.meta" \
+    "window=firstmate:fm-$mine" "endpoint_task_id=$mine" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=ship"
+  fm_write_meta "$dir/home/state/$stale.meta" \
+    "window=firstmate:fm-$stale" "endpoint_task_id=$stale" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  claim_pool_slot "$dir" "$mine" "$dir/home"
+  before=$(cat "$dir/home/state/$stale.meta")
+
+  set +e
+  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
+  FM_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
+    "$TEARDOWN" "$mine" > "$dir/stdout" 2> "$dir/stderr"
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "an unforced teardown returned a slot holding uncommitted work"
+  grep -Fq "$stale's record is stale" "$dir/stderr" \
+    || fail "the scan did not pass over the stale record before refusing: $(cat "$dir/stderr")"
+  [ "$(cat "$dir/home/state/$stale.meta")" = "$before" ] \
+    || fail "a worktree-safety refusal still marked the stale record: $(cat "$dir/home/state/$stale.meta")"
+  assert_present "$dir/pool/1/.fm-slot-owner" "worktree-safety refusal released the slot claim"
+  assert_present "$dir/worktree/sentinel" "worktree-safety refusal reset the slot"
+
+  pass "fm-teardown: a refused claimant teardown leaves a stale record it passed over unmarked"
+}
+
 # A secondmate home takes its slot through a Treehouse lease and writes no
 # claim, so a leftover claim naming a crewmate never overrides its record.
 test_leftover_claim_still_refuses_on_a_secondmate_home() {
@@ -1657,6 +1734,7 @@ test_project_lock_anchors_at_the_local_root_across_home_layouts
 test_reassigned_slot_with_surviving_claimant_record_deadlocks_neither_task
 test_claimant_tears_down_first_past_a_stale_record
 test_own_claim_still_refuses_on_a_record_with_a_present_endpoint
+test_refused_claimant_teardown_leaves_a_stale_record_unmarked
 test_leftover_claim_still_refuses_on_a_secondmate_home
 test_forced_secondmate_keeps_a_stale_child_off_its_claimants_returned_slot
 test_remote_seeded_home_returns_its_uncontested_slot
