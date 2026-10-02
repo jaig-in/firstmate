@@ -47,9 +47,9 @@ signal_decoy() {
 pid_running() {
   local state
   kill -0 "$1" 2>/dev/null || return 1
-  state=$(ps -o stat= -p "$1" 2>/dev/null) || return 1
+  state=$(ps -o stat= -p "$1" 2>/dev/null) || return 0
   case $state in
-    "" | Z*) return 1 ;;
+    Z*) return 1 ;;
   esac
 }
 
