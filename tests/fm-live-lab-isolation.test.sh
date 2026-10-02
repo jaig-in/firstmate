@@ -53,8 +53,9 @@ wait_gone() {
 
 # stop_decoy <pid> <socket> [polls]: stop the decoy server recorded at start.
 # kill-server on its own explicit socket first, then TERM, then KILL on the
-# recorded pid, each bounded (kill-server included, against a wedged server); a decoy that survives all three is reported and
-# fails the call instead of stalling the suite on its pane's 600s sleep.
+# recorded pid, each step bounded (kill-server too, against a wedged server).
+# A decoy that survives all three is reported and fails the call instead of
+# stalling the suite on its pane's 600s sleep.
 stop_decoy() {
   local pid=$1 socket=$2 polls=${3:-$DECOY_POLLS}
   [ ! -S "$socket" ] || fm_run_timed 5 tmux -S "$socket" kill-server 2>/dev/null
