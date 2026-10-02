@@ -43,7 +43,8 @@ signal_decoy() {
 
 # pid_running <pid>: succeeds while the process exists and has not exited.
 # An exited but unreaped process (a zombie, state Z) still answers kill -0
-# when the runner's PID 1 does not reap orphans, so it counts as gone.
+# when the runner's PID 1 does not reap orphans, so it counts as gone. A ps
+# that errors fails closed: the process counts as still running.
 pid_running() {
   local state
   kill -0 "$1" 2>/dev/null || return 1
