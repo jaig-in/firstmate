@@ -8,6 +8,9 @@
 #     back to install mode with a one-line notice naming the reason, exported
 #     as FM_LAUNCH_NOTICE; an explicit project mode there (flag or
 #     config/launch-mode) refuses with the reason and never runs the harness;
+#     on a host whose AppArmor restricts unprivileged user namespaces
+#     (kernel.apparmor_restrict_unprivileged_userns=1, native Ubuntu 23.10+)
+#     the notice and the refusal name that restriction instead;
 #     --mode install needs no view; a launch with no project or org root runs
 #     in install mode and refuses an explicit project mode; a launch root that
 #     is another Firstmate checkout runs as its own install root; a bad mode
@@ -113,6 +116,15 @@ make_refusing_unshare() {
   chmod +x "$1/unshare"
 }
 
+# make_proc_root <dir> [restrict]: a /proc stand-in for FM_PROC_ROOT_OVERRIDE,
+# so the probe's reason never depends on the test host's own AppArmor sysctl.
+# With <restrict>, it presents kernel.apparmor_restrict_unprivileged_userns
+# with that value; without, the sysctl is absent.
+make_proc_root() {
+  mkdir -p "$1/sys/kernel"
+  [ $# -lt 2 ] || printf '%s\n' "$2" > "$1/sys/kernel/apparmor_restrict_unprivileged_userns"
+}
+
 # make_project <dir>: a disposable project repo with its own instructions,
 # a bin/ and docs/ that collide with Firstmate's, a hidden .mcp.json, a
 # project .claude/, and a trusted per-project home.
@@ -149,7 +161,7 @@ make_install() {
 # --- mode selection ------------------------------------------------------------
 
 test_mode_fallback_and_refusal() {
-  local base proj fakebin nounshare out err
+  local base proj fakebin nounshare plainproc aaproc out err
   base=$(new_dir)
   proj="$base/demo"
   make_project "$proj"
@@ -158,9 +170,13 @@ test_mode_fallback_and_refusal() {
   make_fake_harness "$fakebin" codex
   nounshare="$base/nounshare"
   make_refusing_unshare "$nounshare"
+  plainproc="$base/proc-plain"
+  make_proc_root "$plainproc"
+  aaproc="$base/proc-apparmor"
+  make_proc_root "$aaproc" 1
 
   # Unset mode on a host that cannot build the view: install mode, one notice.
-  (cd "$proj/src" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out1" \
+  (cd "$proj/src" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out1" FM_PROC_ROOT_OVERRIDE="$plainproc" \
     PATH="$nounshare:$fakebin:$PATH" "$ROOT/bin/firstmate" 2>"$base/err1") \
     || fail "fallback launch failed: $(cat "$base/err1")"
   assert_grep "PWD=$ROOT" "$base/out1" "fallback did not run from the install root"
@@ -175,7 +191,7 @@ test_mode_fallback_and_refusal() {
 
   # Explicit project mode there refuses with the reason; the harness never runs.
   rm -f "$base/out2"
-  if (cd "$proj" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out2" \
+  if (cd "$proj" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out2" FM_PROC_ROOT_OVERRIDE="$plainproc" \
       PATH="$nounshare:$fakebin:$PATH" "$ROOT/bin/firstmate" --mode project 2>"$base/err2"); then
     fail "explicit project mode on an unsupported host did not refuse"
   fi
@@ -183,9 +199,28 @@ test_mode_fallback_and_refusal() {
     "project-mode refusal did not name the reason"
   assert_absent "$base/out2" "a refused project-mode launch still ran the harness"
 
+  # A host whose AppArmor restricts unprivileged user namespaces (the
+  # ubuntu-24.04 CI runner, native Ubuntu 23.10+) names that restriction in
+  # both the fallback notice and the explicit refusal.
+  (cd "$proj" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out1aa" FM_PROC_ROOT_OVERRIDE="$aaproc" \
+    PATH="$nounshare:$fakebin:$PATH" "$ROOT/bin/firstmate" 2>"$base/err1aa") \
+    || fail "AppArmor-restricted fallback launch failed: $(cat "$base/err1aa")"
+  assert_grep "MODE=install" "$base/out1aa" "an AppArmor-restricted host did not fall back to install mode"
+  assert_grep "NOTICE=project mode unavailable (this host refuses unprivileged user namespaces (kernel.apparmor_restrict_unprivileged_userns=1)" \
+    "$base/out1aa" "the AppArmor-restricted fallback notice did not name the restriction"
+  assert_equals 1 "$(grep -c 'notice' "$base/err1aa")" "the AppArmor-restricted fallback notice was not one line"
+  rm -f "$base/out2aa"
+  if (cd "$proj" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out2aa" FM_PROC_ROOT_OVERRIDE="$aaproc" \
+      PATH="$nounshare:$fakebin:$PATH" "$ROOT/bin/firstmate" --mode project 2>"$base/err2aa"); then
+    fail "explicit project mode on an AppArmor-restricted host did not refuse"
+  fi
+  assert_grep "project mode unavailable: this host refuses unprivileged user namespaces (kernel.apparmor_restrict_unprivileged_userns=1)" \
+    "$base/err2aa" "the AppArmor-restricted refusal did not name the restriction"
+  assert_absent "$base/out2aa" "a refused project-mode launch on an AppArmor-restricted host still ran the harness"
+
   # config/launch-mode=project is the same explicit choice.
   printf 'project\n' > "$proj/.firstmate/config/launch-mode"
-  if (cd "$proj" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out3" \
+  if (cd "$proj" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out3" FM_PROC_ROOT_OVERRIDE="$plainproc" \
       PATH="$nounshare:$fakebin:$PATH" "$ROOT/bin/firstmate" 2>"$base/err3"); then
     fail "config/launch-mode=project on an unsupported host did not refuse"
   fi
@@ -243,7 +278,7 @@ test_mode_fallback_and_refusal() {
   assert_grep "CODE_ROOT=$other" "$base/out9" "a Firstmate checkout was not its own code root"
   assert_grep "MODE=install" "$base/out9" "a Firstmate checkout was viewed"
 
-  pass "launch modes: fallback notice, explicit refusal, config default, install-mode auto-memory off, codex cap, no-project and self-checkout launches"
+  pass "launch modes: fallback notice, explicit refusal, AppArmor-restricted reason, config default, install-mode auto-memory off, codex cap, no-project and self-checkout launches"
 }
 
 test_mode_project_default() {

@@ -50,6 +50,7 @@
 # cleanup removes named files only and never recurses, because a mount that
 # failed to detach still exposes the real tree underneath.
 # FM_VIEW_KEEP_LOG=1 keeps the keeper log beside the runtime dir.
+# FM_PROC_ROOT_OVERRIDE replaces /proc for the probe's AppArmor sysctl read.
 # The keeper's RUN, INSTALL, INSTALL_SRC, LAUNCH, REALRW, and GIT_REAL arrive
 # through the environment cmd_run sets, and the composed text names variables
 # for the reader to expand, never this shell.
@@ -128,7 +129,7 @@ probe_host() {
       unshare --user --map-user="$1" --map-group="$2" -- true || { echo "unshare lacks --map-user (util-linux 2.38+ needed)" >&2; exit 1; }
     ' fm-view-probe "$uid" "$gid" 2>&1 >/dev/null); then
     err=$(printf '%s\n' "$err" | sed -n '1p')
-    restrict=$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || true)
+    restrict=$(cat "${FM_PROC_ROOT_OVERRIDE:-/proc}/sys/kernel/apparmor_restrict_unprivileged_userns" 2>/dev/null || true)
     if [ "$restrict" = 1 ]; then
       echo "this host refuses unprivileged user namespaces (kernel.apparmor_restrict_unprivileged_userns=1): ${err:-no detail}"
     else
