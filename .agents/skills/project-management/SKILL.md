@@ -87,7 +87,7 @@ The captain's request to create that local project authorizes this local initial
 Run no-mistakes initialization only for `no-mistakes` and `no-mistakes-prod-only` projects, in the project's resolved directory (`bin/fm-projects.sh resolve <name>`):
 
 ```sh
-cd "$(bin/fm-projects.sh resolve <name>)" && no-mistakes init && no-mistakes doctor
+(cd "$(bin/fm-projects.sh resolve <name>)" && no-mistakes init && no-mistakes doctor)
 ```
 
 Initialization configures the local gate and does not vendor a no-mistakes skill into the project.
