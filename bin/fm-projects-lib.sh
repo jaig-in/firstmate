@@ -192,7 +192,18 @@ fm_project_registered_aliases() {
   fi
   {
     if [ -f "$data/projects.md" ]; then
-      awk '$1 == "-" && $2 != "" { print $2 }' "$data/projects.md"
+      # The whole name runs to " [" or " - ", whichever comes first, so a
+      # spaced name is one alias rather than its first word.
+      awk '
+        substr($0, 1, 2) == "- " {
+          rest = substr($0, 3)
+          cut = index(rest, " [")
+          dash = index(rest, " - ")
+          if (dash > 0 && (cut == 0 || dash < cut)) cut = dash
+          name = cut > 0 ? substr(rest, 1, cut - 1) : rest
+          if (name != "") print name
+        }
+      ' "$data/projects.md"
     fi
     if [ -n "$pairs" ]; then
       printf '%s\n' "$pairs" | cut -f1

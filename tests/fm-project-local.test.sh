@@ -31,6 +31,8 @@
 #   - a bare-name refresh argument keeps its registry alias as the label, so a
 #     manifest-registered project outside the projects root still resolves its
 #     registered posture (local-only is skipped, not fetched).
+#   - registry parsing reads whole names: a spaced name is one alias and a
+#     name that prefixes a longer one reads its own row's delivery mode.
 #   - org-shaped secondmate seed registers siblings instead of cloning them,
 #     only when the sibling is the parent's registered copy or a clone of its
 #     origin, and a path-registered alias carries its path mapping, delivery
@@ -1204,6 +1206,36 @@ test_manifest_alias_label() {
   pass "legacy home: a bare alias keeps its registry label and its local-only skip"
 }
 
+# --- whole-name registry parsing --------------------------------------------
+# A spaced name is one alias, and a name that prefixes a longer registered name
+# reads its own row, matching bin/fm-project-mode.sh's whole-name rule.
+test_registry_whole_names() {
+  local home out
+  home=$(new_dir)
+  mkdir -p "$home/config" "$home/data"
+  {
+    printf -- '- my app [direct-PR +yolo] - spaced name (added 2026-10-11)\n'
+    printf -- '- my [local-only] - prefix of the spaced name (added 2026-10-11)\n'
+    printf -- '- legacy - unannotated (added 2026-10-11)\n'
+  } > "$home/data/projects.md"
+
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" aliases) \
+    || fail "aliases failed on a spaced registry name"
+  assert_equals "$(printf 'legacy\nmy\nmy app')" "$out" \
+    "a spaced registry name was split into its first word"
+
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" summary) \
+    || fail "summary failed on a spaced registry name"
+  assert_contains "$out" "- my app [direct-PR +yolo] - missing" \
+    "a spaced name did not read its own row's delivery mode"
+  assert_contains "$out" "- my [local-only] - missing" \
+    "a prefix name did not read its own row's delivery mode"
+  assert_contains "$out" "- legacy [no-mistakes] - missing" \
+    "an unannotated row did not default to no-mistakes"
+
+  pass "registry parsing: spaced and prefix names resolve to their own whole rows"
+}
+
 test_launcher_resolution
 test_launcher_trust
 test_init
@@ -1216,5 +1248,6 @@ test_manifest_alias_label
 test_spawn_refusal
 test_org_seed
 test_org_seed_path_registered
+test_registry_whole_names
 
 printf 'all project-local tests passed\n'

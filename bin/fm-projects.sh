@@ -50,13 +50,16 @@ usage() {
 registry_mode() {
   local alias=$1 mode
   [ -f "$DATA/projects.md" ] || { echo unrecorded; return 0; }
+  # Whole-name row match, the same rule bin/fm-project-mode.sh applies, so a
+  # spaced name or a name that prefixes a longer one reads its own row.
   mode=$(awk -v n="$alias" '
-    $1 == "-" && $2 == n {
-      if ($3 ~ /^\[/) {
-        s = ""
-        for (i = 3; i <= NF; i++) { s = s (s == "" ? "" : " ") $i; if ($i ~ /\]$/) break }
-        gsub(/^\[|\]$/, "", s)
-        print s
+    {
+      prefix = "- " n
+      if (substr($0, 1, length(prefix)) != prefix) next
+      after = substr($0, length(prefix) + 1)
+      if (after != "" && substr(after, 1, 2) != " [" && substr(after, 1, 3) != " - ") next
+      if (substr(after, 1, 2) == " [" && index(after, "]") > 0) {
+        print substr(after, 3, index(after, "]") - 3)
       } else {
         print "no-mistakes"
       }
