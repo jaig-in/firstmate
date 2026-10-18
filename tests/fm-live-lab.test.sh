@@ -28,6 +28,7 @@ live_lab_cleanup() {
   while read -r pid; do [ -n "$pid" ] && { pkill -P "$pid" 2>/dev/null || true; kill "$pid" 2>/dev/null || true; }; done < "$TMP_ROOT/pids"
   while read -r dir; do
     [ -n "$dir" ] || continue
+    [ -d "$dir" ] || continue
     # Only the explicit lab socket, and only while it exists: a missing
     # TMUX_TMPDIR would make tmux fall back to the user's default server.
     [ ! -S "$(lab_socket_of "$dir")" ] || env -u TMUX tmux -S "$(lab_socket_of "$dir")" kill-server 2>/dev/null
