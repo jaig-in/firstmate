@@ -180,7 +180,7 @@ A direct harness launch with no `FM_LAUNCH_DIR` omits the section.
 ### Harness selection and home trust
 
 The harness is `--harness <name>`, then the home's `config/primary-harness` (one token), then `claude`; remaining arguments pass through to the harness.
-Whichever source supplies it, the harness name must be a primary-capable adapter (`claude codex opencode pi pi-signed grok cursor omp`; the crew-only adapters `muse gemini rovo agy` are refused, and `kimi` is refused because it is verified as a crewmate harness but sits outside the primary turn-end guard scope), and any other value - including a symlinked `config/primary-harness` file or a value with interior whitespace - fails loudly at launch.
+Whichever source supplies it, the harness name must be a primary-capable adapter (`claude codex opencode pi pi-signed grok cursor omp`; the adapters that [Harness support](#harness-support) verifies for crewmate and scout launches only are refused, and `kimi` is refused because it is verified as a crewmate harness but sits outside the primary turn-end guard scope), and any other value - including a symlinked `config/primary-harness` file or a value with interior whitespace - fails loudly at launch.
 That whitelist keeps a home config or flag from naming an arbitrary binary or a harness with no primary supervision protocol; [README requirements](../README.md#requirements) own the harnesses supported for a primary session.
 A `pi` or `pi-signed` launch exports `FM_PI_HARNESS` as that name and an `omp` launch exports `FM_OMP_HARNESS=omp`, so harness detection labels the primary from the launch itself rather than from an inherited marker.
 
