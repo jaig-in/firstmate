@@ -33,6 +33,8 @@
 #     registered posture (local-only is skipped, not fetched).
 #   - registry parsing reads whole names: a spaced name is one alias and a
 #     name that prefixes a longer one reads its own row's delivery mode.
+#   - spawn refuses an unborn HEAD in the directory the resolver chose: a
+#     registered sibling or a path-registered project, by name and by path.
 #   - org-shaped secondmate seed registers siblings instead of cloning them,
 #     only when the sibling is the parent's registered copy or a clone of its
 #     origin, and a path-registered alias carries its path mapping, delivery
@@ -947,6 +949,57 @@ test_spawn_refusal() {
   pass "spawn: unregistered sibling refused by name and path, registered reaches the brief check"
 }
 
+# The unborn-HEAD refusal checks the directory the resolver chose, so a
+# registered sibling under the projects root and a path-registered project
+# outside it are refused for their own missing commit, by name and by path.
+test_spawn_unborn_head_resolved_project() {
+  local base org home sib ext legacy legacy_ext label target arg n=0
+  base=$(new_dir)
+  org="$base/org"
+  home="$org/.firstmate"
+  mkdir -p "$home/config" "$home/data" "$home/state"
+  printf '..\n' > "$home/config/projects-root"
+  sib="$org/sib"
+  ext="$base/outside/ext"
+  git init -q "$sib"
+  git init -q "$ext"
+  sib=$(cd "$sib" && pwd)
+  ext=$(cd "$ext" && pwd)
+  printf -- '- sib [direct-PR] - registered sibling (added 2026-10-18)\n' > "$home/data/projects.md"
+  printf '{ "ext": "%s" }\n' "$ext" > "$home/data/project-paths.json"
+
+  # An ordinary home whose path-registered alias names a project outside
+  # projects/, while a same-named clone with a commit sits under projects/.
+  legacy="$base/legacy"
+  legacy_ext="$base/elsewhere/ext"
+  mkdir -p "$legacy/config" "$legacy/data" "$legacy/state"
+  fm_git_init_commit "$legacy/projects/ext"
+  git init -q "$legacy_ext"
+  legacy_ext=$(cd "$legacy_ext" && pwd)
+  printf '{ "ext": "%s" }\n' "$legacy_ext" > "$legacy/data/project-paths.json"
+
+  for label in "org:sib:$sib" "org:$sib:$sib" "org:ext:$ext" "org:$ext:$ext" "legacy:ext:$legacy_ext"; do
+    n=$((n + 1))
+    case "$label" in
+      org:*) target=$home; label=${label#org:} ;;
+      legacy:*) target=$legacy; label=${label#legacy:} ;;
+    esac
+    arg=${label%%:*}
+    if FM_HOME="$target" "$ROOT/bin/fm-spawn.sh" "unborn$n" "$arg" --harness claude --mode direct-PR --yolo off \
+      >/dev/null 2>"$base/err$n"; then
+      fail "spawn accepted unborn project $arg"
+    fi
+    assert_grep "project ${label#*:} has no commit yet (unborn HEAD)" "$base/err$n" \
+      "spawn of $arg did not refuse the resolved project's unborn HEAD"
+    [ ! -e "$target/state/unborn$n.meta" ] || fail "refused spawn of $arg published task metadata"
+  done
+  [ -z "$(git -C "$sib" rev-list --all 2>/dev/null)" ] || fail "spawn committed into the sibling"
+  [ -z "$(git -C "$ext" rev-list --all 2>/dev/null)" ] || fail "spawn committed into the path-registered project"
+  [ -z "$(git -C "$legacy_ext" rev-list --all 2>/dev/null)" ] || fail "spawn committed into the legacy path-registered project"
+
+  pass "spawn: unborn HEAD refused on the resolved sibling and path-registered project, by name and path"
+}
+
 # --- org-shaped secondmate seed ----------------------------------------------
 
 test_org_seed() {
@@ -1246,6 +1299,7 @@ test_resolver_fails_closed
 test_manifest_reader_without_jq
 test_manifest_alias_label
 test_spawn_refusal
+test_spawn_unborn_head_resolved_project
 test_org_seed
 test_org_seed_path_registered
 test_registry_whole_names
