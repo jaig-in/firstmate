@@ -77,7 +77,9 @@
 #   short host name),
 #   lanes {count, pr_ready (records with a pr= line), ids},
 #   cap {target (number or null), status ok|none|invalid},
-#   projects (clone directory names under projects/),
+#   projects (the project names this home owns: registered names in a
+#     config/projects-root home, else clone directory names under the
+#     projects root; bin/fm-projects-lib.sh),
 #   pressure {level ok|warn|critical|unknown, why[], basis beat|probe|none,
 #     beat_age_s, avail_gb, total_gb, runq_per_core (probe basis: load1 over
 #     cores), swap_rate_pps_1m, mem_stall_pct, load1, on_battery,
@@ -110,8 +112,8 @@
 # --admit exits 0 when config/lane-capacity is absent or the verdict admits,
 # and 75 with one `deferred:` line on stderr when it does not.
 #
-# Environment: FM_HOME, FM_STATE_OVERRIDE, FM_CONFIG_OVERRIDE, and
-# FM_PROJECTS_OVERRIDE resolve the home exactly as the other bin/ scripts do.
+# Environment: FM_HOME, FM_STATE_OVERRIDE, FM_DATA_OVERRIDE, FM_CONFIG_OVERRIDE,
+# and FM_PROJECTS_OVERRIDE resolve the home exactly as the other bin/ scripts do.
 #
 # Exit status: 0 on a report, 1 on an invalid config/lane-capacity (report,
 # --json, --admit), 2 on a usage error or --json without jq, 75 on an --admit
@@ -124,7 +126,9 @@ FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
-PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
+DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+# shellcheck source=bin/fm-projects-lib.sh
+. "$SCRIPT_DIR/fm-projects-lib.sh"
 LANE_CONFIG="$CONFIG/lane-capacity"
 PUBLISHED="$STATE/lane-capacity.json"
 
@@ -598,12 +602,20 @@ if [ -z "$machine" ]; then
   machine=${machine%%.*}
 fi
 
+# A malformed config/projects-root or registry leaves the list empty rather
+# than stopping the report.
 project_names=
-for p in "$PROJECTS"/*/; do
-  [ -d "$p" ] || continue
-  project_names="$project_names$(basename "$p")
+project_pairs=$(fm_project_sync_candidate_pairs "$FM_HOME" "$CONFIG" "$DATA" 2>/dev/null) || project_pairs=
+tab=$(printf '\t')
+while IFS= read -r p_pair; do
+  p_alias=${p_pair%%"$tab"*}
+  p_path=${p_pair#*"$tab"}
+  [ -n "$p_path" ] && [ -d "$p_path" ] || continue
+  project_names="$project_names${p_alias:-$(basename "$p_path")}
 "
-done
+done <<EOF_PROJECTS
+$project_pairs
+EOF_PROJECTS
 
 boot_id='' boot_epoch='' uptime_s=''
 if [ "$os" = Darwin ]; then
