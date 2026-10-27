@@ -137,25 +137,25 @@ if [ -z "${FM_LAB_ISO_HOST_MARKER:-}" ]; then
   # No socket for kill-server to reach: TERM stops a plain process.
   victim=$(bash -c 'sleep 600 </dev/null >/dev/null 2>&1 & echo $!')
   start=$(date +%s)
-  stop_decoy "$victim" "$TMP_ROOT/no-such-socket" 20 || fail "cleanup could not stop a process that exits on TERM"
+  stop_decoy "$victim" "$TMP_ROOT/no-such-socket" 4 || fail "cleanup could not stop a process that exits on TERM"
   wait_gone "$victim" 0 || fail "cleanup returned success with the process still alive"
-  [ $(($(date +%s) - start)) -lt 10 ] || fail "cleanup of a TERM-able process was not prompt"
+  [ $(($(date +%s) - start)) -lt 5 ] || fail "cleanup of a TERM-able process was not prompt"
 
   # A process that ignores TERM is stopped by the KILL step.
   victim=$(bash -c 'trap "" TERM; exec sleep 600 </dev/null >/dev/null 2>&1 & echo $!')
-  stop_decoy "$victim" "$TMP_ROOT/no-such-socket" 20 || fail "cleanup could not stop a process that ignores TERM"
+  stop_decoy "$victim" "$TMP_ROOT/no-such-socket" 4 || fail "cleanup could not stop a process that ignores TERM"
   wait_gone "$victim" 0 || fail "cleanup returned success with the TERM-ignoring process alive"
 
   # kill-server cannot stop it and neither signal lands: cleanup must return
   # within its poll budget, name the survivor, and report failure.
   victim=$(bash -c 'sleep 600 </dev/null >/dev/null 2>&1 & echo $!')
   start=$(date +%s)
-  out=$(signal_decoy() { :; }; stop_decoy "$victim" "$TMP_ROOT/no-such-socket" 10 2>&1)
+  out=$(signal_decoy() { :; }; stop_decoy "$victim" "$TMP_ROOT/no-such-socket" 3 2>&1)
   code=$?
   kill -KILL "$victim" 2>/dev/null
   expect_code 1 "$code" "cleanup reports a decoy it cannot stop: $out"
   assert_contains "$out" "decoy server $victim survived" "the failure names the surviving decoy"
-  [ $(($(date +%s) - start)) -lt 10 ] || fail "cleanup of an unstoppable decoy waited past its bound"
+  [ $(($(date +%s) - start)) -lt 5 ] || fail "cleanup of an unstoppable decoy waited past its bound"
   # An exited decoy its parent never reaps stays a zombie that still answers
   # kill -0: cleanup must count it as gone rather than report a failure.
   bash -c 'sleep 0.2 </dev/null >/dev/null 2>&1 & echo $! $$; exec sleep 30 </dev/null >&3 2>/dev/null' 3>/dev/null >"$TMP_ROOT/zombie.pids" &
@@ -163,7 +163,7 @@ if [ -z "${FM_LAB_ISO_HOST_MARKER:-}" ]; then
   read -r victim zombie_parent <"$TMP_ROOT/zombie.pids"
   sleep 0.5
   kill -0 "$victim" 2>/dev/null || fail "the zombie fixture was reaped, so the case would be vacuous"
-  stop_decoy "$victim" "$TMP_ROOT/no-such-socket" 10 || fail "cleanup reported failure for an exited, unreaped decoy"
+  stop_decoy "$victim" "$TMP_ROOT/no-such-socket" 3 || fail "cleanup reported failure for an exited, unreaped decoy"
   { kill -KILL "$zombie_parent"; wait "$zombie_parent"; } 2>/dev/null
 
   pass "decoy cleanup is bounded, escalates to TERM and KILL, and reports a decoy it cannot stop"
