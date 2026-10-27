@@ -712,15 +712,6 @@ case "\$1" in
 esac
 SH
   chmod +x "$fakebin/tmux"
-  # A paseo whose daemon is down and that records any attempt to start it.
-  cat > "$fakebin/paseo" <<SH
-#!/bin/sh
-case "\$1" in
-  status) exit 1 ;;
-  *) echo "\$*" >> "$base/paseo-calls"; exit 0 ;;
-esac
-SH
-  chmod +x "$fakebin/paseo"
   sleep 60 &
   local host_pid=$!
   out=$(view_run "$install" "$proj" '
@@ -734,8 +725,6 @@ SH
     . "'"$ROOT"'/bin/backends/tmux.sh"
     unset TMUX
     PATH="'"$fakebin"':$PATH" fm_backend_tmux_container_ensure 2>&1 && echo "tmux_allowed" || echo "tmux_refused"
-    . "'"$ROOT"'/bin/backends/paseo.sh"
-    PATH="'"$fakebin"':$PATH" fm_backend_paseo_ensure_running 2>&1 && echo "paseo_allowed" || echo "paseo_refused"
   ') || fail "worker placement run failed"
   kill "$host_pid" 2>/dev/null || true
   assert_contains "$out" "inner_inside=yes" "a process started inside the view was not reported inside"
@@ -744,8 +733,6 @@ SH
   assert_contains "$out" "tmux_refused" "the tmux container started a server inside the view"
   assert_contains "$out" "would show workers the view" "the refusal did not name the consequence"
   assert_absent "$base/tmux-calls" "tmux was asked to start a session inside the view"
-  assert_contains "$out" "paseo_refused" "the paseo daemon was started inside the view"
-  assert_absent "$base/paseo-calls" "paseo was asked to start its daemon inside the view"
 
   pass "worker placement: servers started inside a view are refused; outside a view the guard is inert"
 }

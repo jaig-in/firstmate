@@ -7163,6 +7163,9 @@ if [ "$BACKEND" = t3code ]; then
     T3CODE_ENV+=(FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE= FM_CONFIG_OVERRIDE= \
       "FM_PUBLIC_FOLLOWUP_PRIMARY_HOME=$FM_HOME" "FM_HOME=$PROJ_ABS" "FM_TRACE_CONTEXT=$SPAWN_TRACE_EFFECTIVE" \
       "FM_SUPERVISION_MODEL=$supervision_model" FM_SUPERVISOR_BACKEND=t3code "FM_SUPERVISOR_TARGET=$T")
+    if [ "$HARNESS" = claude ]; then
+      T3CODE_ENV+=(CLAUDE_CODE_DISABLE_AUTO_MEMORY=1)
+    fi
   fi
   spawn_t3code_env_install "$HARNESS" "${T3CODE_ENV[@]}" || {
     echo "error: could not write the $HARNESS environment config for $ID into $WT" >&2
