@@ -115,7 +115,9 @@ gate_run() {
 
 # ---- the gate ---------------------------------------------------------------
 
-if [ -z "${FM_LAB_ISO_HOST_MARKER:-}" ]; then
+# FM_LAB_ISO_TMP_COPY marks the copy of this suite under /tmp (below), which
+# needs only the decoy preflight.
+if [ -z "${FM_LAB_ISO_HOST_MARKER:-}" ] && [ -z "${FM_LAB_ISO_TMP_COPY:-}" ]; then
   out=$(gate_run "$TMP_ROOT/base")
   expect_code 0 "$?" "the gate passes with no socket directory: $out"
   assert_equals RAN "$out" "the gate runs the suite where no tmux server can answer"
@@ -195,7 +197,9 @@ if [ -z "${FM_LAB_ISO_HOST_MARKER:-}" ]; then
   { kill -KILL "$zombie_parent"; wait "$zombie_parent"; } 2>/dev/null
 
   pass "decoy cleanup is bounded, escalates to TERM and KILL, and reports a decoy it cannot stop"
+fi
 
+if [ -z "${FM_LAB_ISO_HOST_MARKER:-}" ]; then
   # The decoy cases run only in a private mount namespace with a fresh /tmp.
   if ! unshare -Urm sh -c 'mount -t tmpfs tmpfs /tmp' >/dev/null 2>&1; then
     echo "skip: tmux isolation decoy: needs a private /tmp (unshare -Urm with a tmpfs mount on /tmp)"
