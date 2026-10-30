@@ -313,7 +313,7 @@ validate_operational_dirs() {
 validate_seed_leaf_files() {
   local home=$1 label path abs_home abs_path
   abs_home=$(resolved_path "$home")
-  for label in "data/projects.md" "data/charter.md" "$SUB_HOME_MARKER" "$SUB_HOME_PARENT_MARKER"; do
+  for label in "data/projects.md" "data/charter.md" "config/projects-root" "$SUB_HOME_MARKER" "$SUB_HOME_PARENT_MARKER"; do
     path="$home/$label"
     if [ -L "$path" ]; then
       echo "error: secondmate leaf file must not be a symlink: $path" >&2
@@ -1126,6 +1126,9 @@ seed_home() {
   SEED_HOME="$home"
   validate_registry_home_text "$home" || return 1
   validate_home_assignment "$id" "$home"
+  # Before config/projects-root is written: a symlink there (dangling or not)
+  # would redirect that write outside the child home.
+  validate_seed_leaf_files "$home" || return 1
   if [ -n "$projects_root_arg" ]; then
     mkdir -p "$home/config"
     if [ -f "$home/config/projects-root" ]; then

@@ -1223,6 +1223,41 @@ test_org_seed_path_registered() {
   pass "org seed: a path-registered alias carries its path mapping, delivery mode, and alias into the child"
 }
 
+# --- an existing child's config/projects-root leaf ---------------------------
+
+# A reseed with --projects-root never writes through a symlink at the child's
+# config/projects-root: a dangling link would otherwise create a file outside
+# the child home that a failed seed's rollback cannot remove.
+test_org_seed_root_leaf_symlink() {
+  local base parent org child
+  base=$(new_dir)
+  parent="$base/parent"
+  org="$base/org"
+  child="$base/child"
+  mkdir -p "$parent/projects" "$parent/data" "$parent/state" "$org"
+  fm_git_init_commit "$org/alpha"
+  fm_git_add_origin "$org/alpha" "$base/remotes/alpha.git"
+  git clone --quiet "$(git -C "$org/alpha" remote get-url origin)" "$parent/projects/alpha"
+  printf -- '- alpha [direct-PR] - alpha project (added 2026-10-30)\n' > "$parent/data/projects.md"
+  scaffold_secondmate_charter "$parent" mate 'mate charter' alpha \
+    || fail "charter scaffold failed"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" alpha \
+    --projects-root "$org" >/dev/null 2>"$base/err-seed" \
+    || fail "org seed failed: $(cat "$base/err-seed")"
+
+  rm -f "$child/config/projects-root"
+  ln -s "$base/outside-root" "$child/config/projects-root"
+  if FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" alpha \
+      --projects-root "$org" >/dev/null 2>"$base/err-link"; then
+    fail "a reseed wrote through a symlinked config/projects-root"
+  fi
+  assert_absent "$base/outside-root" "a reseed created a file outside the child home through config/projects-root"
+  assert_grep "must not be a symlink: $child/config/projects-root" "$base/err-link" \
+    "the symlinked projects-root refusal did not name the leaf"
+
+  pass "org seed: a symlinked child config/projects-root is refused before it is written"
+}
+
 # --- a bare alias keeps its registry label in a legacy home ------------------
 
 # Regression: a single-argument refresh of a manifest-registered alias in a
@@ -1302,6 +1337,7 @@ test_spawn_refusal
 test_spawn_unborn_head_resolved_project
 test_org_seed
 test_org_seed_path_registered
+test_org_seed_root_leaf_symlink
 test_registry_whole_names
 
 printf 'all project-local tests passed\n'
