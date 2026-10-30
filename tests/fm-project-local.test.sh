@@ -1258,6 +1258,49 @@ test_org_seed_root_leaf_symlink() {
   pass "org seed: a symlinked child config/projects-root is refused before it is written"
 }
 
+# --- a seeded alias the parent stops mapping ---------------------------------
+
+# When the parent moves a path-registered project into its org folder and
+# drops its data/project-paths.json entry, a reseed removes the child's
+# mapping for that alias, so the child resolves the sibling the seed checked
+# rather than the old repository; mappings for unrelated aliases survive.
+test_org_seed_moved_alias() {
+  local base parent org child ship
+  base=$(new_dir)
+  parent="$base/parent"
+  org="$base/org"
+  child="$base/child"
+  mkdir -p "$parent/data" "$parent/state" "$parent/config" "$org"
+  printf '%s\n' "$org" > "$parent/config/projects-root"
+  ship="$base/outside/ship"
+  fm_git_init_commit "$ship"
+  fm_git_add_origin "$ship" "$base/remotes/ship.git"
+  ship=$(cd "$ship" && pwd -P)
+  printf -- '- ship [direct-PR] - ship project (added 2026-10-30)\n' > "$parent/data/projects.md"
+  printf '{"ship": "%s"}\n' "$ship" > "$parent/data/project-paths.json"
+  scaffold_secondmate_charter "$parent" mate 'mate charter' ship \
+    || fail "charter scaffold failed"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" ship \
+    --projects-root "$org" >/dev/null 2>"$base/err-seed" \
+    || fail "org seed failed: $(cat "$base/err-seed")"
+  assert_equals "$ship" "$(FM_HOME="$child" "$ROOT/bin/fm-projects.sh" resolve ship)" \
+    "the child did not inherit ship's path mapping"
+
+  # The parent moves ship into the org folder and stops mapping it.
+  git clone --quiet "$(git -C "$ship" remote get-url origin)" "$org/ship"
+  printf '{}\n' > "$parent/data/project-paths.json"
+  printf '{"ship": "%s", "keep": "/somewhere/keep"}\n' "$ship" > "$child/data/project-paths.json"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" ship \
+    --projects-root "$org" >/dev/null 2>"$base/err-reseed" \
+    || fail "reseed after the move failed: $(cat "$base/err-reseed")"
+  assert_equals "$(cd "$org/ship" && pwd -P)" "$(FM_HOME="$child" "$ROOT/bin/fm-projects.sh" resolve ship)" \
+    "the child kept resolving the old repository after the parent moved it"
+  assert_equals "/somewhere/keep" "$(FM_HOME="$child" "$ROOT/bin/fm-projects.sh" resolve keep)" \
+    "the reseed dropped an unrelated child mapping"
+
+  pass "org seed: a seeded alias the parent no longer maps loses its stale child mapping"
+}
+
 # --- a bare alias keeps its registry label in a legacy home ------------------
 
 # Regression: a single-argument refresh of a manifest-registered alias in a
@@ -1338,6 +1381,7 @@ test_spawn_unborn_head_resolved_project
 test_org_seed
 test_org_seed_path_registered
 test_org_seed_root_leaf_symlink
+test_org_seed_moved_alias
 test_registry_whole_names
 
 printf 'all project-local tests passed\n'

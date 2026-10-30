@@ -41,7 +41,8 @@
 #       under <dir> - and is REGISTERED into the child's data/projects.md
 #       instead of cloned; a path-registered alias also carries its
 #       data/project-paths.json entry into the child, so the child resolves the
-#       same repository under the same alias. No-mistakes initialization is
+#       same repository under the same alias, and a named alias this home no
+#       longer maps loses its child entry. No-mistakes initialization is
 #       left to that project's own tasks. A preexisting child
 #       config/projects-root selects the same mode and must agree with the
 #       flag. Discovery is not authority: only the named projects are
@@ -829,27 +830,35 @@ EOF
 
 # sync_project_paths <home> <project>...: carry this home's
 # data/project-paths.json entry for each named alias into the child's
-# data/project-paths.json, replacing a same-named child entry and keeping the
-# child's others. Written only for an org-shaped seed, whose child resolves the
-# alias in place; a cloned project lives under the child's own projects/.
+# data/project-paths.json, replacing a same-named child entry, removing the
+# child's entry for a named alias this home no longer maps (the child then
+# resolves the sibling the seed checked), and keeping the child's entries for
+# every other alias. Written only for an org-shaped seed, whose child resolves
+# the alias in place; a cloned project lives under the child's own projects/.
 sync_project_paths() {
-  local home=$1 project mapped pairs existing key val tmp out first=1
+  local home=$1 project mapped pairs seeded existing key val tmp out first=1 stale=0
   shift
   pairs=''
+  seeded=''
   for project in "$@"; do
+    seeded="$seeded$project"$'\n'
     mapped=$(fm_project_manifest_lookup "$DATA" "$project") || return 1
     [ -n "$mapped" ] || continue
     pairs="$pairs$project"$'\t'"$mapped"$'\n'
   done
-  [ -n "$pairs" ] || return 0
   out="$home/data/project-paths.json"
   existing=$(fm_project_manifest_pairs "$home/data") || return 1
+  while IFS=$'\t' read -r key val; do
+    [ -n "$key" ] || continue
+    printf '%s' "$seeded" | grep -Fxq -- "$key" && stale=1
+  done <<< "$existing"
+  [ -n "$pairs" ] || [ "$stale" -eq 1 ] || return 0
   tmp="$out.tmp.$$"
   {
     printf '{\n'
     while IFS=$'\t' read -r key val; do
       [ -n "$key" ] || continue
-      printf '%s\n' "$pairs" | cut -f1 | grep -Fxq -- "$key" && continue
+      printf '%s' "$seeded" | grep -Fxq -- "$key" && continue
       [ "$first" -eq 1 ] || printf ',\n'
       printf '  "%s": "%s"' "$key" "$val"
       first=0
