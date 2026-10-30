@@ -59,13 +59,18 @@ fm_backend_hc_session() {
   printf '%s' "${HC_SESSION:-default}"
 }
 
-# fm_backend_hc_cli: run hc against exactly <session>.
+# fm_backend_hc_cli: run hc against exactly <session>, the one point every hc
+# call passes through. Inside a view it refuses before reaching hc, because hc
+# starts a core on any command (measured on hc 0.1.15 from a plain `hc get`),
+# and a core started there would show workers the view; the refusal is a plain
+# failure, never hc's not_found status, so a task is unreadable there, not gone.
 # An invalid or empty session is refused: an empty HC_SESSION would let hc
 # fall back to whatever core the caller's environment names. HC_SOCKET is
 # dropped because hc lets it win over HC_SESSION.
 fm_backend_hc_cli() {  # <session> <args...>
   local session=$1
   shift
+  fm_view_refuse_self_starting_backend hc || return 1
   fm_backend_hc_atom_valid "$session" || { echo "error: refusing hc session '$session'" >&2; return 1; }
   env -u HC_SOCKET HC_SESSION="$session" hc "$@"
 }
@@ -152,17 +157,17 @@ fm_backend_hc_target_ready() {  # <target> [expected-label]
 }
 
 # fm_backend_hc_container_ensure: make sure the session's core answers (hc
-# starts its own core on first use) and print the session name. A fresh spawn
-# is refused inside a view, because `hc server status` can start the core there.
-# A relaunch adopting a recorded endpoint and supervision of existing hc tasks
-# do not pass through here, a known limitation (docs/hc-backend.md "Limits").
+# starts its own core on first use) and print the session name. The status call
+# discards stderr, so a view's refusal is named again on the way out.
 fm_backend_hc_container_ensure() {
   local session
-  fm_view_refuse_self_starting_backend hc || return 1
   session=$(fm_backend_hc_session)
   fm_backend_hc_atom_valid "$session" || { echo "error: refusing hc session name '$session'" >&2; return 1; }
-  fm_backend_hc_cli "$session" server status --json >/dev/null 2>&1 \
-    || { echo "error: 'hc server status' failed for session '$session'; is herdr-core installed and startable?" >&2; return 1; }
+  fm_backend_hc_cli "$session" server status --json >/dev/null 2>&1 || {
+    fm_view_refuse_self_starting_backend hc || return 1
+    echo "error: 'hc server status' failed for session '$session'; is herdr-core installed and startable?" >&2
+    return 1
+  }
   printf '%s' "$session"
 }
 
