@@ -694,6 +694,10 @@ A relaunch adopting a recorded endpoint and supervision of existing hc tasks are
 **`error: the tmux server (pid <n>) was started inside this Firstmate view, so its workers would see the view instead of the real project; ...`**
 Stop that server and start one from a normal terminal.
 
+**`fm-view: git shim needs the view's environment, which this shell lost`**
+A process inside the session ran git after clearing its environment, as `env -i` does, and the shim takes every path from that environment.
+Run git from a shell that keeps the session's environment.
+
 **`fm-view: git shim could not enter the real tree`**
 A git call failed with exit code 128 instead of running against the wrong files; restart the session.
 

@@ -53,8 +53,9 @@
 # FM_VIEW_KEEP_LOG=1 keeps the keeper log beside the runtime dir.
 # FM_PROC_ROOT_OVERRIDE replaces /proc for the probe's AppArmor sysctl read.
 # The keeper's RUN, INSTALL, INSTALL_SRC, LAUNCH, REALRW, and GIT_REAL arrive
-# through the environment cmd_run sets, and the composed text names variables
-# for the reader to expand, never this shell.
+# through the environment cmd_run sets, as does every path the git shim uses, so
+# the shim's text holds no path; the composed text names variables for the
+# reader to expand, never this shell.
 # shellcheck disable=SC2153,SC2016
 set -eu
 
@@ -515,22 +516,33 @@ cmd_run() {
   mkdir -- "$run/state"
   compose_agents "$install" "$launch_dir" "$launch_dir" "$run/AGENTS.md"
   cp -- "$install/CLAUDE.md" "$run/CLAUDE.md"
-  cat > "$run/git-shim" <<SHIM
+  # Quoted: a path is never part of this text, because a shell parses it. Every
+  # path reaches the shim through its own FM_VIEW_SHIM_* variables set below,
+  # which outlive a nested launcher clearing the session's FM_VIEW* description.
+  cat > "$run/git-shim" <<'SHIM'
 #!/bin/sh
 # fm-view git shim: run the real git with the REAL launch tree at its own path.
+case "" in
+  "$FM_VIEW_SHIM_UNSHARE" | "$FM_VIEW_SHIM_TREE" | "$FM_VIEW_SHIM_LAUNCH" | "$FM_VIEW_SHIM_GIT" | "$FM_VIEW_SHIM_GIT_PATH")
+    echo "fm-view: git shim needs the view's environment, which this shell lost" >&2
+    exit 128
+    ;;
+esac
 # The cwd is re-resolved by path after the remount, because a cwd inherited
 # across unshare still points at the view's mount, not the real tree.
-cwd=\$(pwd -P 2>/dev/null) || cwd=/
-exec "$unshare_bin" --user --map-root-user --mount -- /bin/sh -c '
-  mount --rbind "\$1" "\$2" && mount --bind "\$3" "\$4" || { echo "fm-view: git shim could not enter the real tree" >&2; exit 128; }
-  cd -- "\$5" 2>/dev/null || true
+cwd=$(pwd -P 2>/dev/null) || cwd=/
+exec "$FM_VIEW_SHIM_UNSHARE" --user --map-root-user --mount -- /bin/sh -c '
+  mount --rbind "$1" "$2" && mount --bind "$3" "$4" || { echo "fm-view: git shim could not enter the real tree" >&2; exit 128; }
+  cd -- "$5" 2>/dev/null || true
   shift 5
-  exec "$unshare_bin" --user --map-user="\$FM_VIEW_UID" --map-group="\$FM_VIEW_GID" -- "$git_real" "\$@"
-' fm-view-git "$run/rw" "$launch_dir" "$run/git.real" "$git_real" "\$cwd" "\$@"
+  exec "$FM_VIEW_SHIM_UNSHARE" --user --map-user="$FM_VIEW_UID" --map-group="$FM_VIEW_GID" -- "$FM_VIEW_SHIM_GIT_PATH" "$@"
+' fm-view-git "$FM_VIEW_SHIM_TREE" "$FM_VIEW_SHIM_LAUNCH" "$FM_VIEW_SHIM_GIT" "$FM_VIEW_SHIM_GIT_PATH" "$cwd" "$@"
 SHIM
   chmod 755 "$run/git-shim"
   RUN=$run INSTALL=$install INSTALL_SRC=$run/install LAUNCH=$launch_dir REALRW=$run/rw GIT_REAL=$git_real \
   FM_VIEW_UID=$(id -u) FM_VIEW_GID=$(id -g) \
+  FM_VIEW_SHIM_UNSHARE=$unshare_bin FM_VIEW_SHIM_TREE=$run/rw FM_VIEW_SHIM_LAUNCH=$launch_dir \
+  FM_VIEW_SHIM_GIT=$run/git.real FM_VIEW_SHIM_GIT_PATH=$git_real \
   FM_VIEW=1 FM_VIEW_ROOT=$launch_dir FM_LAUNCH_REAL=$run/ro FM_LAUNCH_REAL_RW=$run/rw \
     forward_wait "$unshare_bin" --user --map-root-user --mount --propagation private -- "$0" __keeper "$@" || rc=$?
   trap - HUP INT TERM

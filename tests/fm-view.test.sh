@@ -35,6 +35,10 @@
 #     the launch path; a falsification pass removes the shim bind and asserts
 #     the view then looks dirty, and removes the read-only remount and asserts a
 #     write then lands, each after asserting that its mutation applied.
+#   - the git shim treats every path as data: a launch directory, runtime
+#     directory, or git or unshare location holding command substitutions,
+#     backticks, or quotes runs nothing and leaves git working, and a shell
+#     that lost the view's environment gets a named refusal.
 #   - the keeper presents a top-level entry created outside the session.
 #   - a top-level file whose read-only remount fails is not presented (never
 #     left writable), and the next sync retries it rather than recording it as
@@ -486,6 +490,51 @@ test_view_git_shim() {
   pass "git shim: clean status, nothing staged, real top level from the view"
 }
 
+# Every path the shim needs is data, so a shell never parses one a second time.
+test_view_git_shim_hostile_paths() {
+  local base install name proj runtime tools out
+  skip_without_view "view git shim with hostile paths" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  export FM_VIEW_CANARY_SUBST="$base/canary-subst" FM_VIEW_CANARY_TICK="$base/canary-tick"
+
+  for name in 'cmd-$(touch "$FM_VIEW_CANARY_SUBST")-`touch "$FM_VIEW_CANARY_TICK"`' "it's-\"quoted"; do
+    proj="$base/demo-$name"
+    runtime="$base/run-$name"
+    tools="$base/tools-$name"
+    make_project "$proj"
+    mkdir -p "$runtime" "$tools"
+    chmod 700 "$runtime"
+    cp -- "$(command -v git)" "$(command -v unshare)" "$tools/"
+    out=$(XDG_RUNTIME_DIR=$runtime PATH="$tools:$PATH" view_run "$install" "$proj" '
+      echo "status_lines=$(git status --porcelain | wc -l | tr -d " ")"
+      echo "toplevel=$(git rev-parse --show-toplevel)"
+      echo "head_agents=$(git show HEAD:AGENTS.md | head -n 1)"
+      (cd src && echo "sub_status=$(git status --porcelain | wc -l | tr -d " ")")
+    ' 2>&1) || fail "view run failed under the hostile name $name: $out"
+    assert_contains "$out" "status_lines=0" "git status was not clean under the hostile name $name"
+    assert_contains "$out" "toplevel=$proj" "git lost the launch path under the hostile name $name"
+    assert_contains "$out" "head_agents=# demo project" "git did not read the real tree under the hostile name $name"
+    assert_contains "$out" "sub_status=0" "git failed in a subdirectory under the hostile name $name"
+    assert_absent "$FM_VIEW_CANARY_SUBST" "a path's command substitution ran under the hostile name $name"
+    assert_absent "$FM_VIEW_CANARY_TICK" "a path's backticks ran under the hostile name $name"
+  done
+
+  proj="$base/plain"
+  make_project "$proj"
+  out=$(view_run "$install" "$proj" '
+    scrubbed=$(env -i PATH="$PATH" git --version 2>&1) && echo "scrubbed_ran=yes"
+    echo "scrubbed=$scrubbed"
+    echo "nested_toplevel=$(env -u FM_VIEW -u FM_VIEW_ROOT -u FM_LAUNCH_REAL -u FM_LAUNCH_REAL_RW git rev-parse --show-toplevel)"
+  ') || fail "view run failed: $out"
+  assert_contains "$out" "nested_toplevel=$proj" "git stopped working once a nested launcher cleared the session description"
+  assert_not_contains "$out" "scrubbed_ran=yes" "git ran outside the real tree without the view's environment"
+  assert_contains "$out" "scrubbed=fm-view: git shim" "a shell without the view's environment got no named refusal"
+
+  pass "git shim: hostile paths run nothing and git keeps working; a scrubbed environment is refused by name"
+}
+
 # mutate <src> <dst> <line-pattern>: copy <src> to <dst> without the lines
 # matching <line-pattern>, and fail loudly unless that changed the file.
 mutate() {
@@ -882,6 +931,7 @@ test_mode_fallback_and_refusal
 test_mode_project_default
 test_view_layout_and_read_only
 test_view_git_shim
+test_view_git_shim_hostile_paths
 test_view_falsification
 test_view_keeper_refresh
 test_view_failed_remount_retried
