@@ -145,6 +145,12 @@ A marker that was committed to git does not count, because it proves nothing abo
 An explicit `FM_HOME=...` and the global home need no marker.
 Even a blessed home can only launch one of the supported agent tools, never an arbitrary program.
 
+The same marker guards Firstmate's own code.
+A repository that looks like a Firstmate clone, because it has `AGENTS.md`, `bin/firstmate`, and `bin/fm-session-start.sh`, would otherwise replace your installed Firstmate's instructions and hooks when you launch inside it.
+So the launcher runs such a clone as Firstmate only after you run `firstmate init` in it, which writes an untracked `.fm-home` at the clone's top level.
+Until then the launch uses your installed Firstmate in install mode and prints a notice naming the clone and how to trust it.
+A committed or symlinked `.fm-home` there does not count either.
+
 ### Sharing settings with a team
 
 `.firstmate/` is private by default: its own `.gitignore` ignores everything, including itself, so `git status` stays clean after `firstmate init`.
@@ -444,7 +450,8 @@ A few launches always use install mode, without a notice:
 
 - A launch outside any repository and outside an org folder, for example from `/tmp` with the global home.
 - A launch inside the Firstmate clone itself.
-- A launch inside another Firstmate clone, which runs as its own install, with a note: `firstmate: <dir> is a Firstmate checkout; running it as its own install root`.
+- A launch inside another Firstmate clone that `firstmate init` has trusted, which runs as its own install, with a note: `firstmate: <dir> is a Firstmate checkout; running it as its own install root`.
+- A launch inside another Firstmate clone that is not trusted yet, which runs your installed Firstmate instead, with a notice: `firstmate: notice: <dir> is an untrusted Firstmate checkout; running the install at <clone> instead (run 'firstmate init' in <dir> to trust it as Firstmate's code root)`.
 
 ### The fallback notice
 
@@ -638,7 +645,11 @@ Replace the symlink with a plain one-line file.
 `FM_HOME` points at a missing folder.
 
 **`firstmate: <dir> is a Firstmate checkout; running it as its own install root`**
-Not an error: you launched inside another Firstmate clone, which runs as itself.
+Not an error: you launched inside another Firstmate clone that you trusted with `firstmate init`, which runs as itself.
+
+**`firstmate: notice: <dir> is an untrusted Firstmate checkout; running the install at <clone> instead (run 'firstmate init' in <dir> to trust it as Firstmate's code root)`**
+You launched inside a repository that looks like a Firstmate clone but was never trusted on this machine, so your installed Firstmate ran instead.
+If you trust that clone's instructions and scripts, run `firstmate init` inside it; a `.fm-home` committed to git or a symlinked one is refused.
 
 ### Launch mode notices and refusals
 

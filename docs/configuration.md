@@ -172,6 +172,7 @@ The guide's [troubleshooting section](project-local.md#troubleshooting) lists ev
 The view needs Linux with unprivileged user and mount namespaces and util-linux 2.38 or newer (`unshare --map-user`); macOS, native Ubuntu 23.10+ with `kernel.apparmor_restrict_unprivileged_userns=1`, and containers under the default seccomp profile cannot build it.
 A launch root that contains your home directory, the view's runtime directory, or a Firstmate home outside its `.firstmate/` is not viewed either.
 A launch with no project or org root, or one inside the install checkout, runs in install mode without a notice, and a launch root that is itself another Firstmate checkout runs as its own install root unless install mode is explicit.
+That checkout becomes the code root only after `firstmate init` in it writes the untracked `.fm-home` home trust marker at its top level, under the same rules as a home's marker; an unblessed one runs the install root in install mode with a notice naming the checkout and how to bless it, because file names alone cannot establish trust.
 
 Inside a project-mode session the launch directory, including any mount nested inside it, is read-only apart from its `.firstmate/` home, so the view enforces AGENTS.md hard rule 1 rather than only stating it; the Firstmate surface it presents is read-only too.
 An entry the view cannot make read-only is not presented rather than shown writable, and an entry that failed to present is retried at the next sync.

@@ -13,8 +13,10 @@
 #     the notice and the refusal name that restriction instead;
 #     --mode install needs no view; a launch with no project or org root runs
 #     in install mode and refuses an explicit project mode; a launch root that
-#     is another Firstmate checkout runs as its own install root; a bad mode
-#     value fails loudly.
+#     is another Firstmate checkout runs as its own install root only once
+#     `firstmate init` has blessed it with an untracked, non-symlinked .fm-home
+#     (otherwise the trusted install runs, with a notice naming the checkout);
+#     a bad mode value fails loudly.
 #   - codex is launched with -c project_doc_max_bytes=262144 in either mode.
 #   - a claude launch has auto-memory switched off
 #     (CLAUDE_CODE_DISABLE_AUTO_MEMORY=1) in install mode too, so homes
@@ -158,6 +160,19 @@ make_install() {
   printf '{}\n' > "$i/.claude/settings.json"
 }
 
+# make_checkout <dir>: a disposable git checkout carrying the files that make a
+# directory look like a Firstmate code root.
+make_checkout() {
+  local c=$1
+  mkdir -p "$c/bin"
+  printf '# Firstmate\n' > "$c/AGENTS.md"
+  : > "$c/bin/firstmate"
+  : > "$c/bin/fm-session-start.sh"
+  git -C "$c" init -q -b main
+  git -C "$c" add -A
+  git -C "$c" commit -qm checkout
+}
+
 # --- mode selection ------------------------------------------------------------
 
 test_mode_fallback_and_refusal() {
@@ -263,20 +278,61 @@ test_mode_fallback_and_refusal() {
   fi
   assert_grep "inside no git repository and no org home" "$base/err8" "no-project refusal did not name the reason"
 
-  # A launch root that is another Firstmate checkout runs as its own root.
+  # A launch root that is another Firstmate checkout runs as its own root only
+  # once `firstmate init` there has blessed it; until then its file names prove
+  # nothing, so the launch falls back to the trusted install with a notice.
   local other="$base/other-firstmate"
-  mkdir -p "$other/bin"
-  printf '# Firstmate\n' > "$other/AGENTS.md"
-  : > "$other/bin/firstmate"
-  : > "$other/bin/fm-session-start.sh"
-  git -C "$other" init -q -b main
-  git -C "$other" add -A
-  git -C "$other" commit -qm checkout
+  make_checkout "$other"
   (cd "$other" && env FM_HOME="$proj/.firstmate" FM_FAKE_HARNESS_OUT="$base/out9" \
-    PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" 2>"$base/err9") || fail "Firstmate-checkout launch failed"
-  assert_grep "PWD=$other" "$base/out9" "a Firstmate checkout did not run as its own install root"
-  assert_grep "CODE_ROOT=$other" "$base/out9" "a Firstmate checkout was not its own code root"
-  assert_grep "MODE=install" "$base/out9" "a Firstmate checkout was viewed"
+    PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" --global 2>"$base/err9") || fail "unblessed Firstmate-checkout launch failed"
+  assert_grep "PWD=$ROOT" "$base/out9" "an unblessed Firstmate checkout replaced the trusted install"
+  assert_grep "CODE_ROOT=$ROOT" "$base/out9" "an unblessed Firstmate checkout became the code root"
+  assert_grep "MODE=install" "$base/out9" "an unblessed Firstmate checkout was viewed"
+  assert_grep "$other is an untrusted Firstmate checkout" "$base/err9" "the fallback did not name the checkout"
+  assert_grep "firstmate init" "$base/err9" "the fallback did not name how to bless the checkout"
+  assert_grep "NOTICE=$other is an untrusted Firstmate checkout" "$base/out9" "the fallback notice was not exported"
+
+  # A committed or symlinked marker is not a local trust decision.
+  local tracked="$base/tracked-firstmate"
+  make_checkout "$tracked"
+  : > "$tracked/.fm-home"
+  git -C "$tracked" add -f .fm-home
+  git -C "$tracked" commit -qm marker
+  (cd "$tracked" && env FM_HOME="$proj/.firstmate" FM_FAKE_HARNESS_OUT="$base/out10" \
+    PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" 2>/dev/null) || fail "tracked-marker checkout launch failed"
+  assert_grep "CODE_ROOT=$ROOT" "$base/out10" "a committed .fm-home blessed a Firstmate checkout"
+  if (cd "$tracked" && env -u FM_HOME PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" init >/dev/null 2>"$base/err10"); then
+    fail "init blessed a checkout whose marker is tracked"
+  fi
+  assert_grep "tracked by git" "$base/err10" "init's tracked-marker refusal did not name the reason"
+  local linked="$base/linked-firstmate"
+  make_checkout "$linked"
+  : > "$base/elsewhere-marker"
+  ln -s "$base/elsewhere-marker" "$linked/.fm-home"
+  (cd "$linked" && env FM_HOME="$proj/.firstmate" FM_FAKE_HARNESS_OUT="$base/out11" \
+    PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" 2>/dev/null) || fail "symlinked-marker checkout launch failed"
+  assert_grep "CODE_ROOT=$ROOT" "$base/out11" "a symlinked .fm-home blessed a Firstmate checkout"
+
+  # `firstmate init` blesses the checkout; it then runs as its own root,
+  # whichever home the launch resolves.
+  (cd "$other" && env -u FM_HOME PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" init >"$base/init12" 2>&1) \
+    || fail "init in a Firstmate checkout failed: $(cat "$base/init12")"
+  assert_grep "Firstmate checkout $other is now trusted" "$base/init12" "init did not report blessing the checkout"
+  [ -f "$other/.fm-home" ] || fail "init did not write the checkout's trust marker"
+  if git -C "$other" ls-files --error-unmatch .fm-home >/dev/null 2>&1; then
+    fail "init's checkout trust marker is tracked"
+  fi
+  (cd "$other" && env FM_HOME="$proj/.firstmate" FM_FAKE_HARNESS_OUT="$base/out12" \
+    PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" --global 2>"$base/err12") || fail "blessed Firstmate-checkout launch failed"
+  assert_grep "PWD=$other" "$base/out12" "a blessed Firstmate checkout did not run as its own install root"
+  assert_grep "CODE_ROOT=$other" "$base/out12" "a blessed Firstmate checkout was not its own code root"
+  assert_grep "MODE=install" "$base/out12" "a blessed Firstmate checkout was viewed"
+  (cd "$other" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out13" \
+    PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" 2>/dev/null) || fail "blessed checkout launch against its own home failed"
+  assert_grep "CODE_ROOT=$other" "$base/out13" "a blessed checkout's own home did not run it as its code root"
+  (cd "$other" && env -u FM_HOME PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" init >"$base/init14" 2>&1) \
+    || fail "re-running init in a blessed checkout failed: $(cat "$base/init14")"
+  assert_grep "Firstmate checkout $other is already trusted" "$base/init14" "a second init did not report the checkout already trusted"
 
   pass "launch modes: fallback notice, explicit refusal, AppArmor-restricted reason, config default, install-mode auto-memory off, codex cap, no-project and self-checkout launches"
 }

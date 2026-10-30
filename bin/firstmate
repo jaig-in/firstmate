@@ -28,7 +28,10 @@
 #       project mode that cannot be built refuses with the reason. A launch
 #       with no project or org root, or inside the install checkout, runs in
 #       install mode; a launch root that is itself another Firstmate checkout
-#       runs as its own install root unless install mode is explicit.
+#       runs as its own install root unless install mode is explicit, but only
+#       once `firstmate init` there has blessed it with the untracked .fm-home
+#       marker - an unblessed one runs the install root instead, in install
+#       mode, with a one-line notice naming the checkout and how to bless it.
 #       Exports FM_HOME, FM_ROOT_OVERRIDE, FM_LAUNCH_DIR (the caller's
 #       directory), FM_LAUNCH_MODE, and FM_LAUNCH_ROOT (when there is one);
 #       the session-start digest emits a LAUNCH CONTEXT section for a launch in
@@ -59,6 +62,9 @@
 #       the committed config the home will now honour, and reports "already
 #       trusted" when the marker is present. It refuses a symlinked or
 #       non-directory .firstmate/ (or scaffold piece) and a git-tracked marker.
+#       Run inside another Firstmate checkout, init also blesses that checkout
+#       as a code root by writing the same untracked .fm-home marker at its
+#       top level, refusing a symlinked or git-tracked one.
 set -eu
 
 # The launcher is installed by symlinking it onto PATH, so its own directory is
@@ -101,6 +107,8 @@ die() { echo "firstmate: $*" >&2; exit 1; }
 # discovered by walking .firstmate/ ancestors is honored only when it carries
 # this file: a committed .firstmate/ could otherwise inject a hostile
 # config/primary-harness or .tasks.toml into any launch under that repo.
+# The same marker at a Firstmate checkout's top level blesses that checkout as
+# a code root (is_trusted_checkout).
 HOME_MARKER=".fm-home"
 
 # The verified harness adapters minus the crew-only ones (AGENTS.md section 4)
@@ -286,6 +294,7 @@ cmd_init() {
     target=$(pwd -P)
   else
     target=$(repo_top .) || die "firstmate init must run inside a git repository (or use --org at an org root)"
+    ! is_firstmate_checkout "$target" || bless_checkout "$target"
   fi
   home="$target/.firstmate"
   if [ -e "$home" ] || [ -L "$home" ]; then
@@ -349,9 +358,35 @@ launch_root() {
   esac
 }
 
-# is_firstmate_checkout <dir>: true when <dir> is itself a Firstmate code root.
+# is_firstmate_checkout <dir>: true when <dir> looks like a Firstmate code root.
+# File names are not trust: a downloaded repository can carry them.
 is_firstmate_checkout() {
   [ -f "$1/AGENTS.md" ] && [ -f "$1/bin/firstmate" ] && [ -f "$1/bin/fm-session-start.sh" ]
+}
+
+# is_trusted_checkout <dir>: true when `firstmate init` blessed the checkout as
+# a code root - its top level carries the home trust marker under the same
+# rules as a home (local, untracked, not a symlink).
+is_trusted_checkout() {
+  home_is_trusted "$1"
+}
+
+# bless_checkout <dir>: write the code-root trust marker into a Firstmate
+# checkout other than the install root, reporting one that already has it.
+bless_checkout() {
+  local top=$1
+  [ "$top" != "$INSTALL_ROOT" ] || return 0
+  if [ -e "$top/$HOME_MARKER" ] || [ -L "$top/$HOME_MARKER" ]; then
+    if is_trusted_checkout "$top"; then
+      echo "firstmate: Firstmate checkout $top is already trusted"
+      return 0
+    fi
+    [ ! -L "$top/$HOME_MARKER" ] || die "$top/$HOME_MARKER is a symlink; refusing to bless $top"
+    die "$top/$HOME_MARKER is tracked by git, so it proves nothing on this machine.
+  Untrack it ('git rm --cached $top/$HOME_MARKER'), then run 'firstmate init' again."
+  fi
+  : > "$top/$HOME_MARKER"
+  echo "firstmate: Firstmate checkout $top is now trusted; launches there run its AGENTS.md and bin/ as Firstmate's code root"
 }
 
 cmd_launch() {
@@ -445,10 +480,16 @@ cmd_launch() {
     mode=install
   elif is_firstmate_checkout "$root" && [ "$mode_req" != install ]; then
     # Viewing a Firstmate checkout would compose two contracts; it runs as its
-    # own install root instead.
-    code_root=$root
+    # own install root instead, but only once init blessed it - its file names
+    # alone prove nothing, so an unblessed one runs the trusted install.
     mode=install
-    echo "firstmate: $root is a Firstmate checkout; running it as its own install root" >&2
+    if is_trusted_checkout "$root"; then
+      code_root=$root
+      echo "firstmate: $root is a Firstmate checkout; running it as its own install root" >&2
+    else
+      notice="$root is an untrusted Firstmate checkout; running the install at $INSTALL_ROOT instead (run 'firstmate init' in $root to trust it as Firstmate's code root)"
+      echo "firstmate: notice: $notice" >&2
+    fi
   elif [ "$mode_req" = install ]; then
     mode=install
   elif reason=$("$SCRIPT_DIR/fm-view.sh" probe --install "$INSTALL_ROOT" --launch "$root" --home "$home"); then
