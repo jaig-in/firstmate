@@ -833,10 +833,12 @@ EOF
 # data/project-paths.json, replacing a same-named child entry, removing the
 # child's entry for a named alias this home no longer maps (the child then
 # resolves the sibling the seed checked), and keeping the child's entries for
-# every other alias. Written only for an org-shaped seed, whose child resolves
-# the alias in place; a cloned project lives under the child's own projects/.
+# every other alias. With jq the two manifests merge as JSON, so every key and
+# path keeps its exact bytes. Written only for an org-shaped seed, whose child
+# resolves the alias in place; a cloned project lives under the child's own
+# projects/.
 sync_project_paths() {
-  local home=$1 project mapped pairs seeded existing key val tmp out first=1 stale=0
+  local home=$1 project mapped pairs seeded existing key val tmp out parent child first=1 stale=0
   shift
   pairs=''
   seeded=''
@@ -854,23 +856,37 @@ sync_project_paths() {
   done <<< "$existing"
   [ -n "$pairs" ] || [ "$stale" -eq 1 ] || return 0
   tmp="$out.tmp.$$"
-  {
-    printf '{\n'
-    while IFS=$'\t' read -r key val; do
-      [ -n "$key" ] || continue
-      printf '%s' "$seeded" | grep -Fxq -- "$key" && continue
-      [ "$first" -eq 1 ] || printf ',\n'
-      printf '  "%s": "%s"' "$key" "$val"
-      first=0
-    done <<< "$existing"
-    while IFS=$'\t' read -r key val; do
-      [ -n "$key" ] || continue
-      [ "$first" -eq 1 ] || printf ',\n'
-      printf '  "%s": "%s"' "$key" "$val"
-      first=0
-    done <<< "$pairs"
-    printf '\n}\n'
-  } > "$tmp" || { rm -f -- "$tmp"; return 1; }
+  if command -v jq >/dev/null 2>&1; then
+    parent=$(fm_project_manifest_path "$DATA")
+    child=$out
+    [ -f "$parent" ] || parent=/dev/null
+    [ -f "$child" ] || child=/dev/null
+    jq -n --arg seeded "$seeded" --slurpfile parent "$parent" --slurpfile child "$child" '
+      ($seeded | split("\n")) as $names
+      | (($child[0] // {}) | with_entries(select(.key as $key | $names | index($key) | not)))
+        + (($parent[0] // {}) | with_entries(select(.key as $key | $names | index($key))))
+    ' > "$tmp" || { rm -f -- "$tmp"; return 1; }
+  else
+    # The jq-less reader refused any alias or path holding a double quote or
+    # backslash, so every string here is already its own JSON text.
+    {
+      printf '{\n'
+      while IFS=$'\t' read -r key val; do
+        [ -n "$key" ] || continue
+        printf '%s' "$seeded" | grep -Fxq -- "$key" && continue
+        [ "$first" -eq 1 ] || printf ',\n'
+        printf '  "%s": "%s"' "$key" "$val"
+        first=0
+      done <<< "$existing"
+      while IFS=$'\t' read -r key val; do
+        [ -n "$key" ] || continue
+        [ "$first" -eq 1 ] || printf ',\n'
+        printf '  "%s": "%s"' "$key" "$val"
+        first=0
+      done <<< "$pairs"
+      printf '\n}\n'
+    } > "$tmp" || { rm -f -- "$tmp"; return 1; }
+  fi
   mv -- "$tmp" "$out"
 }
 

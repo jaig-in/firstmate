@@ -41,7 +41,9 @@
 #     mode, and alias into the child; a reseed removes the child's mapping
 #     for a seeded alias the parent no longer maps (keeping unrelated ones),
 #     refuses a symlinked child config/projects-root before writing it, and
-#     reads the child's stored root without the parent's FM_PROJECTS_OVERRIDE.
+#     reads the child's stored root without the parent's FM_PROJECTS_OVERRIDE;
+#     copied and preserved mappings keep their exact bytes, and without jq a
+#     seed refuses a manifest its reader cannot hold.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -1304,6 +1306,81 @@ test_org_seed_moved_alias() {
   pass "org seed: a seeded alias the parent no longer maps loses its stale child mapping"
 }
 
+# --- a seeded mapping keeps its exact bytes ------------------------------------
+
+# With jq the reader accepts an absolute path holding a quote or backslash, so
+# seeding writes each copied and preserved key and path as JSON, and an
+# unrelated child mapping comes through byte for byte. Without jq the reader
+# refuses those bytes, so such a seed stops before the child's manifest changes.
+test_org_seed_path_bytes() {
+  local base parent org child ext nojq before
+  base=$(new_dir)
+  parent="$base/parent"
+  org="$base/org"
+  child="$base/child"
+  mkdir -p "$parent/data" "$parent/state" "$parent/config" "$org"
+  printf '%s\n' "$org" > "$parent/config/projects-root"
+  ext="$base/outside/it's \"ext\" back\\slash"
+  fm_git_init_commit "$ext"
+  fm_git_add_origin "$ext" "$base/remotes/ext.git"
+  ext=$(cd "$ext" && pwd -P)
+  printf -- '- ext [direct-PR] - ext project (added 2026-10-30)\n' > "$parent/data/projects.md"
+  jq -n --arg ext "$ext" '{ext: $ext}' > "$parent/data/project-paths.json"
+  scaffold_secondmate_charter "$parent" mate 'mate charter' ext \
+    || fail "charter scaffold failed"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" ext \
+    --projects-root "$org" >/dev/null 2>"$base/err-seed" \
+    || fail "org seed failed: $(cat "$base/err-seed")"
+  jq -e . "$child/data/project-paths.json" >/dev/null || fail "seeding wrote broken JSON"
+  assert_equals "$ext" "$(jq -r .ext "$child/data/project-paths.json")" "seeding changed the copied path"
+  assert_equals "$ext" "$(FM_HOME="$child" "$ROOT/bin/fm-projects.sh" resolve ext)" \
+    "the child did not resolve the seeded path"
+
+  # An unrelated child mapping survives a reseed, whatever bytes it holds.
+  jq -n --arg ext "$ext" '{
+    "odd\"key\\name": "/some/\"where\"\\keep",
+    "tabbed\tkey": "/line\nbreak\tkeep",
+    ext: "/stale/ext"
+  }' > "$child/data/project-paths.json"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" ext \
+    --projects-root "$org" >/dev/null 2>"$base/err-reseed" \
+    || fail "reseed failed: $(cat "$base/err-reseed")"
+  jq -e . "$child/data/project-paths.json" >/dev/null || fail "reseeding wrote broken JSON"
+  assert_equals "$ext" "$(jq -r .ext "$child/data/project-paths.json")" "reseeding did not replace the stale path"
+  assert_equals '/some/"where"\keep' "$(jq -r '."odd\"key\\name"' "$child/data/project-paths.json")" \
+    "reseeding changed a preserved mapping holding a quote and a backslash"
+  assert_equals $'/line\nbreak\tkeep' "$(jq -r '."tabbed\tkey"' "$child/data/project-paths.json")" \
+    "reseeding changed a preserved mapping holding a line break and a tab"
+
+  # Without jq the same parent manifest is refused and the child keeps its file.
+  nojq=$(make_jqless_path "$base/nojq")
+  for tool in chmod cp date dirname id ln mv pwd readlink rmdir sleep touch; do
+    ln -sf "$(command -v "$tool")" "$nojq/$tool"
+  done
+  before=$(cat "$child/data/project-paths.json")
+  if PATH="$nojq" FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" ext \
+      --projects-root "$org" >/dev/null 2>"$base/err-nojq"; then
+    fail "a jq-less seed accepted a manifest its reader cannot hold"
+  fi
+  assert_grep "must be a flat JSON object" "$base/err-nojq" "the jq-less seed stopped for another reason"
+  assert_equals "$before" "$(cat "$child/data/project-paths.json")" "a refused jq-less seed changed the child's manifest"
+
+  # A plain manifest seeds the same way without jq.
+  ext="$base/outside/plain"
+  fm_git_init_commit "$ext"
+  fm_git_add_origin "$ext" "$base/remotes/plain.git"
+  ext=$(cd "$ext" && pwd -P)
+  printf '{"ext": "%s"}\n' "$ext" > "$parent/data/project-paths.json"
+  printf '{"keep": "/somewhere/keep", "ext": "/stale/ext"}\n' > "$child/data/project-paths.json"
+  PATH="$nojq" FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" ext \
+    --projects-root "$org" >/dev/null 2>"$base/err-plain" \
+    || fail "a jq-less reseed of a plain manifest failed: $(cat "$base/err-plain")"
+  assert_equals "$ext" "$(jq -r .ext "$child/data/project-paths.json")" "a jq-less reseed did not replace the stale path"
+  assert_equals "/somewhere/keep" "$(jq -r .keep "$child/data/project-paths.json")" "a jq-less reseed dropped an unrelated mapping"
+
+  pass "org seed: copied and preserved mappings keep their exact bytes, and a jq-less seed refuses what its reader cannot hold"
+}
+
 # --- the child's stored root, not the parent's override ----------------------
 
 # The parent's FM_PROJECTS_OVERRIDE is parent-only: a secondmate launch clears
@@ -1426,6 +1503,7 @@ test_org_seed
 test_org_seed_path_registered
 test_org_seed_root_leaf_symlink
 test_org_seed_moved_alias
+test_org_seed_path_bytes
 test_org_seed_override_root
 test_registry_whole_names
 
