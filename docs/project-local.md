@@ -446,12 +446,12 @@ firstmate --mode install                         # this launch only
 echo install > .firstmate/config/launch-mode     # this home, every launch
 ```
 
-A few launches always use install mode, without a notice:
+A few launches always use install mode; the first two print nothing:
 
 - A launch outside any repository and outside an org folder, for example from `/tmp` with the global home.
 - A launch inside the Firstmate clone itself.
 - A launch inside another Firstmate clone that `firstmate init` has trusted, which runs as its own install, with a note: `firstmate: <dir> is a Firstmate checkout; running it as its own install root`.
-- A launch inside another Firstmate clone that is not trusted yet, which runs your installed Firstmate instead, with a notice: `firstmate: notice: <dir> is an untrusted Firstmate checkout; running the install at <clone> instead (run 'firstmate init' in <dir> to trust it as Firstmate's code root)`.
+- A launch inside another Firstmate clone that is not trusted yet, which runs your installed Firstmate instead, with a notice: `firstmate: notice: <dir> is an untrusted Firstmate checkout; running the install at <install> instead (run 'firstmate init' in <dir> to trust it as Firstmate's code root)`.
 
 ### The fallback notice
 
@@ -647,7 +647,7 @@ Replace the symlink with a plain one-line file.
 **`firstmate: <dir> is a Firstmate checkout; running it as its own install root`**
 Not an error: you launched inside another Firstmate clone that you trusted with `firstmate init`, which runs as itself.
 
-**`firstmate: notice: <dir> is an untrusted Firstmate checkout; running the install at <clone> instead (run 'firstmate init' in <dir> to trust it as Firstmate's code root)`**
+**`firstmate: notice: <dir> is an untrusted Firstmate checkout; running the install at <install> instead (run 'firstmate init' in <dir> to trust it as Firstmate's code root)`**
 You launched inside a repository that looks like a Firstmate clone but was never trusted on this machine, so your installed Firstmate ran instead.
 If you trust that clone's instructions and scripts, run `firstmate init` inside it; a `.fm-home` committed to git or a symlinked one is refused.
 
