@@ -35,7 +35,7 @@ fm_view_refuse_server_start() {
 # server on any command, so no call can look first; succeed outside a view.
 fm_view_refuse_self_starting_backend() {
   [ "${FM_VIEW:-}" = 1 ] || return 0
-  echo "error: backend $1 cannot run or supervise tasks inside a Firstmate view, because any $1 call can start an $1 server here and show workers the view instead of the real project; launch with 'firstmate --mode install' to use $1, or choose another backend" >&2
+  echo "error: backend $1 cannot run or supervise tasks inside a Firstmate view, because any $1 call can start an $1 server here and show workers the view instead of the real project; launch with 'firstmate --mode install' from a normal terminal outside this session to use $1, or choose another backend" >&2
   return 1
 }
 

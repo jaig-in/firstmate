@@ -32,6 +32,9 @@
 #       once `firstmate init` there has blessed it with the untracked .fm-home
 #       marker - an unblessed one runs the install root instead, in install
 #       mode, with a one-line notice naming the checkout and how to bless it.
+#       A launch from inside a Firstmate view (FM_VIEW set) refuses, even with
+#       --mode install: an exec stays in the view's mount namespace, and the
+#       new session would clear the FM_VIEW that bin/fm-view-lib.sh's guards read.
 #       Exports FM_HOME, FM_ROOT_OVERRIDE, FM_LAUNCH_DIR (the caller's
 #       directory), FM_LAUNCH_MODE, and FM_LAUNCH_ROOT (when there is one);
 #       the session-start digest emits a LAUNCH CONTEXT section for a launch in
@@ -417,6 +420,7 @@ cmd_launch() {
     esac
     shift
   done
+  [ -z "${FM_VIEW:-}" ] || die "this launch is already inside a Firstmate view; run firstmate from a normal terminal outside this session"
   local home=''
   local ancestor_home=0
   if [ -n "${FM_HOME:-}" ]; then

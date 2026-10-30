@@ -674,9 +674,12 @@ Project mode needs a repository or an org folder to open in.
 | `the launch directory <dir> contains your home directory, whose harness configuration must stay writable` | You launched from `/` or `/home`; launch from the project instead |
 | `the launch directory <dir> contains the view runtime directory <dir>` | Launch from the project, not a folder that holds `/run` or `/tmp` |
 | `the Firstmate home <home> lies inside the launch directory but outside its .firstmate/, and the view presents the project read-only` | Your `FM_HOME` sits inside the project; move it to `<project>/.firstmate` or outside the project |
-| `this launch is already inside a Firstmate view` | You ran `firstmate` from inside a project-mode session; run it from a normal terminal |
 
 ### Inside a session
+
+**`firstmate: this launch is already inside a Firstmate view; run firstmate from a normal terminal outside this session`**
+You ran `firstmate` from inside a project-mode session, and that is refused even with `--mode install`.
+A launch there would stay in the view's private mount namespace, so a worker server it started would show workers the view.
 
 **`touch: cannot touch '<file>': Read-only file system`**
 Expected in project mode; see [What is read-only](#what-is-read-only-and-why).
@@ -688,8 +691,10 @@ The same check covers Zellij and Herdr, and hc has the stricter refusal below.
 
 **`error: backend hc cannot run or supervise tasks inside a Firstmate view, because any hc call can start an hc server here and show workers the view instead of the real project; ...`**
 Any hc command can start a core, so a project-mode session cannot run or supervise hc tasks.
-Every hc call is refused before it reaches hc, and an hc task recorded in that home reads as unreadable there, never as gone.
-Launch with `firstmate --mode install` to use hc, or choose another backend.
+Every hc call is refused before it reaches hc, so a recorded hc task cannot be read there.
+Endpoint-state reads report such a task as unreadable, while the session-start digest and the fleet snapshot report it as dead.
+Kill and relaunch refuse, so the task is safe; check it from an install-mode session.
+Launch with `firstmate --mode install` from a normal terminal outside the session to use hc, or choose another backend.
 
 **`error: the tmux server (pid <n>) was started inside this Firstmate view, so its workers would see the view instead of the real project; ...`**
 Stop that server and start one from a normal terminal.

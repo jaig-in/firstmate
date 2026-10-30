@@ -169,6 +169,7 @@ The caller's directory is exported as `FM_LAUNCH_DIR`, the launch root as `FM_LA
 `firstmate --mode project|install`, then the home's `config/launch-mode` (one token, `project` or `install`, a regular file; any other value fails loudly), selects the mode.
 Unset, the launcher uses project mode where the host can build the view and otherwise falls back to install mode, printing one `firstmate: notice:` line that names the concrete reason and exporting it as `FM_LAUNCH_NOTICE`, which the session-start digest repeats.
 An explicit project mode that cannot be built refuses with the same reason rather than falling back.
+A launch from inside a Firstmate view refuses in every mode, even with `--mode install`, and names a normal terminal outside the session.
 The guide's [troubleshooting section](project-local.md#troubleshooting) lists every notice and refusal line with its fix.
 The view needs Linux with unprivileged user and mount namespaces and util-linux 2.38 or newer (`unshare --map-user`); macOS, native Ubuntu 23.10+ with `kernel.apparmor_restrict_unprivileged_userns=1`, and containers under the default seccomp profile cannot build it.
 A launch root that contains your home directory, the view's runtime directory, or a Firstmate home outside its `.firstmate/` is not viewed either.

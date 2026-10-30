@@ -122,14 +122,15 @@ test_create_task_is_independent_labeled_and_refuses_duplicates() {
 }
 
 # hc 0.1.15 starts a core from a plain `hc get`, so a view refuses every hc call
-# at the one boundary they share, and a supervised task reads as unreadable
-# there rather than gone.
+# at the one boundary they share: endpoint-state reads say unreadable, the
+# presence check fails, and kill refuses, so nothing closes a live task there.
 test_view_refuses_every_hc_call() {
   setup_case view
   local out rc=0 tag state
   out=$(hc_shell 'FM_VIEW=1 fm_backend_hc_container_ensure' 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "container_ensure succeeded inside a view: $out"
   assert_contains "$out" "firstmate --mode install" "the refusal did not name install mode"
+  assert_contains "$out" "outside this session" "the refusal did not say to launch from outside the session"
   assert_contains "$out" "instead of the real project" "the refusal did not name the consequence"
   assert_contains "$out" "an hc server" "the refusal did not read as plain English"
   assert_not_contains "$out" "is herdr-core installed" "the refusal blamed the hc install"
@@ -145,6 +146,7 @@ test_view_refuses_every_hc_call() {
   done
   assert_equals unknown "$(hc_shell 'FM_VIEW=1 fm_backend_hc_busy_state fmtest:t1' 2>/dev/null)" \
     "busy_state must read unknown inside a view"
+  expect_refused hc_shell 'FM_VIEW=1 fm_backend_hc_target_ready fmtest:t1 fm-a1'
   expect_refused hc_shell 'FM_VIEW=1 fm_backend_hc_capture fmtest:t1 10 fm-a1'
   expect_refused hc_shell 'FM_VIEW=1 fm_backend_hc_send_key fmtest:t1 Enter fm-a1'
   expect_refused hc_shell 'FM_VIEW=1 fm_backend_hc_send_text_line fmtest:t1 hello fm-a1'

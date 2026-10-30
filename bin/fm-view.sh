@@ -152,10 +152,6 @@ probe_root() {
     echo "the launch directory $launch is inside the Firstmate install root"
     return 1
   fi
-  if [ -n "${FM_VIEW:-}" ]; then
-    echo "this launch is already inside a Firstmate view"
-    return 1
-  fi
   if [ -n "${HOME:-}" ]; then
     home_dir=$(cd "$HOME" 2>/dev/null && pwd -P) || home_dir=$HOME
     if path_within "$home_dir" "$launch"; then
@@ -518,7 +514,7 @@ cmd_run() {
   cp -- "$install/CLAUDE.md" "$run/CLAUDE.md"
   # Quoted: a path is never part of this text, because a shell parses it. Every
   # path reaches the shim through its own FM_VIEW_SHIM_* variables set below,
-  # which outlive a nested launcher clearing the session's FM_VIEW* description.
+  # which outlive a process clearing the session's FM_VIEW* description.
   cat > "$run/git-shim" <<'SHIM'
 #!/bin/sh
 # fm-view git shim: run the real git with the REAL launch tree at its own path.

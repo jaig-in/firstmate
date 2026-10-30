@@ -16,7 +16,8 @@
 #     is another Firstmate checkout runs as its own install root only once
 #     `firstmate init` has blessed it with an untracked, non-symlinked .fm-home
 #     (otherwise the trusted install runs, with a notice naming the checkout);
-#     a bad mode value fails loudly.
+#     a bad mode value fails loudly; a launch whose environment shows it is
+#     inside a view refuses in every mode and never runs the harness.
 #   - codex is launched with -c project_doc_max_bytes=262144 in either mode.
 #   - a claude launch has auto-memory switched off
 #     (CLAUDE_CODE_DISABLE_AUTO_MEMORY=1) in install mode too, so homes
@@ -263,6 +264,24 @@ test_mode_fallback_and_refusal() {
   if (cd "$proj" && env -u FM_HOME PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" --mode bogus 2>/dev/null); then
     fail "an unknown --mode value was accepted"
   fi
+
+  # A launch from inside a view stays in its mount namespace, so every mode
+  # refuses; the empty FM_VIEW a worker launch sets is not a view.
+  local nested_args
+  for nested_args in "--mode install" "--mode project" ""; do
+    # shellcheck disable=SC2086 # $nested_args is zero or two words.
+    if (cd "$proj" && env -u FM_HOME FM_VIEW=1 FM_FAKE_HARNESS_OUT="$base/out-nested" \
+        PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" $nested_args 2>"$base/err-nested"); then
+      fail "a launch inside a view was not refused (args: '$nested_args')"
+    fi
+    assert_grep "already inside a Firstmate view" "$base/err-nested" "the nested refusal did not name the view"
+    assert_grep "normal terminal outside this session" "$base/err-nested" "the nested refusal did not say where to launch"
+    assert_absent "$base/out-nested" "a refused nested launch still ran the harness (args: '$nested_args')"
+  done
+  (cd "$proj" && env -u FM_HOME FM_VIEW= FM_FAKE_HARNESS_OUT="$base/out-cleared" \
+    PATH="$fakebin:$PATH" "$ROOT/bin/firstmate" --mode install 2>/dev/null) \
+    || fail "an empty FM_VIEW was refused as a view"
+  assert_grep "MODE=install" "$base/out-cleared" "an empty FM_VIEW did not launch in install mode"
 
   # Codex gets the raised instruction cap, ahead of the pass-through args.
   (cd "$proj" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out6" \
@@ -528,7 +547,7 @@ test_view_git_shim_hostile_paths() {
     echo "scrubbed=$scrubbed"
     echo "nested_toplevel=$(env -u FM_VIEW -u FM_VIEW_ROOT -u FM_LAUNCH_REAL -u FM_LAUNCH_REAL_RW git rev-parse --show-toplevel)"
   ') || fail "view run failed: $out"
-  assert_contains "$out" "nested_toplevel=$proj" "git stopped working once a nested launcher cleared the session description"
+  assert_contains "$out" "nested_toplevel=$proj" "git stopped working once a process cleared the session description"
   assert_not_contains "$out" "scrubbed_ran=yes" "git ran outside the real tree without the view's environment"
   assert_contains "$out" "scrubbed=fm-view: git shim" "a shell without the view's environment got no named refusal"
 

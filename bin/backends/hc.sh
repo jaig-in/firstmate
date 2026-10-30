@@ -62,8 +62,10 @@ fm_backend_hc_session() {
 # fm_backend_hc_cli: run hc against exactly <session>, the one point every hc
 # call passes through. Inside a view it refuses before reaching hc, because hc
 # starts a core on any command (measured on hc 0.1.15 from a plain `hc get`),
-# and a core started there would show workers the view; the refusal is a plain
-# failure, never hc's not_found status, so a task is unreadable there, not gone.
+# and a core started there would show workers the view. The refusal is a plain
+# failure, never hc's not_found status: endpoint-state reads report a recorded
+# task as unreadable and kill and relaunch refuse, while the presence check
+# behind the session-start digest and the fleet snapshot reports it as dead.
 # An invalid or empty session is refused: an empty HC_SESSION would let hc
 # fall back to whatever core the caller's environment names. HC_SOCKET is
 # dropped because hc lets it win over HC_SESSION.
