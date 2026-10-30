@@ -620,8 +620,9 @@ Plain `init` makes a per-project home at a repository root.
 Use `firstmate init --org` for a folder of repositories.
 
 **`firstmate: harness is not primary-capable: <name> (primary-capable: claude codex opencode pi pi-signed grok cursor omp)`**
-The name came from `--harness` or `config/primary-harness`, and only those tools can run a first mate.
+The name came from `--harness` or `config/primary-harness`, and only those tools can be launched as a first mate through `firstmate`.
 Worker-only tools such as `gemini` and `kimi` are refused here.
+Antigravity CLI (`agy`) is a verified primary that `firstmate` does not launch yet, so start it directly in the Firstmate clone.
 
 **`firstmate: harness not found on PATH: <name>`**
 Install that tool or fix your `PATH`.

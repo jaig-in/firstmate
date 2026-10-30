@@ -105,10 +105,12 @@ HOME_MARKER=".fm-home"
 
 # The verified harness adapters minus the crew-only ones (AGENTS.md section 4)
 # and minus kimi, which is verified as a crewmate harness but sits outside the
-# primary turn-end guard scope (references/harness/kimi.md); the launched harness,
-# from --harness or config/primary-harness, is restricted to this list so neither
-# can name an arbitrary binary or a harness with no primary supervision protocol.
-# README's Requirements own the supported primary set.
+# primary turn-end guard scope (references/harness/kimi.md), and minus agy,
+# a verified primary whose launch through this launcher is not yet verified;
+# the launched harness, from --harness or config/primary-harness, is restricted
+# to this list so neither can name an arbitrary binary or a harness with no
+# primary supervision protocol. README's Requirements own the supported primary
+# set.
 VERIFIED_PRIMARY_HARNESSES="claude codex opencode pi pi-signed grok cursor omp"
 
 # Codex's project-instruction cap for a launched primary: the default 32 KiB
