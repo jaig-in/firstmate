@@ -121,6 +121,20 @@ test_create_task_is_independent_labeled_and_refuses_duplicates() {
   pass "hc: create_task starts an independent labeled terminal and refuses a duplicate"
 }
 
+test_container_ensure_refuses_a_view_before_any_hc_call() {
+  setup_case view
+  local out rc=0
+  out=$(hc_shell 'FM_VIEW=1 fm_backend_hc_container_ensure' 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "container_ensure succeeded inside a view: $out"
+  assert_contains "$out" "firstmate --mode install" "the refusal did not name install mode"
+  assert_contains "$out" "instead of the real project" "the refusal did not name the consequence"
+  assert_absent "$D/log" "hc was invoked inside a view"
+  out=$(hc_shell 'unset FM_VIEW; fm_backend_hc_container_ensure') || fail "container_ensure refused outside a view: $out"
+  assert_equals "$out" "fmtest" "container_ensure did not print the session outside a view"
+  assert_contains "$(cat "$D/log")" "server"$'\x1f'"status" "hc was not asked for the server status outside a view"
+  pass "hc: a view is refused before any hc call; outside a view container_ensure is unchanged"
+}
+
 test_control_interrupt_delivers_the_harness_keys() {
   local tag out rc=0 id=hcint1
   setup_case interrupt
@@ -263,6 +277,7 @@ test_endpoint_validation_binds_hc_meta() {
 fm_test_run \
   test_hc_is_spawn_capable_and_never_autodetected \
   test_create_task_is_independent_labeled_and_refuses_duplicates \
+  test_container_ensure_refuses_a_view_before_any_hc_call \
   test_control_interrupt_delivers_the_harness_keys \
   test_foreign_or_unlabeled_terminal_gets_no_input_and_no_close \
   test_invalid_session_never_reaches_hc \

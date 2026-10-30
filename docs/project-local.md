@@ -683,7 +683,11 @@ Expected in project mode; see [What is read-only](#what-is-read-only-and-why).
 **`error: no tmux server is running outside this Firstmate view, and one started from inside it would show workers the view instead of the real project; ...`**
 Workers need a terminal multiplexer started outside the session.
 Start `tmux` in a normal terminal, or launch `firstmate` from inside a tmux pane, then ask again.
-The same check covers Zellij and Herdr.
+The same check covers Zellij and Herdr, and hc has the stricter refusal below.
+
+**`error: backend hc cannot be used inside a Firstmate view, because any hc call can start its server here and show workers the view instead of the real project; ...`**
+hc starts its core on any call, so it cannot be checked first and is refused in every project-mode session.
+Launch with `firstmate --mode install` to use hc, or choose another backend.
 
 **`error: the tmux server (pid <n>) was started inside this Firstmate view, so its workers would see the view instead of the real project; ...`**
 Stop that server and start one from a normal terminal.

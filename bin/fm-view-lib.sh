@@ -30,6 +30,15 @@ fm_view_refuse_server_start() {
   return 1
 }
 
+# fm_view_refuse_self_starting_backend <backend>: refuse (return 1 with a
+# reason) to use, from inside a view, a <backend> whose every CLI call can start
+# its server, so no call can check for one first; succeed outside a view.
+fm_view_refuse_self_starting_backend() {
+  [ "${FM_VIEW:-}" = 1 ] || return 0
+  echo "error: backend $1 cannot be used inside a Firstmate view, because any $1 call can start its server here and show workers the view instead of the real project; launch with 'firstmate --mode install' to use $1, or choose another backend, then spawn again" >&2
+  return 1
+}
+
 # fm_view_refuse_server_inside <backend> <pid>: refuse (return 1 with a reason)
 # when a running <backend> server was started inside this view.
 fm_view_refuse_server_inside() {

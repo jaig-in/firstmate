@@ -50,6 +50,8 @@
 . "$FM_BACKEND_LIB_DIR/fm-composer-lib.sh"
 # shellcheck source=bin/fm-agent-process-lib.sh
 . "$FM_BACKEND_LIB_DIR/fm-agent-process-lib.sh"
+# shellcheck source=bin/fm-view-lib.sh
+. "$FM_BACKEND_LIB_DIR/fm-view-lib.sh"
 
 # The hc session a new task is created on: the caller's HC_SESSION, else hc's
 # own default session name.
@@ -153,6 +155,7 @@ fm_backend_hc_target_ready() {  # <target> [expected-label]
 # starts its own core on first use) and print the session name.
 fm_backend_hc_container_ensure() {
   local session
+  fm_view_refuse_self_starting_backend hc || return 1
   session=$(fm_backend_hc_session)
   fm_backend_hc_atom_valid "$session" || { echo "error: refusing hc session name '$session'" >&2; return 1; }
   fm_backend_hc_cli "$session" server status --json >/dev/null 2>&1 \
