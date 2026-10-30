@@ -685,9 +685,10 @@ Workers need a terminal multiplexer started outside the session.
 Start `tmux` in a normal terminal, or launch `firstmate` from inside a tmux pane, then ask again.
 The same check covers Zellij and Herdr, and hc has the stricter refusal below.
 
-**`error: backend hc cannot be used inside a Firstmate view, because any hc call can start its server here and show workers the view instead of the real project; ...`**
-hc starts its core on any call, so it cannot be checked first and is refused in every project-mode session.
+**`error: backend hc cannot spawn inside a Firstmate view, because checking for a hc server can start one here and show workers the view instead of the real project; ...`**
+`hc server status` can start a core, so a fresh hc spawn is refused in every project-mode session.
 Launch with `firstmate --mode install` to use hc, or choose another backend.
+A relaunch adopting a recorded endpoint and supervision of existing hc tasks are not covered, which is a known limitation of this experimental backend.
 
 **`error: the tmux server (pid <n>) was started inside this Firstmate view, so its workers would see the view instead of the real project; ...`**
 Stop that server and start one from a normal terminal.

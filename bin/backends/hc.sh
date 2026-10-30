@@ -152,7 +152,10 @@ fm_backend_hc_target_ready() {  # <target> [expected-label]
 }
 
 # fm_backend_hc_container_ensure: make sure the session's core answers (hc
-# starts its own core on first use) and print the session name.
+# starts its own core on first use) and print the session name. A fresh spawn
+# is refused inside a view, because `hc server status` can start the core there.
+# A relaunch adopting a recorded endpoint and supervision of existing hc tasks
+# do not pass through here, a known limitation (docs/hc-backend.md "Limits").
 fm_backend_hc_container_ensure() {
   local session
   fm_view_refuse_self_starting_backend hc || return 1
