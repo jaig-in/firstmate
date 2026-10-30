@@ -9,7 +9,8 @@
 #
 # The decoy never runs on the host /tmp: the suite re-executes itself under
 # `unshare -Urm` with a fresh tmpfs on /tmp, confirms there that /tmp is not the
-# host one, and skips the decoy cases where no such namespace is available.
+# host one, and skips the decoy cases where no such namespace is available or
+# the checkout itself lives under /tmp, where that mount would hide it.
 set -u
 
 if [ -n "${FM_LAB_ISO_HOST_MARKER:-}" ]; then
@@ -31,10 +32,10 @@ TMP_ROOT=$(fm_test_tmproot fm-lab-iso)
 LIVE_LAB="$ROOT/bin/fm-live-lab.sh"
 GATE_SOCKET="$TMP_ROOT/base/tmux-$(id -u)/default"
 DEFAULT_SOCKET="/tmp/tmux-$(id -u)/default"
-DECOY_PID=''
 STUCK_SOCKET="$TMP_ROOT/stuck/tmux-$(id -u)/default"
-
+DECOY_PID=''
 STUCK_PID=''
+
 # Poll steps (0.05s each) a process gets to exit after each escalation step.
 DECOY_POLLS=100
 
@@ -88,11 +89,11 @@ isolation_cleanup() {
   # only while it is still there; the decoy is gone before the suite returns.
   local rc=0
   [ ! -S "$GATE_SOCKET" ] || tmux -S "$GATE_SOCKET" kill-server 2>/dev/null
-  if [ -n "$DECOY_PID" ]; then
   if [ -n "$STUCK_PID" ]; then
     kill -CONT "$STUCK_PID" 2>/dev/null
     stop_decoy "$STUCK_PID" "$STUCK_SOCKET" || rc=1
   fi
+  if [ -n "$DECOY_PID" ]; then
     stop_decoy "$DECOY_PID" "$DEFAULT_SOCKET" || rc=1
   fi
   fm_test_cleanup
@@ -138,7 +139,6 @@ if [ -z "${FM_LAB_ISO_HOST_MARKER:-}" ]; then
   assert_equals RAN "$out" "the gate runs again once only a dead socket is left"
   pass "fm_tmux_isolation_gate runs isolated and skips beside a live server"
 
-  # ---- the decoy cleanup is bounded ------------------------------------------
   # A server that accepts the connection but never answers (stopped here) must
   # not hold the gate: it gives up at its probe deadline and skips.
   mkdir -p "$TMP_ROOT/stuck"
@@ -160,6 +160,7 @@ if [ -z "${FM_LAB_ISO_HOST_MARKER:-}" ]; then
   [ $(($(date +%s) - start)) -lt 10 ] || fail "the gate waited past its probe deadline"
   pass "fm_tmux_isolation_gate skips at its deadline when a tmux server does not answer"
 
+  # ---- the decoy cleanup is bounded ------------------------------------------
 
   # No socket for kill-server to reach: TERM stops a plain process.
   victim=$(bash -c 'sleep 600 </dev/null >/dev/null 2>&1 & echo $!')
@@ -200,10 +201,35 @@ if [ -z "${FM_LAB_ISO_HOST_MARKER:-}" ]; then
     echo "skip: tmux isolation decoy: needs a private /tmp (unshare -Urm with a tmpfs mount on /tmp)"
     exit 0
   fi
+  # bash reopens this script after the tmpfs is mounted on /tmp, so a checkout
+  # under /tmp would be hidden by the very mount that isolates the decoy.
+  suite=$(cd -P -- "$ROOT/tests" && pwd -P)/fm-live-lab-isolation.test.sh
+  case $suite in
+    "$(cd -P /tmp && pwd -P)"/*)
+      echo "skip: tmux isolation decoy: the checkout is under /tmp ($suite), which the private tmpfs on /tmp would hide"
+      exit 0
+      ;;
+  esac
+  # A checkout under /tmp skips the decoy cases rather than failing on a script
+  # the tmpfs mount has hidden. The copy holds the suite and what it sources;
+  # its bin links back here.
+  if [ -z "${FM_LAB_ISO_TMP_COPY:-}" ]; then
+    copy=$(mktemp -d /tmp/fm-lab-iso-copy.XXXXXX) || fail "cannot make a checkout copy under /tmp"
+    FM_TEST_CLEANUP_DIRS+=("$copy")
+    mkdir -p "$copy/tests"
+    ln -s "$ROOT/bin" "$copy/bin" || fail "cannot link the copy's bin"
+    cp "$ROOT/tests/lib.sh" "$ROOT/tests/fixtures.sh" "$ROOT/tests/git-config-helpers.sh" \
+      "$ROOT/tests/fm-live-lab-isolation.test.sh" "$copy/tests/" || fail "cannot copy the suite"
+    out=$(FM_LAB_ISO_TMP_COPY=1 fm_run_timed 120 bash "$copy/tests/fm-live-lab-isolation.test.sh" 2>&1)
+    expect_code 0 "$?" "a checkout under /tmp ends cleanly: $out"
+    assert_contains "$out" "skip: tmux isolation decoy: the checkout is under /tmp" "a checkout under /tmp says why it skips the decoy cases"
+    pass "a checkout under /tmp skips the decoy cases instead of losing its script to the mount"
+  fi
+
   host_marker=$(mktemp /tmp/fm-lab-iso-host.XXXXXX) || fail "cannot mark the host /tmp"
   FM_TEST_CLEANUP_DIRS+=("$host_marker")
   # shellcheck disable=SC2016 # $0 expands in the namespaced shell.
-  FM_LAB_ISO_HOST_MARKER=$host_marker unshare -Urm bash -c 'mount -t tmpfs tmpfs /tmp && exec env -u TMPDIR -u TMP -u TMUX_TMPDIR bash "$0"' "$ROOT/tests/fm-live-lab-isolation.test.sh"
+  FM_LAB_ISO_HOST_MARKER=$host_marker unshare -Urm bash -c 'mount -t tmpfs tmpfs /tmp && exec env -u TMPDIR -u TMP -u TMUX_TMPDIR bash "$0"' "$suite"
   exit $?
 fi
 
