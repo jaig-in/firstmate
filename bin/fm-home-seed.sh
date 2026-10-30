@@ -45,8 +45,8 @@
 #       longer maps loses its child entry. No-mistakes initialization is
 #       left to that project's own tasks. A preexisting child
 #       config/projects-root, read without this home's FM_PROJECTS_OVERRIDE,
-#       selects the same mode and must agree with the flag. Discovery is not authority: only the named projects are
-#       registered.
+#       selects the same mode and must agree with the flag. Discovery is not
+#       authority: only the named projects are registered.
 #   fm-home-seed.sh validate
 #       Refuse records that operational consumers cannot parse, unavailable or
 #       unsafe registry files when present, non-absolute or unresolvable homes,
