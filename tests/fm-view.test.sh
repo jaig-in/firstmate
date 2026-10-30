@@ -49,6 +49,9 @@
 #   - worker placement: inside a view a process started in the view is
 #     "inside", the tmux container refuses to start a server there, and outside
 #     a view the guard is inert.
+#   - a worker spawn from inside a view succeeds: the shared git exclude, read-only
+#     at the launch path, is written to the real project and covers the worker's
+#     per-task files.
 # View cases run only where this host can build a view (bin/fm-view.sh probe);
 # they report an explicit skip otherwise. Every fixture is a disposable temp
 # directory, including the install root the view presents.
@@ -57,8 +60,8 @@
 # shellcheck disable=SC2016
 set -u
 
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 fm_git_identity fmtest fmtest@example.invalid
 
@@ -793,6 +796,43 @@ SH
   pass "worker placement: servers started inside a view are refused; outside a view the guard is inert"
 }
 
+# A task worktree is a linked worktree of the project, so git names its exclude
+# file inside the project's .git, which the view presents read-only.
+test_worker_spawn_inside_view() {
+  local base install proj wt home fakebin out
+  skip_without_view "worker spawn inside a view" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+  wt="$base/worktree"
+  git -C "$proj" worktree add -q -b task "$wt"
+  home="$proj/.firstmate"
+  fm_test_spawn_home "$home"
+  fm_test_spawn_brief "$home" view-spawn
+  fakebin=$(fm_test_make_spawn_fakebin "$base/fake" claude)
+  mkdir -p "$base/user-home"
+
+  out=$(view_run "$install" "$proj" '
+    { echo x >> .git/info/exclude; } 2>/dev/null && echo "exclude_at_launch_path=rw" || echo "exclude_at_launch_path=ro"
+    FM_ROOT_OVERRIDE= FM_SPAWN_NO_GUARD=1 FM_FAKE_PANE_PATH="'"$wt"'" TMUX=fake,1,0 \
+      HOME="'"$base"'/user-home" CLAUDE_CONFIG_DIR= PATH="'"$fakebin"':$PATH" \
+      "'"$ROOT"'/bin/fm-spawn.sh" view-spawn "'"$proj"'" --scout --harness claude --backend tmux 2>&1 \
+      && echo "spawn=ok" || echo "spawn=failed"
+  ') || fail "worker spawn view run failed"
+  assert_contains "$out" "exclude_at_launch_path=ro" "the fixture's exclude file was writable at the launch path"
+  assert_contains "$out" "spawn=ok" "a worker spawn from inside a view failed"
+  assert_present "$home/state/view-spawn.meta" "a worker spawn from inside a view wrote no metadata"
+  assert_grep "worktree=$wt" "$home/state/view-spawn.meta" "the worker was not recorded in its own worktree"
+  mkdir -p "$wt/.claude"
+  : > "$wt/.claude/settings.local.json"
+  git -C "$wt" check-ignore -q .claude/settings.local.json \
+    || fail "the worker's per-task file is not excluded in the real project"
+
+  pass "worker spawn: a spawn from inside a view writes the shared git exclude to the real project"
+}
+
 # --- runtime dir cleanup --------------------------------------------------------
 
 test_view_cleanup_on_hangup() {
@@ -850,6 +890,7 @@ test_view_nested_mount_read_only
 test_view_nested_mount_odd_name
 test_view_probe_leaves_nothing
 test_worker_placement_guard
+test_worker_spawn_inside_view
 test_view_cleanup_on_hangup
 
 printf 'all view tests passed\n'

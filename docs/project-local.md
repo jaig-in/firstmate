@@ -534,6 +534,7 @@ Why: Firstmate's first rule is that the first mate never writes to a project; wo
 Project mode turns that rule from a promise into a guarantee against accidents.
 It is a guard against mistakes, not a sandbox against a determined program: git and `$FM_LAUNCH_REAL_RW` still reach the real files.
 When you tell the first mate to make one specific change directly, it uses `$FM_LAUNCH_REAL_RW` for exactly that change.
+The one other write through it is Firstmate's own: spawning a worker adds its per-task files to the project's `.git/info/exclude`, so they never show up in git.
 The rule itself is in [`AGENTS.md`](../AGENTS.md) hard rule 1.
 
 ## How git behaves inside a session

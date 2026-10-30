@@ -17,7 +17,8 @@
 #       FM_VIEW_ROOT=<dir>, FM_LAUNCH_REAL (a read-only alias of the real
 #       launch tree), and FM_LAUNCH_REAL_RW (a writable alias, reserved for a
 #       concrete captain-approved project operation under AGENTS.md hard rule
-#       1). Both aliases exist only inside the session.
+#       1, and used by fm-spawn.sh for the project's git exclude file). Both
+#       aliases exist only inside the session.
 #   fm-view.sh shadowed <real-launch-dir>
 #       Print "<name><TAB><how>" for every real top-level entry the view does
 #       not present at its own path (how = folded, merged, firstmate, or hidden).

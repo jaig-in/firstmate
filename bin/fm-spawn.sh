@@ -5989,6 +5989,14 @@ exclude_path() {
     /*) ;;
     *) EXCL="$WT/$EXCL" ;;
   esac
+  # Inside a view the project's .git is read-only at the launch path and only
+  # git itself reaches the real tree, so write the same file through the
+  # view's writable alias.
+  if [ "${FM_VIEW:-}" = 1 ]; then
+    case "$EXCL" in
+      "$FM_VIEW_ROOT"/*) EXCL="$FM_LAUNCH_REAL_RW/${EXCL#"$FM_VIEW_ROOT"/}" ;;
+    esac
+  fi
   mkdir -p "$(dirname "$EXCL")"
   grep -qxF "$rel" "$EXCL" 2>/dev/null || echo "$rel" >>"$EXCL"
 }
