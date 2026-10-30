@@ -38,7 +38,10 @@
 #   - org-shaped secondmate seed registers siblings instead of cloning them,
 #     only when the sibling is the parent's registered copy or a clone of its
 #     origin, and a path-registered alias carries its path mapping, delivery
-#     mode, and alias into the child.
+#     mode, and alias into the child; a reseed removes the child's mapping
+#     for a seeded alias the parent no longer maps (keeping unrelated ones),
+#     refuses a symlinked child config/projects-root before writing it, and
+#     reads the child's stored root without the parent's FM_PROJECTS_OVERRIDE.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -1301,6 +1304,47 @@ test_org_seed_moved_alias() {
   pass "org seed: a seeded alias the parent no longer maps loses its stale child mapping"
 }
 
+# --- the child's stored root, not the parent's override ----------------------
+
+# The parent's FM_PROJECTS_OVERRIDE is parent-only: a secondmate launch clears
+# it, so seeding reads and compares the child's own config/projects-root.
+test_org_seed_override_root() {
+  local base parent org other child
+  base=$(new_dir)
+  parent="$base/parent"
+  org="$base/org"
+  other="$base/other"
+  child="$base/child"
+  mkdir -p "$parent/projects" "$parent/data" "$parent/state" "$org" "$other"
+  fm_git_init_commit "$org/alpha"
+  fm_git_add_origin "$org/alpha" "$base/remotes/alpha.git"
+  git clone --quiet "$(git -C "$org/alpha" remote get-url origin)" "$parent/projects/alpha"
+  printf -- '- alpha [direct-PR] - alpha project (added 2026-10-30)\n' > "$parent/data/projects.md"
+  scaffold_secondmate_charter "$parent" mate 'mate charter' alpha \
+    || fail "charter scaffold failed"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" alpha \
+    --projects-root "$org" >/dev/null 2>"$base/err-seed" \
+    || fail "org seed failed: $(cat "$base/err-seed")"
+  other=$(cd "$other" && pwd -P)
+  printf '%s\n' "$other" > "$child/config/projects-root"
+
+  # A flag matching the parent's override does not match the child's root.
+  if FM_PROJECTS_OVERRIDE="$org" FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" alpha \
+      --projects-root "$org" >/dev/null 2>"$base/err-flag"; then
+    fail "a reseed compared --projects-root with the parent's override, not the child's root"
+  fi
+  assert_grep "already names $other" "$base/err-flag" "the root-mismatch refusal did not name the child's root"
+  # Without the flag, the child's own root decides where siblings are checked.
+  if FM_PROJECTS_OVERRIDE="$org" FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" alpha \
+      >/dev/null 2>"$base/err-noflag"; then
+    fail "a reseed checked siblings under the parent's override instead of the child's root"
+  fi
+  assert_grep "$other/alpha" "$base/err-noflag" "the reseed did not check the sibling under the child's root"
+  assert_equals "$other" "$(cat "$child/config/projects-root")" "a refused reseed changed the child's projects root"
+
+  pass "org seed: the child's stored projects root is read without the parent's override"
+}
+
 # --- a bare alias keeps its registry label in a legacy home ------------------
 
 # Regression: a single-argument refresh of a manifest-registered alias in a
@@ -1382,6 +1426,7 @@ test_org_seed
 test_org_seed_path_registered
 test_org_seed_root_leaf_symlink
 test_org_seed_moved_alias
+test_org_seed_override_root
 test_registry_whole_names
 
 printf 'all project-local tests passed\n'

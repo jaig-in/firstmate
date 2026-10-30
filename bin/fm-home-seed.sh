@@ -44,8 +44,8 @@
 #       same repository under the same alias, and a named alias this home no
 #       longer maps loses its child entry. No-mistakes initialization is
 #       left to that project's own tasks. A preexisting child
-#       config/projects-root selects the same mode and must agree with the
-#       flag. Discovery is not authority: only the named projects are
+#       config/projects-root, read without this home's FM_PROJECTS_OVERRIDE,
+#       selects the same mode and must agree with the flag. Discovery is not authority: only the named projects are
 #       registered.
 #   fm-home-seed.sh validate
 #       Refuse records that operational consumers cannot parse, unavailable or
@@ -1059,7 +1059,9 @@ seed_home() {
   # Resolve the org-mode projects root before project validation: the flag
   # wins, then a preexisting child config/projects-root. The flag's relative
   # value resolves against the caller's cwd here, and the child's
-  # config/projects-root records the resulting absolute path.
+  # config/projects-root records the resulting absolute path. A child's stored
+  # root is read with this home's FM_PROJECTS_OVERRIDE cleared: the override is
+  # parent-only, and a secondmate launch clears it.
   SEED_PROJECTS_ROOT=
   if [ -n "$projects_root_arg" ]; then
     [ -d "$projects_root_arg" ] || {
@@ -1077,7 +1079,7 @@ seed_home() {
         ;;
     esac
   elif [ "$requested_home" != "-" ] && [ -f "$requested_home/config/projects-root" ]; then
-    SEED_PROJECTS_ROOT=$(fm_projects_root "$requested_home" "$requested_home/config") || return 1
+    SEED_PROJECTS_ROOT=$(FM_PROJECTS_OVERRIDE='' fm_projects_root "$requested_home" "$requested_home/config") || return 1
     [ -d "$SEED_PROJECTS_ROOT" ] || {
       echo "error: $requested_home/config/projects-root does not resolve to a directory: $SEED_PROJECTS_ROOT" >&2
       return 1
@@ -1144,7 +1146,7 @@ seed_home() {
       # Compare resolved roots, not raw text: the file may hold a relative
       # path that names the same directory as the flag.
       local existing_root
-      existing_root=$(fm_projects_root "$home" "$home/config") || return 1
+      existing_root=$(FM_PROJECTS_OVERRIDE='' fm_projects_root "$home" "$home/config") || return 1
       [ "$existing_root" = "$SEED_PROJECTS_ROOT" ] || {
         echo "error: $home/config/projects-root already names $existing_root, not $SEED_PROJECTS_ROOT" >&2
         return 1
