@@ -32,7 +32,9 @@ LIVE_LAB="$ROOT/bin/fm-live-lab.sh"
 GATE_SOCKET="$TMP_ROOT/base/tmux-$(id -u)/default"
 DEFAULT_SOCKET="/tmp/tmux-$(id -u)/default"
 DECOY_PID=''
+STUCK_SOCKET="$TMP_ROOT/stuck/tmux-$(id -u)/default"
 
+STUCK_PID=''
 # Poll steps (0.05s each) a process gets to exit after each escalation step.
 DECOY_POLLS=100
 
@@ -87,6 +89,10 @@ isolation_cleanup() {
   local rc=0
   [ ! -S "$GATE_SOCKET" ] || tmux -S "$GATE_SOCKET" kill-server 2>/dev/null
   if [ -n "$DECOY_PID" ]; then
+  if [ -n "$STUCK_PID" ]; then
+    kill -CONT "$STUCK_PID" 2>/dev/null
+    stop_decoy "$STUCK_PID" "$STUCK_SOCKET" || rc=1
+  fi
     stop_decoy "$DECOY_PID" "$DEFAULT_SOCKET" || rc=1
   fi
   fm_test_cleanup
@@ -133,6 +139,27 @@ if [ -z "${FM_LAB_ISO_HOST_MARKER:-}" ]; then
   pass "fm_tmux_isolation_gate runs isolated and skips beside a live server"
 
   # ---- the decoy cleanup is bounded ------------------------------------------
+  # A server that accepts the connection but never answers (stopped here) must
+  # not hold the gate: it gives up at its probe deadline and skips.
+  mkdir -p "$TMP_ROOT/stuck"
+  mkdir -m 700 "$TMP_ROOT/stuck/tmux-$(id -u)"
+  tmux -S "$STUCK_SOCKET" -f /dev/null new-session -d -s stuck 'exec sleep 600' || fail "cannot start the stuck server"
+  STUCK_PID=$(tmux -S "$STUCK_SOCKET" display-message -p '#{pid}')
+  [ -n "$STUCK_PID" ] || fail "the stuck server has no pid"
+  kill -STOP "$STUCK_PID" || fail "cannot stop the stuck server"
+  start=$(date +%s)
+  # shellcheck disable=SC2016 # $1 and $2 expand in the bounded shell.
+  out=$(FM_TMUX_ISOLATION_PROBE_SECONDS=1 fm_run_timed 30 bash -c '. "$1/tests/lib.sh"; fm_tmux_isolation_gate "$2"; echo RAN' _ "$ROOT" "$TMP_ROOT/stuck" 2>&1)
+  code=$?
+  kill -CONT "$STUCK_PID" 2>/dev/null
+  stop_decoy "$STUCK_PID" "$STUCK_SOCKET" || fail "cannot stop the stuck server"
+  STUCK_PID=''
+  expect_code 0 "$code" "the gate returns from a server that never answers: $out"
+  assert_contains "$out" "skip: tmux isolation: the tmux server on $STUCK_SOCKET did not answer within 1s" "the skip names the silent socket and the deadline"
+  assert_not_contains "$out" RAN "the gate stops the suite beside a server that never answers"
+  [ $(($(date +%s) - start)) -lt 10 ] || fail "the gate waited past its probe deadline"
+  pass "fm_tmux_isolation_gate skips at its deadline when a tmux server does not answer"
+
 
   # No socket for kill-server to reach: TERM stops a plain process.
   victim=$(bash -c 'sleep 600 </dev/null >/dev/null 2>&1 & echo $!')
