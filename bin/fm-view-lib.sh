@@ -8,7 +8,7 @@
 # multiplexer pane already does.
 #
 # This file is sourced; it has no side effects on source. Outside a view
-# (FM_VIEW unset) every function succeeds without looking.
+# (FM_VIEW unset) every refusal succeeds without looking.
 
 # fm_view_pid_inside <pid>: true when <pid> runs in this process's mount
 # namespace while this process is inside a view. An unreadable namespace link

@@ -47,7 +47,7 @@
 # that is not an absolute path, because a relative one would resolve against
 # whatever directory the caller happens to be in. jq is used when present; the
 # fallback reader accepts only the flat object form and refuses aliases or paths
-# containing a double quote or backslash, which the format forbids.
+# containing a double quote or backslash, which it cannot decode; jq accepts them.
 
 # fm_projects_root <home> <config>: print the effective projects root.
 fm_projects_root() {
