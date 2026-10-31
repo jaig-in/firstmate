@@ -639,8 +639,8 @@ For Cursor the line is `firstmate: harness not found: cursor (no verified cursor
 **`firstmate: launch mode must be project or install, not: <value>`**
 Fix the `--mode` value or the `config/launch-mode` file.
 
-**`firstmate: config/launch-mode must be a regular file, not a symlink: <file>`** (the same for `config/primary-harness`)
-Replace the symlink with a plain one-line file.
+**`firstmate: config/launch-mode must be a regular file, not a symlink or special file: <path>`** (the same for `config/primary-harness`)
+The launcher refuses a setting it cannot read, rather than starting a default session; replace it with a plain one-line file or remove it.
 
 **`firstmate: resolved home does not exist: <home>`**
 `FM_HOME` points at a missing folder.
@@ -673,6 +673,8 @@ Project mode needs a repository or an org folder to open in.
 | `<tool> not found; the per-session view needs util-linux and git` | Install util-linux or git |
 | `the launch directory <dir> contains your home directory, whose harness configuration must stay writable` | You launched from `/` or `/home`; launch from the project instead |
 | `the launch directory <dir> contains the view runtime directory <dir>` | Launch from the project, not a folder that holds `/run` or `/tmp` |
+| `the view runtime directory <dir> does not exist` | Create it, or fix `XDG_RUNTIME_DIR` or `TMPDIR` |
+| `the view runtime directory <dir> holds a tab or newline, which the view's entry records cannot carry` | Point `XDG_RUNTIME_DIR` or `TMPDIR` at a path without one |
 | `the Firstmate home <home> lies inside the launch directory but outside its .firstmate/, and the view presents the project read-only` | Your `FM_HOME` sits inside the project; move it to `<project>/.firstmate` or outside the project |
 
 ### Inside a session
@@ -715,14 +717,14 @@ The repository you launched in is not in this home's registry; register it ([Exa
 **`error: <path> must be a readable regular file`**
 A directory, dangling link, or unreadable file sits at `data/projects.md` or `data/project-paths.json`, so Firstmate stops rather than read it as an empty registry; replace it with the real file.
 
-**`firstmate: config/primary-harness must be a regular file, not a symlink or special file: <path>`**
-The launcher refuses a harness or launch-mode setting it cannot read, here or at `config/launch-mode`, rather than starting a default session; replace it with a one-line file or remove it.
-
 ### Registering and seeding
 
 **`firstmate: cannot register this repository under its directory name: <name>`**
 `firstmate init` refuses a repository name holding ` - `, ` [`, a quote, a backslash, `$`, a backtick, or a control byte, because `data/projects.md` cannot hold it.
 Rename the directory, or register it under another name from an org home through `data/project-paths.json`.
+
+**`error: project alias contains a byte the manifest cannot hold: <name>`**
+You named a project with a double quote or backslash that is not a key in `data/project-paths.json`; fix the name or add that key.
 
 **`error: <path> is not a registered project of this home; register it in <home>/data/projects.md (or data/project-paths.json) before refreshing`**
 The repository was found in the org folder but not registered.

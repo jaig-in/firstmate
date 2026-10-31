@@ -97,9 +97,9 @@ fi
 
 # project_label [alias]: when the caller knows the registry alias a synced path
 # came from - every project of a custom projects root, any bare-name argument,
-# and any path with a registered alias - it passes that alias through so it is the label and the registry
-# lookup key without re-resolving the whole registry per project; no alias
-# falls through to the legacy rules.
+# and any path with a registered alias - it passes that alias through so it is
+# the label and the registry lookup key without re-resolving the whole registry
+# per project; no alias falls through to the legacy rules.
 project_label() {
   if [ -n "${1:-}" ]; then
     printf '%s\n' "$1"
