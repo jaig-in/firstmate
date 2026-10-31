@@ -28,6 +28,9 @@
 #   - central resolver precedence: data/project-paths.json, then
 #     <projects-root>/<alias>, then $FM_HOME/projects/<alias>; projects/<name>
 #     prefers the legacy clone, except that FM_PROJECTS_OVERRIDE's root wins.
+#   - data/project-paths.json refuses a control byte, an empty alias, or a
+#     second JSON document whole, with and without jq, so no decoded value can
+#     forge a record.
 #   - a spawn argument that is really a path - `.`, `..`, a bare relative
 #     directory no alias resolves, or a projects/ form with a trailing slash or
 #     dot segment - records its registered alias or basename, never its text.
@@ -45,8 +48,8 @@
 #     for a seeded alias the parent no longer maps (keeping unrelated ones),
 #     refuses a symlinked child config/projects-root before writing it, and
 #     reads the child's stored root without the parent's FM_PROJECTS_OVERRIDE;
-#     copied and preserved mappings keep their exact bytes, and without jq a
-#     seed refuses a manifest its reader cannot hold.
+#     copied and preserved mappings keep their exact bytes, and a seed refuses
+#     a manifest its reader cannot hold, with or without jq.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -922,6 +925,68 @@ test_manifest_reader_without_jq() {
   pass "manifest reader: one-line, multi-line, and duplicate aliases agree with and without jq"
 }
 
+# --- manifest record boundaries ----------------------------------------------
+# Entries travel as alias<TAB>path lines, so a decoded tab, newline, or other
+# control byte would forge a second record. Both readers refuse the whole
+# manifest before returning any record, naming the file, and never hand back
+# the existing directory a truncated value happens to name.
+test_manifest_record_boundaries() {
+  local base home repo nojq doc out
+  base=$(new_dir)
+  home="$base/home"
+  repo="$base/line"
+  mkdir -p "$home/config" "$home/data" "$home/state"
+  fm_git_init_commit "$repo"
+  nojq=$(make_jqless_path "$base/nojq")
+
+  refuses() {  # <label> <path-prefix>
+    if out=$(PATH="$2" FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve ext 2>"$base/err"); then
+      fail "$1: the reader returned '$out' for a manifest it cannot hold"
+    fi
+    assert_grep "project-paths.json" "$base/err" "$1: the refusal did not name the manifest"
+    if FM_HOME="$home" PATH="$2" "$ROOT/bin/fm-projects.sh" aliases >/dev/null 2>&1; then
+      fail "$1: aliases succeeded on a manifest the reader cannot hold"
+    fi
+  }
+
+  if command -v jq >/dev/null 2>&1; then
+    for doc in \
+      '{"ext":"'"$repo"'\nbreak"}' \
+      '{"ext":"'"$repo"'\tbreak"}' \
+      '{"e\nxt":"'"$repo"'"}' \
+      '{"e\txt":"'"$repo"'"}' \
+      '{"ext":"'"$repo"'\u0000break"}' \
+      '{"ext":"'"$repo"'\u001bbreak"}' \
+      '{"ext":"'"$repo"'\u007fbreak"}' \
+      '{"":"'"$repo"'"}' \
+      '{"ext":"'"$repo"'"} {"other":"'"$repo"'"}'; do
+      printf '%s\n' "$doc" > "$home/data/project-paths.json"
+      refuses "jq reader on $doc" "$PATH"
+    done
+  fi
+  printf '{"ext":"%s\nbreak"}\n' "$repo" > "$home/data/project-paths.json"
+  refuses "fallback reader on a raw newline" "$nojq"
+  printf '{"ext":"%s\tbreak"}\n' "$repo" > "$home/data/project-paths.json"
+  refuses "fallback reader on a raw tab" "$nojq"
+  printf '{"e\txt":"%s"}\n' "$repo" > "$home/data/project-paths.json"
+  refuses "fallback reader on a raw tab in an alias" "$nojq"
+  printf '{"ext":"%s","later":"%s\033"}\n' "$repo" "$repo" > "$home/data/project-paths.json"
+  refuses "fallback reader on a control byte in a later entry" "$nojq"
+
+  # Spaces and non-ASCII names are ordinary path bytes in both readers.
+  local spaced="$base/spaced café"
+  mkdir -p "$spaced"
+  printf '{"ext":"%s"}\n' "$spaced" > "$home/data/project-paths.json"
+  assert_equals "$spaced" "$(PATH="$nojq" FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve ext)" \
+    "the fallback reader refused an ordinary spaced path"
+  if command -v jq >/dev/null 2>&1; then
+    assert_equals "$spaced" "$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve ext)" \
+      "the jq reader refused an ordinary spaced path"
+  fi
+
+  pass "manifest reader: a control byte or empty alias is refused whole, before any record is returned"
+}
+
 # --- spawn refuses unregistered siblings -------------------------------------
 
 test_spawn_refusal() {
@@ -1339,10 +1404,9 @@ test_org_seed_path_bytes() {
   assert_equals "$ext" "$(FM_HOME="$child" "$ROOT/bin/fm-projects.sh" resolve ext)" \
     "the child did not resolve the seeded path"
 
-  # An unrelated child mapping survives a reseed, whatever bytes it holds.
+  # An unrelated child mapping survives a reseed with its exact bytes.
   jq -n --arg ext "$ext" '{
     "odd\"key\\name": "/some/\"where\"\\keep",
-    "tabbed\tkey": "/line\nbreak\tkeep",
     ext: "/stale/ext"
   }' > "$child/data/project-paths.json"
   FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" ext \
@@ -1352,8 +1416,17 @@ test_org_seed_path_bytes() {
   assert_equals "$ext" "$(jq -r .ext "$child/data/project-paths.json")" "reseeding did not replace the stale path"
   assert_equals '/some/"where"\keep' "$(jq -r '."odd\"key\\name"' "$child/data/project-paths.json")" \
     "reseeding changed a preserved mapping holding a quote and a backslash"
-  assert_equals $'/line\nbreak\tkeep' "$(jq -r '."tabbed\tkey"' "$child/data/project-paths.json")" \
-    "reseeding changed a preserved mapping holding a line break and a tab"
+
+  # A child manifest no reader can hold stops the reseed and is left untouched.
+  jq -n '{"tabbed\tkey": "/line\nbreak\tkeep"}' > "$child/data/project-paths.json"
+  before=$(cat "$child/data/project-paths.json")
+  if FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" ext \
+      --projects-root "$org" >/dev/null 2>"$base/err-held"; then
+    fail "a reseed accepted a child manifest its reader cannot hold"
+  fi
+  assert_grep "must be a flat JSON object" "$base/err-held" "the reseed stopped for another reason"
+  assert_equals "$before" "$(cat "$child/data/project-paths.json")" "a refused reseed changed the child's manifest"
+  jq -n '{"odd\"key\\name": "/some/\"where\"\\keep", ext: "/stale/ext"}' > "$child/data/project-paths.json"
 
   # Without jq the same parent manifest is refused and the child keeps its file.
   nojq=$(make_jqless_path "$base/nojq")
@@ -1528,6 +1601,7 @@ test_projects_root
 test_discovery_authority
 test_resolver_fails_closed
 test_manifest_reader_without_jq
+test_manifest_record_boundaries
 test_manifest_alias_label
 test_project_name_path_forms
 test_spawn_refusal

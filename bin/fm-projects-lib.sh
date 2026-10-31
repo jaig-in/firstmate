@@ -45,9 +45,12 @@
 # data/project-paths.json is a flat JSON object {"<alias>": "<absolute-path>"}
 # for projects that live outside the projects root. Both readers refuse a value
 # that is not an absolute path, because a relative one would resolve against
-# whatever directory the caller happens to be in. jq is used when present; the
-# fallback reader accepts only the flat object form and refuses aliases or paths
-# containing a double quote or backslash, which it cannot decode; jq accepts them.
+# whatever directory the caller happens to be in, and refuse an empty alias or a
+# control byte (a tab or newline among them) in any alias or path, because
+# entries travel as alias<TAB>path lines. A refusal returns no record at all.
+# jq is used when present; the fallback reader accepts only the flat object form
+# and refuses aliases or paths containing a double quote or backslash, which it
+# cannot decode; jq accepts them.
 
 # fm_projects_root <home> <config>: print the effective projects root.
 fm_projects_root() {
@@ -112,14 +115,18 @@ fm_project_manifest_path() {
 }
 
 # fm_project_manifest_pairs <data>: print every manifest entry as
-# "alias<TAB>path", one per line. A malformed manifest fails loudly.
+# "alias<TAB>path", one per line, or fail loudly having printed nothing when the
+# manifest is malformed.
 fm_project_manifest_pairs() {
   local data=$1 manifest
   manifest=$(fm_project_manifest_path "$data")
   [ -f "$manifest" ] || return 0
   if command -v jq >/dev/null 2>&1; then
-    jq -e 'type == "object" and (all(.[]; type == "string" and startswith("/")))' "$manifest" >/dev/null 2>&1 || {
-      echo "error: $manifest must be a flat JSON object of alias -> absolute path" >&2
+    jq -se 'length == 1 and (.[0] | type == "object"
+        and all(.[]; type == "string" and startswith("/"))
+        and all(keys_unsorted[], .[]; length > 0 and (explode | all(. > 31 and . != 127))))' \
+        "$manifest" >/dev/null 2>&1 || {
+      echo "error: $manifest must be a flat JSON object of alias -> absolute path, with no empty alias and no control byte" >&2
       return 1
     }
     jq -r 'to_entries[] | .key + "\t" + .value' "$manifest"
@@ -130,7 +137,7 @@ fm_project_manifest_pairs() {
   # as they do to jq.
   awk -v file="$manifest" '
     function bad() {
-      printf "error: %s must be a flat JSON object of alias -> absolute path\n", file > "/dev/stderr"
+      printf "error: %s must be a flat JSON object of alias -> absolute path, with no empty alias and no control byte\n", file > "/dev/stderr"
       exit 1
     }
     { doc = doc $0 "\n" }
@@ -138,6 +145,7 @@ fm_project_manifest_pairs() {
       if (!match(doc, /^[[:space:]]*[{]/)) bad()
       doc = substr(doc, RSTART + RLENGTH)
       if (match(doc, /^[[:space:]]*[}][[:space:]]*$/)) exit 0
+      out = ""
       while (1) {
         if (!match(doc, /^[[:space:]]*"[^"\\]+"[[:space:]]*:[[:space:]]*"\/[^"\\]*"/)) bad()
         pair = substr(doc, RSTART, RLENGTH)
@@ -148,12 +156,16 @@ fm_project_manifest_pairs() {
         val = pair
         sub(/^[[:space:]]*"[^"\\]*"[[:space:]]*:[[:space:]]*"/, "", val)
         sub(/"$/, "", val)
-        print key "\t" val
+        if (key ~ /[[:cntrl:]]/ || val ~ /[[:cntrl:]]/) bad()
+        out = out key "\t" val "\n"
         if (match(doc, /^[[:space:]]*,/)) {
           doc = substr(doc, RSTART + RLENGTH)
           continue
         }
-        if (match(doc, /^[[:space:]]*[}][[:space:]]*$/)) exit 0
+        if (match(doc, /^[[:space:]]*[}][[:space:]]*$/)) {
+          printf "%s", out
+          exit 0
+        }
         bad()
       }
     }
