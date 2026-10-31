@@ -144,7 +144,7 @@ cmd_summary() {
   while IFS= read -r alias; do
     [ -n "$alias" ] || continue
     total=$((total + 1))
-    path=$(fm_project_resolve "$FM_HOME" "$CONFIG" "$DATA" "$alias") || return 1
+    path=$(fm_project_resolve "$FM_HOME" "$CONFIG" "$DATA" "$alias" registered) || return 1
     real=''
     if [ "$path" != "$alias" ] && [ -d "$path" ]; then
       real=$(cd "$path" && pwd -P)

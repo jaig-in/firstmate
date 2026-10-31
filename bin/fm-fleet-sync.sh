@@ -31,7 +31,9 @@
 # caller's cwd) or a bare "<name>"/"projects/<name>" form, resolved through
 # the central resolver whose order bin/fm-projects-lib.sh's header owns. Example: from
 # anywhere, `fm-fleet-sync.sh dotfiles-private` syncs just that one clone,
-# same as passing its full path.
+# same as passing its full path. In every home a path takes its registered
+# alias, so a registered project keeps its label and delivery posture however
+# it was named; a path with no alias keeps the legacy label.
 # A home with config/projects-root (an org home) refreshes only REGISTERED
 # projects - data/projects.md and data/project-paths.json aliases - because
 # every sibling of the org root is a user working copy and discovery is not
@@ -94,8 +96,8 @@ fi
 [ $# -le 1 ] || { usage; exit 1; }
 
 # project_label [alias]: when the caller knows the registry alias a synced path
-# came from - every project of a custom projects root, and any bare-name
-# argument - it passes that alias through so it is the label and the registry
+# came from - every project of a custom projects root, any bare-name argument,
+# and any path with a registered alias - it passes that alias through so it is the label and the registry
 # lookup key without re-resolving the whole registry per project; no alias
 # falls through to the legacy rules.
 project_label() {
@@ -513,6 +515,14 @@ if [ $# -eq 1 ]; then
       exit 1
     fi
     arg_alias=$registered
+  elif [ "$resolved" = "$1" ] || [ -z "$arg_alias" ]; then
+    # A bare name the resolver left unchanged can only be a cwd directory, so it
+    # is a path here too.
+    registered=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$resolved") || {
+      echo "error: could not read this home's project registry" >&2
+      exit 1
+    }
+    arg_alias=${registered:-$arg_alias}
   fi
   sync_project "$resolved" "$arg_alias"
   exit 0

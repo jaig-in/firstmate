@@ -34,7 +34,9 @@
 #     read as a regular file is a named failure, never an empty registry, and a
 #     malformed config/projects-root stops a path spawn.
 #   - an unresolved projects/<name> passes through unchanged; a quoted alias jq
-#     can hold resolves; init refuses a name the registry cannot hold; an init
+#     can hold resolves; a typed name with those bytes that is no key is
+#     refused, while a registered row with them never stops a walk over the
+#     registry; init refuses a name the registry cannot hold; an init
 #     that fails partway is completed by the next one.
 #   - a caller's GIT_* variables and CDPATH cannot redirect the launcher or the
 #     project library, and the trust check runs no command from the repository
@@ -1317,6 +1319,53 @@ test_summary_reads_backslash_name_row() {
   pass "summary: a registered name reads its own row byte for byte"
 }
 
+# The quote and backslash refusal is for a name a caller typed. A registered row
+# holding those bytes is an alias like any other to every registry walk.
+test_quoted_registry_row_never_stops_a_walk() {
+  local base org home legacy out name
+  base=$(new_dir)
+  org="$base/org"
+  home="$org/.firstmate"
+  mkdir -p "$home/config" "$home/data"
+  printf '..\n' > "$home/config/projects-root"
+  fm_git_init_commit "$org/good"
+  printf -- '- b"c [local-only] - quoted\n- d\\e [local-only] - backslashed\n- good [local-only] - plain\n' \
+    > "$home/data/projects.md"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" 2>&1) \
+    || fail "a quoted row stopped the whole-fleet refresh: $out"
+  assert_contains "$out" 'b"c: skipped: registered project resolves to no directory' "the quoted row was not reported"
+  assert_contains "$out" 'd\e: skipped: registered project resolves to no directory' "the backslashed row was not reported"
+  assert_contains "$out" "good: skipped: local-only project" "a quoted row cost the plain project its refresh"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" summary 2>&1) \
+    || fail "a quoted row stopped the summary: $out"
+  assert_contains "$out" '- b"c [local-only] - missing: resolves to no directory' "summary lost the quoted row"
+  assert_contains "$out" "- good [local-only]" "a quoted row cost the plain project its summary"
+  assert_equals "good" "$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" name "$org/good" "$org/good")" \
+    "a quoted row stopped alias-for-path"
+  fm_git_init_commit "$org/b\"c"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" 2>&1) \
+    || fail "a resolvable quoted row stopped the whole-fleet refresh: $out"
+  assert_contains "$out" 'b"c: skipped: local-only project' "a quoted row with a directory did not resolve"
+
+  legacy="$base/legacy"
+  mkdir -p "$legacy/config" "$legacy/data" "$legacy/projects"
+  printf -- '- see "notes" for bar\n' > "$legacy/data/projects.md"
+  mkdir "$base/plain"
+  assert_equals "plain" "$(cd "$base/plain" && FM_HOME="$legacy" "$ROOT/bin/fm-projects.sh" name . "$base/plain")" \
+    "a free-form quoted bullet stopped a path-form name"
+
+  for name in 'b"c' 'd\e'; do
+    mkdir "$base/plain/$name"
+    if (cd "$base/plain" && FM_HOME="$legacy" "$ROOT/bin/fm-projects.sh" resolve "$name") \
+        >"$base/out" 2>"$base/err"; then
+      fail "a typed name the manifest cannot hold resolved: $name"
+    fi
+    assert_grep "manifest cannot hold" "$base/err" "the typed refusal did not name the bad alias"
+    [ ! -s "$base/out" ] || fail "a refused name printed a resolution: $(cat "$base/out")"
+  done
+  pass "a quoted registry row never stops a walk, and a typed one is still refused"
+}
+
 # A multibyte path is ordinary text whatever the locale, and the writer and the
 # reader must agree on that.
 test_projects_root_non_ascii_c_locale() {
@@ -2108,6 +2157,7 @@ test_org_seed_relative_root_with_leading_dash
 test_discover_skips_line_break_names
 test_legacy_refresh_skips_line_break_names
 test_summary_reads_backslash_name_row
+test_quoted_registry_row_never_stops_a_walk
 test_projects_root_non_ascii_c_locale
 test_init_interrupted_completes_on_rerun
 test_spawn_refusal

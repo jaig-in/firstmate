@@ -79,7 +79,7 @@
 #   cap {target (number or null), status ok|none|invalid},
 #   projects (the project names this home owns: registered names in a
 #     config/projects-root home, else clone directory names under the
-#     projects root; bin/fm-projects-lib.sh),
+#     projects root; bin/fm-projects-lib.sh; null when they cannot be read),
 #   pressure {level ok|warn|critical|unknown, why[], basis beat|probe|none,
 #     beat_age_s, avail_gb, total_gb, runq_per_core (probe basis: load1 over
 #     cores), swap_rate_pps_1m, mem_stall_pct, load1, on_battery,
@@ -602,10 +602,15 @@ if [ -z "$machine" ]; then
   machine=${machine%%.*}
 fi
 
-# A malformed config/projects-root or registry leaves the list empty rather
-# than stopping the report.
+# A malformed config/projects-root or registry publishes projects as null, not
+# as an empty list that reads as "this home owns no projects", and does not stop
+# the report. The reason goes to stderr.
 project_names=
-project_pairs=$(fm_project_sync_candidate_pairs "$FM_HOME" "$CONFIG" "$DATA" 2>/dev/null) || project_pairs=
+projects_read=true
+project_pairs=$(fm_project_sync_candidate_pairs "$FM_HOME" "$CONFIG" "$DATA") || {
+  projects_read=false
+  project_pairs=
+}
 tab=$(printf '\t')
 while IFS= read -r p_pair; do
   p_alias=${p_pair%%"$tab"*}
@@ -687,6 +692,7 @@ doc=$(jq -n \
   --argjson now "$now" --arg home "$home" --arg machine "$machine" \
   --arg lanes "$lanes" --arg pr_ready "$pr_ready" --arg lane_ids "$lane_ids" \
   --arg target "$target" --arg cap_status "$cap_status" --arg projects "$project_names" \
+  --arg projects_read "$projects_read" \
   --arg level "$level" --arg why "$pub_why" --arg basis "$basis" --arg beat_age "$beat_age_s" \
   --arg avail "$avail_gb" --arg total "$total_gb" --arg runq "$runq_per_core" \
   --arg swap "$swap_rate" --arg stall "$mem_stall" --arg load1 "$p_load1" \
@@ -702,7 +708,7 @@ doc=$(jq -n \
   {schema: "fm-lane-capacity.v1", generated_epoch: $now, home: $home, machine: $machine,
    lanes: {count: ($lanes | tonumber), pr_ready: ($pr_ready | tonumber), ids: ($lane_ids | lines)},
    cap: {target: (if $cap_status == "ok" then ($target | tonumber) else null end), status: $cap_status},
-   projects: ($projects | lines),
+   projects: (if $projects_read == "true" then ($projects | lines) else null end),
    pressure: {level: $level, why: ($why | lines), basis: $basis, beat_age_s: ($beat_age | num),
      avail_gb: ($avail | num), total_gb: ($total | num), runq_per_core: ($runq | num),
      swap_rate_pps_1m: ($swap | num), mem_stall_pct: ($stall | num), load1: ($load1 | num),

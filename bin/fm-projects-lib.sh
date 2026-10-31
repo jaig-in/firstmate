@@ -40,7 +40,12 @@
 #     root, so a same-named package directory inside a per-project repo never
 #     shadows the repo), then the legacy <home>/projects/<alias>;
 #   - an alias that resolves nowhere passes through unchanged so callers keep
-#     their existing not-a-directory handling.
+#     their existing not-a-directory handling;
+#   - a typed name holding a double quote or backslash that is no manifest key
+#     is refused at the manifest step, so it never reaches a directory under the
+#     caller's cwd. A registered alias is exempt: the registry walkers pass
+#     `registered`, so one such row resolves like any other and cannot stop the
+#     whole fleet.
 #
 # data/project-paths.json is a flat JSON object {"<alias>": "<absolute-path>"}
 # for projects that live outside the projects root. Both readers refuse a value
@@ -188,17 +193,7 @@ fm_project_manifest_lookup() {
       found=$val
     fi
   done <<< "$pairs"
-  if [ -n "$found" ]; then
-    printf '%s\n' "$found"
-    return 0
-  fi
-  # jq can hold these bytes, so only a name that is not a key is refused.
-  case "$alias" in
-    *\"*|*\\*)
-      echo "error: project alias contains a byte the manifest cannot hold: $alias" >&2
-      return 1
-      ;;
-  esac
+  [ -z "$found" ] || printf '%s\n' "$found"
 }
 
 # fm_project_registered_aliases <data>: print every registered alias, one per
@@ -259,11 +254,12 @@ fm_project_is_git_root() {
   [ "$top" = "$(CDPATH='' cd -- "$dir" && pwd -P)" ]
 }
 
-# fm_project_resolve <home> <config> <data> <arg>: resolve a project argument
-# to a directory path per the contract in this file's header. Prints the
-# resolved path (or the argument unchanged when nothing resolves it).
+# fm_project_resolve <home> <config> <data> <arg> [registered]: resolve a project
+# argument to a directory path per the contract in this file's header. Prints
+# the resolved path (or the argument unchanged when nothing resolves it). A
+# caller walking registered aliases passes `registered`.
 fm_project_resolve() {
-  local home=$1 config=$2 data=$3 arg=$4 given=$4 projects candidate mapped
+  local home=$1 config=$2 data=$3 arg=$4 given=$4 source=${5:-} projects candidate mapped
   case "$arg" in
     projects/?*)
       for candidate in ${FM_PROJECTS_OVERRIDE:+"$FM_PROJECTS_OVERRIDE/${arg#projects/}"} \
@@ -290,6 +286,15 @@ fm_project_resolve() {
   if [ -n "$mapped" ]; then
     printf '%s\n' "$mapped"
     return 0
+  fi
+  # jq can hold these bytes, so only a name that is not a key is refused.
+  if [ "$source" != registered ]; then
+    case "$arg" in
+      *\"*|*\\*)
+        echo "error: project alias contains a byte the manifest cannot hold: $arg" >&2
+        return 1
+        ;;
+    esac
   fi
   projects=$(fm_projects_root "$home" "$config") || return 1
   if fm_projects_root_is_custom "$config"; then
@@ -322,7 +327,7 @@ fm_project_resolve() {
 # single-project forms cannot drift on what "registered but unusable" means.
 fm_project_sync_candidate() {
   local home=$1 config=$2 data=$3 alias=$4 resolved projects
-  resolved=$(fm_project_resolve "$home" "$config" "$data" "$alias") || return 1
+  resolved=$(fm_project_resolve "$home" "$config" "$data" "$alias" registered) || return 1
   if [ "$resolved" != "$alias" ]; then
     printf '%s\n' "$resolved"
     return 0
@@ -340,6 +345,8 @@ fm_project_sync_candidate() {
 # an empty alias.
 fm_project_sync_candidate_pairs() {
   local home=$1 config=$2 data=$3 projects alias candidate aliases proj
+  # Read first, so a malformed root fails even with nothing registered.
+  projects=$(fm_projects_root "$home" "$config") || return 1
   if fm_projects_root_is_custom "$config"; then
     aliases=$(fm_project_registered_aliases "$data") || return 1
     while IFS= read -r alias; do
@@ -349,7 +356,6 @@ fm_project_sync_candidate_pairs() {
     done <<< "$aliases"
     return 0
   fi
-  projects=$(fm_projects_root "$home" "$config") || return 1
   [ -d "$projects" ] || return 0
   for proj in "$projects"/*; do
     [ -e "$proj" ] || continue
@@ -404,7 +410,7 @@ fm_project_alias_for_path() {
   aliases=$(fm_project_registered_aliases "$data") || return 1
   while IFS= read -r alias; do
     [ -n "$alias" ] || continue
-    resolved=$(fm_project_resolve "$home" "$config" "$data" "$alias") || return 1
+    resolved=$(fm_project_resolve "$home" "$config" "$data" "$alias" registered) || return 1
     [ "$resolved" != "$alias" ] || continue
     resolved=$(CDPATH='' cd -- "$resolved" 2>/dev/null && pwd -P) || continue
     if [ "$resolved" = "$target" ]; then

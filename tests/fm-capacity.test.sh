@@ -516,9 +516,25 @@ test_projects_list_follows_projects_root() {
   printf -- '- registered [no-mistakes]\n' > "$home/data/projects.md"
   assert_equals 'registered' "$(capacity_doc "$home" "$fakebin" | jq -r '.projects | join(",")')" \
     "a projects-root home must list only its registered projects"
+  printf -- '- b"c [local-only] - quoted row\n- registered [no-mistakes]\n' > "$home/data/projects.md"
+  assert_equals 'registered' "$(capacity_doc "$home" "$fakebin" | jq -r '.projects | join(",")')" \
+    "a quoted registry row must not cost the other project names"
+  printf -- '- registered [no-mistakes]\n' > "$home/data/projects.md"
   printf 'a\nb\n' > "$home/config/projects-root"
-  assert_equals '' "$(capacity_doc "$home" "$fakebin" | jq -r '.projects | join(",")')" \
-    "a malformed projects-root must leave the list empty rather than stop the report"
+  assert_equals 'null|fm-lane-capacity.v1' "$(capacity_doc "$home" "$fakebin" | jq -r '[.projects, .schema] | map(tostring) | join("|")')" \
+    "a malformed projects-root must report null projects without stopping the report"
+  : > "$home/data/projects.md"
+  assert_equals 'null' "$(capacity_doc "$home" "$fakebin" | jq -c .projects)" \
+    "a malformed projects-root must report null even with nothing registered"
+  printf '..\n' > "$home/config/projects-root"
+  rm -f "$home/data/projects.md"
+  mkdir "$home/data/projects.md"
+  printf 'target 3\n' > "$home/config/lane-capacity"
+  FM_LANE_CAPACITY_PUBLISH_INTERVAL=0 PATH="$fakebin:$PATH" FM_HOME="$home" "$CAPACITY" --publish \
+    >/dev/null 2>"$TMP_ROOT/projects-err"
+  assert_equals 'null' "$(jq -c .projects "$home/state/lane-capacity.json")" \
+    "an unreadable registry must publish null projects, not an empty list"
+  assert_grep "projects.md" "$TMP_ROOT/projects-err" "stderr must name the unreadable registry"
   pass "the projects list follows the home's projects root and registry"
 }
 
