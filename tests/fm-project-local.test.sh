@@ -28,6 +28,9 @@
 #   - central resolver precedence: data/project-paths.json, then
 #     <projects-root>/<alias>, then $FM_HOME/projects/<alias>; projects/<name>
 #     prefers the legacy clone, except that FM_PROJECTS_OVERRIDE's root wins.
+#   - a spawn argument that is really a path - `.`, `..`, a bare relative
+#     directory no alias resolves, or a projects/ form with a trailing slash or
+#     dot segment - records its registered alias or basename, never its text.
 #   - a bare-name refresh argument keeps its registry alias as the label, so a
 #     manifest-registered project outside the projects root still resolves its
 #     registered posture (local-only is skipped, not fetched).
@@ -1458,6 +1461,35 @@ test_manifest_alias_label() {
   pass "legacy home: a bare alias keeps its registry label and its local-only skip"
 }
 
+# --- project names for path-shaped arguments ---------------------------------
+# A spawn records project_name and reads capacity and forge by it, so anything
+# that is really a path takes its registered alias or basename, never its text.
+test_project_name_path_forms() {
+  local base home repo plain out arg
+  base=$(new_dir)
+  home="$base/home"
+  repo="$base/work/checkout"
+  plain="$base/work/plain"
+  mkdir -p "$home/config" "$home/data" "$home/projects/clone" "$repo/sub" "$plain"
+  printf '{"ext": "%s"}\n' "$repo" > "$home/data/project-paths.json"
+  name_of() { FM_HOME="$home" "$ROOT/bin/fm-projects.sh" name "$1" "$2"; }
+
+  assert_equals ext "$(cd "$repo" && name_of . "$repo")" ". lost the registered alias"
+  assert_equals ext "$(cd "$repo/sub" && name_of .. "$repo")" ".. lost the registered alias"
+  assert_equals plain "$(cd "$plain" && name_of . "$plain")" ". of an unregistered directory did not take its basename"
+  assert_equals ext "$(cd "$base/work" && name_of checkout "$repo")" \
+    "a bare relative directory no alias resolves lost its registered alias"
+  assert_equals ext "$(name_of ext "$repo")" "a bare alias did not keep its name"
+  assert_equals clone "$(name_of projects/clone "$home/projects/clone")" "projects/<name> did not keep its name"
+  for arg in projects/clone/ projects/./clone; do
+    assert_equals clone "$(name_of "$arg" "$home/projects/clone")" "$arg was recorded as typed"
+  done
+  assert_equals projects "$(name_of projects/ "$home/projects")" "projects/ recorded no name"
+  assert_equals home "$(name_of projects/.. "$home")" "projects/.. was recorded as typed"
+
+  pass "project name: . .. and other path-shaped arguments take the registered alias or basename"
+}
+
 # --- whole-name registry parsing --------------------------------------------
 # A spaced name is one alias, and a name that prefixes a longer registered name
 # reads its own row, matching bin/fm-project-mode.sh's whole-name rule.
@@ -1497,6 +1529,7 @@ test_discovery_authority
 test_resolver_fails_closed
 test_manifest_reader_without_jq
 test_manifest_alias_label
+test_project_name_path_forms
 test_spawn_refusal
 test_spawn_unborn_head_resolved_project
 test_org_seed

@@ -368,19 +368,21 @@ fm_project_alias_for_path() {
 
 # fm_project_name_for <home> <config> <data> <arg> <abs-path>: the stable
 # project name recorded in task metadata and used for registry lookups.
-# A bare alias or projects/<name> argument keeps that name; a path argument
-# uses its registered alias when one resolves to it, else its basename.
+# A bare alias or projects/<name> argument keeps that name. Everything else is
+# a path and uses its registered alias when one resolves to it, else its
+# basename: `.`, `..`, any other argument holding a slash, and a bare word the
+# resolver left unchanged, which can only be a directory relative to the cwd.
 fm_project_name_for() {
-  local home=$1 config=$2 data=$3 arg=$4 abs=$5 alias
-  case "$arg" in
-    projects/*)
-      printf '%s\n' "${arg#projects/}"
-      return 0
-      ;;
-    */*) ;;
+  local home=$1 config=$2 data=$3 arg=$4 abs=$5 alias name resolved
+  name=${arg#projects/}
+  case "$name" in
+    '' | . | .. | */*) ;;
     *)
-      printf '%s\n' "$arg"
-      return 0
+      resolved=$(fm_project_resolve "$home" "$config" "$data" "$arg") || return 1
+      if [ "$resolved" != "$arg" ]; then
+        printf '%s\n' "$name"
+        return 0
+      fi
       ;;
   esac
   alias=$(fm_project_alias_for_path "$home" "$config" "$data" "$abs") || return 1
