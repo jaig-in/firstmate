@@ -277,6 +277,7 @@ bless_existing_home() {
       echo "firstmate: $home is already trusted"
       return 0
     fi
+    [ -f "$home/$HOME_MARKER" ] || die "$home/$HOME_MARKER is not a regular file; refusing to bless $home"
     die "$home/$HOME_MARKER is tracked by git, so it proves nothing on this machine.
   Untrack it ('git rm --cached $home/$HOME_MARKER'), then run 'firstmate init' again."
   fi
@@ -404,6 +405,7 @@ bless_checkout() {
       return 0
     fi
     [ ! -L "$top/$HOME_MARKER" ] || die "$top/$HOME_MARKER is a symlink; refusing to bless $top"
+    [ -f "$top/$HOME_MARKER" ] || die "$top/$HOME_MARKER is not a regular file; refusing to bless $top"
     die "$top/$HOME_MARKER is tracked by git, so it proves nothing on this machine.
   Untrack it ('git rm --cached $top/$HOME_MARKER'), then run 'firstmate init' again."
   fi

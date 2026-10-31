@@ -120,7 +120,11 @@ fm_project_manifest_path() {
 fm_project_manifest_pairs() {
   local data=$1 manifest
   manifest=$(fm_project_manifest_path "$data")
-  [ -f "$manifest" ] || return 0
+  [ -e "$manifest" ] || [ -L "$manifest" ] || return 0
+  [ -f "$manifest" ] && [ -r "$manifest" ] || {
+    echo "error: $manifest must be a readable regular file" >&2
+    return 1
+  }
   if command -v jq >/dev/null 2>&1; then
     jq -se 'length == 1 and (.[0] | type == "object"
         and all(.[]; type == "string" and startswith("/"))

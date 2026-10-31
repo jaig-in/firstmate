@@ -166,7 +166,7 @@ The caller's directory is exported as `FM_LAUNCH_DIR`, the launch root as `FM_LA
 - **Install mode** runs the harness with its working directory at the install root and primes it with the launch project through the session-start digest (below).
   It is the mode for hosts that cannot build the view.
 
-`firstmate --mode project|install`, then the home's `config/launch-mode` (one token, `project` or `install`, a regular file; any other value fails loudly), selects the mode.
+`firstmate --mode project|install`, then the home's `config/launch-mode` (one token, `project` or `install`, a readable regular file; anything else fails loudly), selects the mode.
 Unset, the launcher uses project mode where the host can build the view and otherwise falls back to install mode, printing one `firstmate: notice:` line that names the concrete reason and exporting it as `FM_LAUNCH_NOTICE`, which the session-start digest repeats.
 An explicit project mode that cannot be built refuses with the same reason rather than falling back.
 A launch from inside a Firstmate view refuses in every mode, even with `--mode install`, and names a normal terminal outside the session.
@@ -200,7 +200,7 @@ A direct harness launch with no `FM_LAUNCH_DIR` omits the section.
 ### Harness selection and home trust
 
 The harness is `--harness <name>`, then the home's `config/primary-harness` (one token), then `claude`; remaining arguments pass through to the harness.
-Whichever source supplies it, the harness name must be a primary-capable adapter (`claude codex opencode pi pi-signed grok cursor omp`; the adapters that [Harness support](#harness-support) verifies for crewmate and scout launches only are refused, and `kimi` is refused because it is verified as a crewmate harness but sits outside the primary turn-end guard scope), and any other value - including a symlinked `config/primary-harness` file or a value with interior whitespace - fails loudly at launch.
+Whichever source supplies it, the harness name must be a primary-capable adapter (`claude codex opencode pi pi-signed grok cursor omp`; the adapters that [Harness support](#harness-support) verifies for crewmate and scout launches only are refused, and `kimi` is refused because it is verified as a crewmate harness but sits outside the primary turn-end guard scope), and any other value - including a `config/primary-harness` that is a symlink, is not a regular file, or cannot be read, or a value with interior whitespace - fails loudly at launch.
 That whitelist keeps a home config or flag from naming an arbitrary binary or a harness with no primary supervision protocol; [README requirements](../README.md#requirements) own the harnesses supported for a primary session.
 A `pi` or `pi-signed` launch exports `FM_PI_HARNESS` as that name and an `omp` launch exports `FM_OMP_HARNESS=omp`, so harness detection labels the primary from the launch itself rather than from an inherited marker.
 

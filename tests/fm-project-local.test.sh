@@ -1063,6 +1063,124 @@ test_init_refuses_unregistrable_name() {
   pass "init: a repository name the registry cannot hold is refused before anything is written"
 }
 
+# --- anything but a readable regular file ---------------------------------------
+
+test_manifest_non_regular() {
+  local base home
+  base=$(new_dir)
+  home="$base/home"
+  mkdir -p "$home/config" "$home/data"
+  printf -- '- app [local-only] - app (added 2026-10-30)\n' > "$home/data/projects.md"
+
+  refuses() {  # <label>
+    if FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve app >/dev/null 2>"$base/err"; then
+      fail "$1: resolve read it as an absent manifest"
+    fi
+    assert_grep "project-paths.json" "$base/err" "$1: the refusal did not name the manifest"
+    if FM_HOME="$home" "$ROOT/bin/fm-projects.sh" aliases >/dev/null 2>&1; then
+      fail "$1: aliases read it as an absent manifest"
+    fi
+  }
+
+  mkdir "$home/data/project-paths.json"
+  refuses "a directory"
+  rmdir "$home/data/project-paths.json"
+  ln -s "$base/gone" "$home/data/project-paths.json"
+  refuses "a dangling link"
+  rm -f "$home/data/project-paths.json"
+  if [ "$(id -u)" -ne 0 ]; then
+    printf '{}\n' > "$home/data/project-paths.json"
+    chmod 000 "$home/data/project-paths.json"
+    refuses "an unreadable file"
+    chmod 644 "$home/data/project-paths.json"
+  fi
+  pass "manifest: anything but a readable regular file is refused rather than read as absent"
+}
+
+# A malformed config/projects-root must not read as a legacy home, whose rules
+# accept an unregistered path.
+test_spawn_malformed_projects_root() {
+  local base home repo
+  base=$(new_dir)
+  home="$base/home"
+  repo="$base/repo"
+  mkdir -p "$home/config" "$home/data" "$home/state"
+  fm_git_init_commit "$repo"
+  mkdir "$base/root"
+  ln -s "$base/root" "$home/config/projects-root"
+  if FM_HOME="$home" "$ROOT/bin/fm-spawn.sh" t1 "$repo" --harness claude --mode direct-PR --yolo off \
+      >/dev/null 2>"$base/err"; then
+    fail "spawn accepted a path under a malformed config/projects-root"
+  fi
+  assert_grep "projects-root must be a regular file" "$base/err" "spawn did not name the malformed config/projects-root"
+  pass "spawn: a malformed config/projects-root stops a path spawn"
+}
+
+# The child's manifest is a seed leaf like its siblings, so a symlink there is
+# refused rather than followed by the reader and replaced by the write.
+test_org_seed_manifest_symlink() {
+  local base parent org child target
+  base=$(new_dir)
+  parent="$base/parent"
+  org="$base/org"
+  child="$base/child"
+  target="$base/elsewhere.json"
+  mkdir -p "$parent/data" "$parent/state" "$parent/config" "$org"
+  printf '%s\n' "$org" > "$parent/config/projects-root"
+  fm_git_init_commit "$org/alpha"
+  fm_git_add_origin "$org/alpha" "$base/remotes/alpha.git"
+  printf -- '- alpha [direct-PR] - alpha (added 2026-10-30)\n' > "$parent/data/projects.md"
+  scaffold_secondmate_charter "$parent" mate 'mate charter' alpha || fail "charter scaffold failed"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" alpha --projects-root "$org" >/dev/null 2>"$base/err" \
+    || fail "the first seed failed: $(cat "$base/err")"
+  printf '{}\n' > "$target"
+  ln -s "$target" "$child/data/project-paths.json"
+  if FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" alpha --projects-root "$org" \
+      >/dev/null 2>"$base/err"; then
+    fail "a seed accepted a symlinked child data/project-paths.json"
+  fi
+  assert_grep "project-paths.json" "$base/err" "the refusal did not name the child manifest"
+  [ -L "$child/data/project-paths.json" ] || fail "a refused seed replaced the child's manifest link"
+  pass "org seed: a symlinked child manifest is refused like its sibling leaf files"
+}
+
+test_bless_marker_not_regular() {
+  local base repo
+  base=$(new_dir)
+  repo="$base/repo"
+  fm_git_init_commit "$repo"
+  mkdir -p "$repo/.firstmate/.fm-home"
+  if (cd "$repo" && "$ROOT/bin/firstmate" init) >/dev/null 2>"$base/err"; then
+    fail "init blessed a home whose marker is a directory"
+  fi
+  assert_grep "not a regular file" "$base/err" "a directory at the marker was not named as such"
+  if grep -q "tracked by git" "$base/err"; then
+    fail "a directory at the marker was reported as tracked"
+  fi
+  pass "init: a non-regular marker is reported as that, not as tracked by git"
+}
+
+test_summary_unreadable_instructions() {
+  local base org home out
+  if [ "$(id -u)" -eq 0 ]; then
+    printf 'ok - SKIP unreadable instructions: running as root\n'
+    return 0
+  fi
+  base=$(new_dir)
+  org="$base/org"
+  home="$org/.firstmate"
+  mkdir -p "$home/config" "$home/data"
+  printf '..\n' > "$home/config/projects-root"
+  fm_git_init_commit "$org/app"
+  printf '# App\n' > "$org/app/AGENTS.md"
+  chmod 000 "$org/app/AGENTS.md"
+  printf -- '- app [local-only] - app (added 2026-10-30)\n' > "$home/data/projects.md"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" summary 2>/dev/null)
+  chmod 644 "$org/app/AGENTS.md"
+  assert_contains "$out" "AGENTS.md: unreadable" "an unreadable AGENTS.md was reported as absent"
+  pass "summary: an unreadable instruction file is named rather than reported absent"
+}
+
 # --- an unreadable registry is a failure, never an empty one -------------------
 # An empty success reads as "this home registers nothing", so an org refresh
 # would skip every project without saying why.
@@ -1787,6 +1905,11 @@ test_unresolved_projects_form_stays_unchanged
 test_org_refresh_of_current_directory
 test_manifest_quoted_alias_resolves
 test_init_refuses_unregistrable_name
+test_manifest_non_regular
+test_spawn_malformed_projects_root
+test_org_seed_manifest_symlink
+test_bless_marker_not_regular
+test_summary_unreadable_instructions
 test_spawn_refusal
 test_spawn_unborn_head_resolved_project
 test_org_seed

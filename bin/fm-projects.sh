@@ -98,6 +98,10 @@ first_instruction_line() {
   local dir=$1 f line
   for f in AGENTS.md CLAUDE.md; do
     [ -f "$dir/$f" ] || continue
+    if [ ! -r "$dir/$f" ]; then
+      echo "$f: unreadable"
+      return 0
+    fi
     line=$(grep -v -E '^[[:space:]]*(<!--.*-->)?[[:space:]]*$' "$dir/$f" 2>/dev/null | sed -n '1p') || line=
     [ -n "$line" ] || continue
     [ "$line" != "@AGENTS.md" ] || continue

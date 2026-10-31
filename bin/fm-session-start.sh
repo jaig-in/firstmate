@@ -577,6 +577,10 @@ print_launch_instructions_excerpt() {
   local line count extra
   [ -n "$LAUNCH_INSTR" ] || return 0
   subsection "LAUNCH INSTRUCTIONS EXCERPT - $LAUNCH_INSTR (first 50 lines)"
+  if [ ! -r "$LAUNCH_INSTR" ]; then
+    printf '  (unreadable, so its instructions are not in this digest)\n'
+    return 0
+  fi
   extra=0
   count=0
   while IFS= read -r line || [ -n "$line" ]; do

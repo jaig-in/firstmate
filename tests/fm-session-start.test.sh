@@ -989,6 +989,35 @@ EOF
   pass "LAUNCH CONTEXT reports an unreadable registry instead of calling the repo unregistered"
 }
 
+test_launch_context_unreadable_instructions_are_named() {
+  local rec root home fakebin proj out repo_root
+  if [ "$(id -u)" -eq 0 ]; then
+    printf 'ok - SKIP unreadable launch instructions: running as root\n'
+    return 0
+  fi
+  rec=$(new_world launch-unreadable)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+
+  proj="${home%/home}/demo"
+  fm_git_init_commit "$proj"
+  repo_root=$(cd "$proj" && pwd -P)
+  printf '# Demo\n' > "$proj/AGENTS.md"
+  chmod 000 "$proj/AGENTS.md"
+  printf -- '- demo [local-only] - demo project (added 2026-10-30)\n' > "$home/data/projects.md"
+  printf '{"demo": "%s"}\n' "$repo_root" > "$home/data/project-paths.json"
+
+  out=$(run_session_start_launched_from "$home" "$root" "$fakebin:$BASE_PATH" "$repo_root" 2>/dev/null)
+  chmod 644 "$proj/AGENTS.md"
+  assert_contains "$out" "(unreadable, so its instructions are not in this digest)" \
+    "an unreadable AGENTS.md read as an empty excerpt"
+
+  pass "LAUNCH CONTEXT names an unreadable instruction file instead of an empty excerpt"
+}
+
 test_launch_context_non_repo_launch_omits_section_and_instructions() {
   local rec root home fakebin plain out
   rec=$(new_world launch-non-repo)
@@ -3515,6 +3544,7 @@ test_launch_context_org_launch_summarizes_projects
 test_launch_context_view_lists_shadowed_entries_instead_of_excerpt
 test_launch_context_excerpt_caps_long_lines
 test_launch_context_unreadable_registry_is_not_reported_unregistered
+test_launch_context_unreadable_instructions_are_named
 test_launch_context_non_repo_launch_omits_section_and_instructions
 test_launch_context_linked_worktree_resolves_registry_via_main_worktree
 test_lock_refusal_read_only_path

@@ -712,6 +712,12 @@ The repository you launched in is not in this home's registry; register it ([Exa
 **Digest shows `Registry: unreadable (<reason>)`**
 `data/projects.md`, `data/project-paths.json`, or `config/projects-root` could not be read; fix the named file.
 
+**`error: <path> must be a readable regular file`**
+A directory, dangling link, or unreadable file sits at `data/projects.md` or `data/project-paths.json`, so Firstmate stops rather than read it as an empty registry; replace it with the real file.
+
+**`firstmate: config/primary-harness must be a regular file, not a symlink or special file: <path>`**
+The launcher refuses a harness or launch-mode setting it cannot read, here or at `config/launch-mode`, rather than starting a default session; replace it with a one-line file or remove it.
+
 ### Registering and seeding
 
 **`firstmate: cannot register this repository under its directory name: <name>`**

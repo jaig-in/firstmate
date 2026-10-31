@@ -3994,6 +3994,9 @@ elif [ "$RELAUNCH" -eq 1 ]; then
   PROJ_NAME=$(fm_meta_get "$RELAUNCH_META" project_name)
   [ -n "$PROJ_NAME" ] || PROJ_NAME=$(basename "$PROJ_ABS")
 else
+  # A malformed config/projects-root stops the spawn; it must not read as a
+  # legacy home, whose rules let an unregistered path through.
+  fm_projects_root "$FM_HOME" "$CONFIG" >/dev/null || exit 1
   PROJ_REGISTERED_ALIAS=
   if fm_projects_root_is_custom "$CONFIG"; then
     PROJ_REGISTERED_ALIAS=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$PROJ_ABS") || {
