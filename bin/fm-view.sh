@@ -171,9 +171,17 @@ probe_root() {
       return 1
     fi
   fi
-  run_base=$(runtime_base)
-  run_base=$(cd "$run_base" 2>/dev/null && pwd -P) || run_base=
-  if [ -n "$run_base" ] && path_within "$run_base" "$launch"; then
+  run_base=$(cd "$(runtime_base)" 2>/dev/null && pwd -P) || {
+    echo "the view runtime directory $(runtime_base) does not exist"
+    return 1
+  }
+  case "$run_base" in
+    *$'\t'* | *$'\n'*)
+      echo "the view runtime directory $run_base holds a tab or newline, which the view's entry records cannot carry"
+      return 1
+      ;;
+  esac
+  if path_within "$run_base" "$launch"; then
     echo "the launch directory $launch contains the view runtime directory $run_base"
     return 1
   fi
@@ -426,10 +434,11 @@ sync_all() {
     [ -d "$REALRW/$name" ] && [ ! -L "$REALRW/$name" ] && [ -e "$INSTALL_SRC/$name" ] || continue
     sync_level "$LAUNCH/$name" "$RUN/state/merged.$name" desired_merged "$name"
   done
-  # Recompose when either instruction source changed.
-  srcsig="$(sig "$INSTALL_SRC/AGENTS.md") $(stat -c %Y:%s "$INSTALL_SRC/AGENTS.md" 2>/dev/null || true)"
+  # Recompose when either instruction source changed. The stamp follows a
+  # symlink, because an instruction file is often a link to the real text.
+  srcsig="$(sig "$INSTALL_SRC/AGENTS.md") $(stat -L -c %Y:%s "$INSTALL_SRC/AGENTS.md" 2>/dev/null || true)"
   for name in $INSTR_FILES; do
-    srcsig="$srcsig $(sig "$REALRW/$name") $(stat -c %Y:%s "$REALRW/$name" 2>/dev/null || true)"
+    srcsig="$srcsig $(sig "$REALRW/$name") $(stat -L -c %Y:%s "$REALRW/$name" 2>/dev/null || true)"
   done
   if [ "$srcsig" != "$(cat "$RUN/state/compose" 2>/dev/null || true)" ]; then
     compose_agents "$INSTALL_SRC" "$REALRW" "$LAUNCH" "$RUN/AGENTS.md"
@@ -521,7 +530,8 @@ cmd_run() {
   launch_dir=$(cd "$launch_dir" && pwd -P)
   git_real=$(readlink -f -- "$(command -v git)") || die "git not found"
   unshare_bin=$(command -v unshare)
-  run="$(runtime_base)/firstmate-view.$$"
+  # Absolute: the session's working directory is the view, not this one.
+  run="$(cd "$(runtime_base)" && pwd -P)/firstmate-view.$$"
   [ ! -e "$run" ] || die "runtime dir already exists: $run"
   mkdir -m 700 -- "$run"
   # A step below that fails leaves nothing behind.

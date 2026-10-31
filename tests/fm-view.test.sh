@@ -717,6 +717,81 @@ tail" ] && echo "odd=absent"
   pass "view: a name with a line break is left out and forges no other entry"
 }
 
+# An instruction file is often a link to the real text, so the recompose stamp
+# must follow it; the link itself does not change when the text does.
+test_view_recomposes_linked_instructions() {
+  local base install proj out
+  skip_without_view "view linked instructions" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+  mkdir -p "$proj/notes"
+  printf 'FIRST_TEXT\n' > "$proj/notes/agents.md"
+  rm -f "$proj/AGENTS.md"
+  ln -s notes/agents.md "$proj/AGENTS.md"
+
+  out=$(view_run "$install" "$proj" '
+    grep -q FIRST_TEXT AGENTS.md && echo "first=seen"
+    printf "THE_SECOND_TEXT\n" > "$FM_LAUNCH_REAL_RW/notes/agents.md"
+    for i in $(seq 1 25); do grep -q THE_SECOND_TEXT AGENTS.md && break; sleep 0.2; done
+    grep -q THE_SECOND_TEXT AGENTS.md && echo "second=seen"
+  ') || fail "linked-instructions view run failed"
+  assert_contains "$out" "first=seen" "the linked instruction text was not composed"
+  assert_contains "$out" "second=seen" "an edit behind a linked instruction file was not recomposed"
+
+  pass "keeper: an edit behind a linked instruction file is recomposed"
+}
+
+# The session's working directory is the view, so every runtime path it is
+# handed has to be absolute.
+test_view_relative_runtime_dir() {
+  local base install proj out
+  skip_without_view "view relative runtime dir" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+  mkdir -p "$base/rel"
+
+  out=$(cd "$base" && env -u XDG_RUNTIME_DIR TMPDIR=rel FM_HOME="$proj/.firstmate" FM_VIEW_POLL=1 \
+    "$ROOT/bin/fm-view.sh" run --install "$install" --launch "$proj" -- bash -c '
+      [ -d "$FM_LAUNCH_REAL" ] && echo "real=seen"
+      git status --porcelain >/dev/null && echo "git=works"
+    ' 2>&1) || fail "relative-runtime view run failed: $out"
+  assert_contains "$out" "real=seen" "a relative runtime dir left the real-tree alias unreachable"
+  assert_contains "$out" "git=works" "a relative runtime dir broke git in the session"
+
+  pass "view: a relative runtime directory is made absolute before the session starts"
+}
+
+# The entry records are tab-separated, so a runtime path that cannot be a field
+# is a probe refusal the launcher can fall back from, not a broken session.
+test_view_probe_names_unusable_runtime_dir() {
+  local base install proj reason tabbed
+  skip_without_view "view unusable runtime dir" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+  tabbed="$base/run	tab"
+  mkdir -p "$tabbed"
+
+  if reason=$(env -u XDG_RUNTIME_DIR TMPDIR="$tabbed" "$ROOT/bin/fm-view.sh" probe --install "$install" --launch "$proj"); then
+    fail "the probe accepted a runtime directory holding a tab"
+  fi
+  assert_contains "$reason" "tab or newline" "the probe did not name the tab"
+  if reason=$(env -u XDG_RUNTIME_DIR TMPDIR="$base/gone" "$ROOT/bin/fm-view.sh" probe --install "$install" --launch "$proj"); then
+    fail "the probe accepted a runtime directory that does not exist"
+  fi
+  assert_contains "$reason" "does not exist" "the probe did not name the missing runtime directory"
+
+  pass "probe: an unusable runtime directory is a named refusal"
+}
+
 # Nothing past the runtime directory's creation may strand it.
 test_view_failed_start_leaves_nothing() {
   local base install proj run
@@ -1079,6 +1154,9 @@ test_view_keeper_survives_bad_poll
 test_view_ignores_caller_quoting_style
 test_view_name_spanning_two_listed_words
 test_view_line_break_name_forges_no_entry
+test_view_recomposes_linked_instructions
+test_view_relative_runtime_dir
+test_view_probe_names_unusable_runtime_dir
 test_view_failed_start_leaves_nothing
 test_view_failed_remount_retried
 test_view_project_symlink_boundary
