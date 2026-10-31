@@ -17,6 +17,8 @@
 #     marker, read from the repository's own index whatever git redirection
 #     the caller exports; config/primary-harness accepts only verified primary adapters;
 #     a relative FM_HOME is canonicalized before export.
+#   - a directory, fifo, dangling link, or unreadable file at
+#     config/primary-harness or config/launch-mode stops the launch by name.
 #   - `firstmate init`: --org scaffolds .firstmate/ at the cwd with
 #     config/projects-root=.. and no projects/ dir; without --org it scaffolds
 #     at the enclosing repo's root and registers the repo itself.
@@ -325,6 +327,51 @@ SH
   assert_grep "FM_HOME=$relhome" "$base/out4" "relative FM_HOME was not canonicalized"
 
   pass "trust: unmarked home refused, marker blesses, adapter whitelist, relative FM_HOME canonicalized"
+}
+
+# --- a broken launcher setting is an error, never a default --------------------
+# Anything at config/primary-harness or config/launch-mode that cannot be read
+# as a regular file stops the launch naming the setting, rather than reading as
+# unset and starting a session the captain did not choose.
+test_launcher_broken_settings() {
+  local base home repo fakebin setting
+  base=$(new_dir)
+  home="$base/home"
+  repo="$base/repo"
+  mkdir -p "$home/config"
+  fm_git_init_commit "$repo"
+  fakebin=$(make_fake_harness "$base/fakebin")
+
+  refuses() {  # <label> <setting>
+    rm -f "$base/out"
+    if (cd "$repo" && FM_HOME="$home" FM_FAKE_HARNESS_OUT="$base/out" PATH="$fakebin:$PATH" \
+        "$ROOT/bin/firstmate") >/dev/null 2>"$base/err"; then
+      fail "$1 at config/$2: the launch was not refused"
+    fi
+    assert_grep "config/$2" "$base/err" "$1 at config/$2: the refusal did not name the setting"
+    assert_absent "$base/out" "$1 at config/$2: the harness ran"
+  }
+
+  for setting in primary-harness launch-mode; do
+    mkdir "$home/config/$setting"
+    refuses "a directory" "$setting"
+    rmdir "$home/config/$setting"
+    mkfifo "$home/config/$setting"
+    refuses "a fifo" "$setting"
+    rm -f "$home/config/$setting"
+    ln -s "$base/gone" "$home/config/$setting"
+    refuses "a dangling link" "$setting"
+    rm -f "$home/config/$setting"
+    if [ "$(id -u)" -ne 0 ]; then
+      printf 'claude\n' > "$home/config/$setting"
+      chmod 000 "$home/config/$setting"
+      refuses "an unreadable file" "$setting"
+      chmod 644 "$home/config/$setting"
+      rm -f "$home/config/$setting"
+    fi
+  done
+
+  pass "launcher: a non-regular or unreadable harness or mode setting stops the launch"
 }
 
 # --- firstmate init ----------------------------------------------------------
@@ -1636,6 +1683,7 @@ test_registry_whole_names() {
 
 test_launcher_resolution
 test_launcher_trust
+test_launcher_broken_settings
 test_init
 test_init_bless
 test_projects_root

@@ -331,14 +331,16 @@ cmd_init() {
 }
 
 # read_one_token_config <file> <what>: print the first line of a home config
-# file trimmed, or nothing when absent; a symlinked file fails loudly.
+# file trimmed, or nothing when absent; anything else there that cannot be read
+# as a regular file fails loudly rather than reading as an unset setting.
 read_one_token_config() {
   local file=$1
-  if [ -L "$file" ]; then
-    die "$2 must be a regular file, not a symlink: $file"
-  elif [ -f "$file" ]; then
-    sed -n '1p' "$file" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+  [ -e "$file" ] || [ -L "$file" ] || return 0
+  if [ -L "$file" ] || [ ! -f "$file" ]; then
+    die "$2 must be a regular file, not a symlink or special file: $file"
   fi
+  [ -r "$file" ] || die "$2 is not readable: $file"
+  sed -n '1p' "$file" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
 }
 
 # launch_root <launch-dir> <home>: the directory a project-mode session is
