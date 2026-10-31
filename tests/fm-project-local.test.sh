@@ -1347,6 +1347,30 @@ test_projects_root_non_ascii_c_locale() {
   pass "projects root: only a control byte is refused, whatever the locale"
 }
 
+# --- partial writes --------------------------------------------------------------
+
+# The marker is what makes a home read as finished, so an init that fails
+# partway must leave a home the next init completes.
+test_init_interrupted_completes_on_rerun() {
+  local base repo stub
+  base=$(new_dir)
+  repo="$base/repo"
+  stub="$base/stub"
+  fm_git_init_commit "$repo"
+  mkdir -p "$stub"
+  printf '#!/bin/sh\nexit 1\n' > "$stub/cat"
+  chmod +x "$stub/cat"
+  if (cd "$repo" && PATH="$stub:$PATH" "$ROOT/bin/firstmate" init) >/dev/null 2>&1; then
+    fail "the stubbed init did not fail"
+  fi
+  assert_absent "$repo/.firstmate/.fm-home" "an interrupted init left a home that reads as finished"
+  (cd "$repo" && "$ROOT/bin/firstmate" init) >/dev/null || fail "the rerun init failed"
+  assert_present "$repo/.firstmate/.fm-home" "the rerun init left no marker"
+  assert_present "$repo/.firstmate/.gitignore" "the rerun init left the home without its .gitignore"
+  assert_present "$repo/.firstmate/data/projects.md" "the rerun init did not register the repository"
+  pass "init: an interrupted scaffold is completed by the next init"
+}
+
 # --- an unreadable registry is a failure, never an empty one -------------------
 # An empty success reads as "this home registers nothing", so an org refresh
 # would skip every project without saying why.
@@ -2085,6 +2109,7 @@ test_discover_skips_line_break_names
 test_legacy_refresh_skips_line_break_names
 test_summary_reads_backslash_name_row
 test_projects_root_non_ascii_c_locale
+test_init_interrupted_completes_on_rerun
 test_spawn_refusal
 test_spawn_unborn_head_resolved_project
 test_org_seed

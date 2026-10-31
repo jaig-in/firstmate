@@ -494,7 +494,7 @@ keeper() {
 cleanup_run() {
   local run=$1
   rm -f -- "$run/state/top" "$run/state/compose" "$run/state"/merged.* "$run/AGENTS.md" \
-    "$run/CLAUDE.md" "$run/git-shim" "$run/git.real"
+    "$run"/AGENTS.md.* "$run/CLAUDE.md" "$run/git-shim" "$run/git.real"
   if [ -n "${FM_VIEW_KEEP_LOG:-}" ] && [ -s "$run/keeper.log" ]; then
     mv -- "$run/keeper.log" "$run.keeper.log"
   fi
@@ -524,8 +524,11 @@ cmd_run() {
   run="$(runtime_base)/firstmate-view.$$"
   [ ! -e "$run" ] || die "runtime dir already exists: $run"
   mkdir -m 700 -- "$run"
-  # A closed terminal hangs up this process too: clean up before dying.
+  # A step below that fails leaves nothing behind.
   # shellcheck disable=SC2064 # $run is local: expand now, while it is set.
+  trap "cleanup_run $(printf %q "$run")" EXIT
+  # A closed terminal hangs up this process too: clean up before dying.
+  # shellcheck disable=SC2064
   trap "cleanup_run $(printf %q "$run"); exit 129" HUP
   # shellcheck disable=SC2064
   trap "cleanup_run $(printf %q "$run"); exit 130" INT
@@ -563,7 +566,7 @@ SHIM
   FM_VIEW_SHIM_GIT=$run/git.real FM_VIEW_SHIM_GIT_PATH=$git_real \
   FM_VIEW=1 FM_VIEW_ROOT=$launch_dir FM_LAUNCH_REAL=$run/ro FM_LAUNCH_REAL_RW=$run/rw \
     forward_wait "$unshare_bin" --user --map-root-user --mount --propagation private -- "$0" __keeper "$@" || rc=$?
-  trap - HUP INT TERM
+  trap - HUP INT TERM EXIT
   cleanup_run "$run"
   return "$rc"
 }

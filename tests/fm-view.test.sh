@@ -717,6 +717,29 @@ tail" ] && echo "odd=absent"
   pass "view: a name with a line break is left out and forges no other entry"
 }
 
+# Nothing past the runtime directory's creation may strand it.
+test_view_failed_start_leaves_nothing() {
+  local base install proj run
+  skip_without_view "view failed start" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+  run="$base/run"
+  mkdir -p "$run"
+  chmod 700 "$run"
+  rm -f "$install/CLAUDE.md"
+
+  if (cd "$proj" && XDG_RUNTIME_DIR="$run" FM_HOME="$proj/.firstmate" \
+      "$ROOT/bin/fm-view.sh" run --install "$install" --launch "$proj" -- true) >/dev/null 2>&1; then
+    fail "the view started without its install CLAUDE.md"
+  fi
+  assert_equals "" "$(ls -A "$run")" "a failed start left a runtime directory behind"
+
+  pass "view: a start that fails leaves no runtime directory behind"
+}
+
 # A top-level file whose read-only remount fails is undone rather than left
 # writable at the launch path, and the keeper does not record it as
 # synchronized, so a later sync whose remount succeeds presents it read-only.
@@ -1056,6 +1079,7 @@ test_view_keeper_survives_bad_poll
 test_view_ignores_caller_quoting_style
 test_view_name_spanning_two_listed_words
 test_view_line_break_name_forges_no_entry
+test_view_failed_start_leaves_nothing
 test_view_failed_remount_retried
 test_view_project_symlink_boundary
 test_view_nested_mount_read_only

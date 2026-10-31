@@ -212,7 +212,6 @@ scaffold_home() {
       printf 'backend = "markdown"\n\n[markdown]\npath = "data/backlog.md"\narchive = "data/done-archive.md"\ndone_keep = 10\n' > "$home/.tasks.toml"
     fi
   fi
-  [ -e "$home/$HOME_MARKER" ] || : > "$home/$HOME_MARKER"
   [ -e "$home/.gitignore" ] || cat > "$home/.gitignore" <<'EOF'
 # .firstmate/ is private operational state and stays uncommitted by default.
 # To share a config item with the team, append a negation for its exact path
@@ -239,6 +238,9 @@ EOF
       printf -- '- %s [%s] - this repository (added %s)\n' "$name" "$mode" "$(date +%F)" \
         > "$home/data/projects.md"
   fi
+  # Last, because a home that has its marker reads as finished: an interrupted
+  # init runs again as a blessing and fills in whatever is missing.
+  [ -e "$home/$HOME_MARKER" ] || : > "$home/$HOME_MARKER"
 }
 
 # require_registrable_name <name>: refuse a repository name data/projects.md and
