@@ -714,6 +714,10 @@ The repository you launched in is not in this home's registry; register it ([Exa
 
 ### Registering and seeding
 
+**`firstmate: cannot register this repository under its directory name: <name>`**
+`firstmate init` refuses a repository name holding ` - `, ` [`, a quote, a backslash, `$`, a backtick, or a control byte, because `data/projects.md` cannot hold it.
+Rename the directory, or register it under another name from an org home through `data/project-paths.json`.
+
 **`error: <path> is not a registered project of this home; register it in <home>/data/projects.md (or data/project-paths.json) before refreshing`**
 The repository was found in the org folder but not registered.
 

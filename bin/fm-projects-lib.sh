@@ -177,12 +177,6 @@ fm_project_manifest_pairs() {
 # way jq reads the same document, so both readers name the same directory.
 fm_project_manifest_lookup() {
   local data=$1 alias=$2 pairs key val found=''
-  case "$alias" in
-    *\"*|*\\*)
-      echo "error: project alias contains a byte the manifest cannot hold: $alias" >&2
-      return 1
-      ;;
-  esac
   pairs=$(fm_project_manifest_pairs "$data") || return 1
   while IFS=$'\t' read -r key val; do
     [ -n "$key" ] || continue
@@ -190,7 +184,17 @@ fm_project_manifest_lookup() {
       found=$val
     fi
   done <<< "$pairs"
-  [ -z "$found" ] || printf '%s\n' "$found"
+  if [ -n "$found" ]; then
+    printf '%s\n' "$found"
+    return 0
+  fi
+  # jq can hold these bytes, so only a name that is not a key is refused.
+  case "$alias" in
+    *\"*|*\\*)
+      echo "error: project alias contains a byte the manifest cannot hold: $alias" >&2
+      return 1
+      ;;
+  esac
 }
 
 # fm_project_registered_aliases <data>: print every registered alias, one per
@@ -241,7 +245,7 @@ fm_project_is_git_root() {
 # to a directory path per the contract in this file's header. Prints the
 # resolved path (or the argument unchanged when nothing resolves it).
 fm_project_resolve() {
-  local home=$1 config=$2 data=$3 arg=$4 projects candidate mapped
+  local home=$1 config=$2 data=$3 arg=$4 given=$4 projects candidate mapped
   case "$arg" in
     projects/?*)
       for candidate in ${FM_PROJECTS_OVERRIDE:+"$FM_PROJECTS_OVERRIDE/${arg#projects/}"} \
@@ -260,7 +264,7 @@ fm_project_resolve() {
   esac
   case "$arg" in
     ''|.|..|*'$'*|*'`'*)
-      printf '%s\n' "$arg"
+      printf '%s\n' "$given"
       return 0
       ;;
   esac
@@ -287,7 +291,7 @@ fm_project_resolve() {
     printf '%s\n' "$home/projects/$arg"
     return 0
   fi
-  printf '%s\n' "$arg"
+  printf '%s\n' "$given"
 }
 
 # fm_project_sync_candidate <home> <config> <data> <alias>: the directory a

@@ -30,8 +30,17 @@
 #   - central resolver precedence: data/project-paths.json, then
 #     <projects-root>/<alias>, then $FM_HOME/projects/<alias>; projects/<name>
 #     prefers the legacy clone, except that FM_PROJECTS_OVERRIDE's root wins.
-#   - a data/projects.md that exists but cannot be read as a regular file is a
-#     named failure, never an empty registry.
+#   - a data/projects.md or data/project-paths.json that exists but cannot be
+#     read as a regular file is a named failure, never an empty registry, and a
+#     malformed config/projects-root stops a path spawn.
+#   - an unresolved projects/<name> passes through unchanged; a quoted alias jq
+#     can hold resolves; init refuses a name the registry cannot hold; an init
+#     that fails partway is completed by the next one.
+#   - a caller's GIT_* variables and CDPATH cannot redirect the launcher or the
+#     project library, and the trust check runs no command from the repository
+#     it is judging.
+#   - a line break in a directory name forges no project record, and
+#     config/projects-root refuses control bytes, not locale-dependent ones.
 #   - data/project-paths.json refuses a control byte, an empty alias, or a
 #     second JSON document whole, with and without jq, so no decoded value can
 #     forge a record.
@@ -974,6 +983,86 @@ test_manifest_reader_without_jq() {
   pass "manifest reader: one-line, multi-line, and duplicate aliases agree with and without jq"
 }
 
+# --- aliases versus paths -----------------------------------------------------
+
+# A projects/<name> nothing resolves stays exactly that, so a caller's own
+# not-a-directory handling runs; stripped, it would name a directory relative
+# to whatever the caller's cwd happens to hold.
+test_unresolved_projects_form_stays_unchanged() {
+  local base home cwd out
+  base=$(new_dir)
+  home="$base/home"
+  cwd="$base/cwd"
+  mkdir -p "$home/config" "$home/data"
+  fm_git_init_commit "$cwd/ghost"
+  out=$(cd "$cwd" && FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve projects/ghost)
+  assert_equals projects/ghost "$out" "an unresolved projects/<name> did not pass through unchanged"
+  out=$(cd "$cwd" && FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" projects/ghost 2>/dev/null)
+  assert_contains "$out" "skipped: not a directory" "an unresolved projects/<name> refreshed a directory under the cwd"
+  pass "resolver: an unresolved projects/<name> passes through unchanged"
+}
+
+# `.` names a directory, not a registry key, so an org refresh takes the same
+# path-to-alias route it takes for the absolute path.
+test_org_refresh_of_current_directory() {
+  local base org home out
+  base=$(new_dir)
+  org="$base/org"
+  home="$org/.firstmate"
+  mkdir -p "$home/config" "$home/data" "$home/state"
+  printf '..\n' > "$home/config/projects-root"
+  fm_git_init_commit "$org/app"
+  mkdir -p "$org/app/sub"
+  printf -- '- app [local-only] - app (added 2026-10-30)\n' > "$home/data/projects.md"
+  out=$(cd "$org/app" && FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" . 2>&1) \
+    || fail "org refresh of . was refused: $out"
+  assert_contains "$out" "app:" "org refresh of . was not reported by its registered name"
+  out=$(cd "$org/app/sub" && FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" .. 2>&1) \
+    || fail "org refresh of .. was refused: $out"
+  assert_contains "$out" "app:" "org refresh of .. was not reported by its registered name"
+  pass "org refresh: . and .. resolve to their registered alias"
+}
+
+# jq holds a key with a quote or backslash, and seeding keeps its exact bytes,
+# so the lookup must find it, and enumerating aliases must survive it.
+test_manifest_quoted_alias_resolves() {
+  local base home repo out key
+  command -v jq >/dev/null 2>&1 || { printf 'ok - SKIP quoted manifest alias: no jq\n'; return 0; }
+  base=$(new_dir)
+  home="$base/home"
+  repo="$base/repo"
+  mkdir -p "$home/config" "$home/data" "$repo"
+  key='odd"key\name'
+  jq -n --arg key "$key" --arg repo "$repo" '{($key): $repo, plain: "/nowhere"}' > "$home/data/project-paths.json"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" resolve "$key") || fail "a jq-held alias was refused"
+  assert_equals "$repo" "$out" "a jq-held alias did not resolve"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" name "$repo/" "$repo") || fail "a jq-held alias poisoned the registry"
+  assert_equals "$key" "$out" "a jq-held alias was not found by path"
+  pass "manifest lookup: an alias jq can hold resolves, with its exact bytes"
+}
+
+# init must not report a registration the resolver can never read back.
+test_init_refuses_unregistrable_name() {
+  local base name repo
+  base=$(new_dir)
+  # shellcheck disable=SC2016 # Each $ and backtick is a literal directory name.
+  for name in 'my - app' 'my [app]' 'my$app' 'my`app' 'my"app' 'my\app'; do
+    repo="$base/$name"
+    fm_git_init_commit "$repo"
+    if (cd "$repo" && "$ROOT/bin/firstmate" init) >/dev/null 2>"$base/err"; then
+      fail "init registered a name the registry cannot hold: $name"
+    fi
+    assert_grep "cannot register" "$base/err" "the refusal for '$name' did not say why"
+    assert_absent "$repo/.firstmate" "a refused init left a home behind for '$name'"
+  done
+  repo="$base/plain name"
+  fm_git_init_commit "$repo"
+  (cd "$repo" && "$ROOT/bin/firstmate" init) >/dev/null || fail "init refused a plain spaced name"
+  assert_equals "plain name" "$(FM_HOME="$repo/.firstmate" "$ROOT/bin/fm-projects.sh" aliases)" \
+    "a plain spaced name was not registered whole"
+  pass "init: a repository name the registry cannot hold is refused before anything is written"
+}
+
 # --- an unreadable registry is a failure, never an empty one -------------------
 # An empty success reads as "this home registers nothing", so an org refresh
 # would skip every project without saying why.
@@ -1694,6 +1783,10 @@ test_registry_read_failure
 test_manifest_record_boundaries
 test_manifest_alias_label
 test_project_name_path_forms
+test_unresolved_projects_form_stays_unchanged
+test_org_refresh_of_current_directory
+test_manifest_quoted_alias_resolves
+test_init_refuses_unregistrable_name
 test_spawn_refusal
 test_spawn_unborn_head_resolved_project
 test_org_seed

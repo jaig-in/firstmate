@@ -3994,6 +3994,7 @@ elif [ "$RELAUNCH" -eq 1 ]; then
   PROJ_NAME=$(fm_meta_get "$RELAUNCH_META" project_name)
   [ -n "$PROJ_NAME" ] || PROJ_NAME=$(basename "$PROJ_ABS")
 else
+  PROJ_REGISTERED_ALIAS=
   if fm_projects_root_is_custom "$CONFIG"; then
     PROJ_REGISTERED_ALIAS=$(fm_project_alias_for_path "$FM_HOME" "$CONFIG" "$DATA" "$PROJ_ABS") || {
       echo "error: could not read this home's project registry" >&2
@@ -4003,13 +4004,16 @@ else
       echo "error: $PROJ_ABS is not a registered project of this home; register it in $DATA/projects.md (or data/project-paths.json) before spawning" >&2
       exit 1
     }
-    PROJ_NAME=$PROJ_REGISTERED_ALIAS
-  else
-    PROJ_NAME=$(fm_project_name_for "$FM_HOME" "$CONFIG" "$DATA" "$PROJ" "$PROJ_ABS") || {
-      echo "error: could not resolve the project name for $PROJ" >&2
-      exit 1
-    }
   fi
+  PROJ_NAME=$(fm_project_name_for "$FM_HOME" "$CONFIG" "$DATA" "$PROJ" "$PROJ_ABS") || {
+    echo "error: could not resolve the project name for $PROJ" >&2
+    exit 1
+  }
+  # A bare alias keeps its name when two aliases share a directory; a path form
+  # in a config/projects-root home takes the registered alias.
+  case "$PROJ" in
+    */*) PROJ_NAME=${PROJ_REGISTERED_ALIAS:-$PROJ_NAME} ;;
+  esac
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
   git -C "$PROJ_ABS" rev-parse --git-dir >/dev/null 2>&1 &&

@@ -40,7 +40,14 @@
 #     directory, or git or unshare location holding command substitutions,
 #     backticks, or quotes runs nothing and leaves git working, and a shell
 #     that lost the view's environment gets a named refusal.
-#   - the keeper presents a top-level entry created outside the session.
+#   - the keeper presents a top-level entry created outside the session, keeps
+#     running on an FM_VIEW_POLL that sleep refuses, and recomposes after an
+#     edit behind a linked instruction file.
+#   - entry listing is byte-exact: a caller's QUOTING_STYLE hides nothing, a
+#     name spanning two list words is presented, and a line-break name is left
+#     out without forging another entry.
+#   - the runtime directory is absolute, an unusable one is a named probe
+#     refusal, and a start that fails leaves nothing behind.
 #   - a top-level file whose read-only remount fails is not presented (never
 #     left writable), and the next sync retries it rather than recording it as
 #     synchronized.

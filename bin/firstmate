@@ -53,7 +53,8 @@
 #       Scaffold a .firstmate/ home. --org creates it at the current directory
 #       (an org root whose sibling directories are the projects); without
 #       --org it must run inside a git repository and creates a per-project
-#       home at that repo's root, registering the repo itself. Both write
+#       home at that repo's root, registering the repo itself, and refuses a
+#       directory name data/projects.md cannot hold. Both write
 #       config/projects-root=.., a .tasks.toml backlog config, the untracked
 #       .fm-home trust marker, and a whitelist-style .firstmate/.gitignore. The home is never added to the
 #       enclosing repository's .git/info/exclude: git would then never read
@@ -244,6 +245,18 @@ EOF
   fi
 }
 
+# require_registrable_name <name>: refuse a repository name data/projects.md and
+# the resolver cannot hold, rather than registering a name that resolves nowhere.
+require_registrable_name() {
+  case "$1" in
+    *' - '* | *' ['* | *[[:cntrl:]]* | *'$'* | *'`'* | *\"* | *\\*)
+      die "cannot register this repository under its directory name: $1
+  A data/projects.md name holds no ' - ', ' [', quote, backslash, \$, backtick, or control byte.
+  Rename the directory, or run 'firstmate init --org' in its parent and register it there under another name in data/project-paths.json."
+      ;;
+  esac
+}
+
 # bless_existing_home <home> <org>: `firstmate init` on a directory whose
 # .firstmate/ already exists (a cloned shared home, or one created before the
 # marker). Writes the missing untracked marker and any missing scaffold piece,
@@ -295,11 +308,15 @@ cmd_init() {
   local target home existing
   if [ "$org" -eq 1 ]; then
     target=$(pwd -P)
+    home="$target/.firstmate"
   else
     target=$(repo_top .) || die "firstmate init must run inside a git repository (or use --org at an org root)"
+    home="$target/.firstmate"
+    if [ ! -e "$home/data/projects.md" ] && [ ! -L "$home/data/projects.md" ]; then
+      require_registrable_name "$(basename "$target")"
+    fi
     ! is_firstmate_checkout "$target" || bless_checkout "$target"
   fi
-  home="$target/.firstmate"
   if [ -e "$home" ] || [ -L "$home" ]; then
     bless_existing_home "$home" "$org"
     return

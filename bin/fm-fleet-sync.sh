@@ -475,7 +475,7 @@ if [ $# -eq 1 ]; then
   resolved=$(resolve_project_arg "$1") || exit 1
   arg_alias=
   case "$1" in
-    */*) ;;
+    */* | . | ..) ;;
     *) arg_alias=$1 ;;
   esac
   if [ "$ORG_HOME" -eq 1 ]; then

@@ -327,6 +327,23 @@ test_current_directory_is_declared() {
   pass "a spawn of . or .. is declared by the project's registered name"
 }
 
+# A bare alias keeps its own name when two registered aliases share a directory,
+# so the declaration for the alias the spawn named is the one that applies.
+test_bare_alias_keeps_its_declaration() {
+  local case_dir home out rc=0
+  case_dir=$(make_case twin task-c)
+  home="$case_dir/home"
+  printf '%s\n' "$case_dir" > "$home/config/projects-root"
+  printf '{"aaa": "%s", "heavy": "%s"}\n' "$case_dir/project" "$case_dir/project" > "$home/data/project-paths.json"
+  declare_capacity "$home" "heavy 1" "aaa 5"
+  write_live "$home" live-a "$case_dir/project"
+  out=$(run_spawn "$case_dir" "$home" "$case_dir/unused" task-c heavy --mode no-mistakes --yolo off) || rc=$?
+  expect_code "$DEFER_EXIT" "$rc" "a bare alias took another alias's declaration: $out"
+  assert_contains "$out" "deferred: project heavy admits 1 worker(s) at once" \
+    "the deferral did not use the named alias's declaration"
+  pass "a bare alias sharing a directory keeps its own declaration"
+}
+
 # A clone directory may be named with a leading '#'. That name is declared when
 # the '#' is written against the rest of the name and the line ends with the
 # capacity. A '#' followed by whitespace stays a comment even when the line
@@ -694,6 +711,7 @@ test_exhausted_capacity_defers_without_leaving_anything_behind
 test_spaced_project_name_is_declared
 test_registered_alias_is_declared
 test_current_directory_is_declared
+test_bare_alias_keeps_its_declaration
 test_hash_prefixed_project_name_is_declared
 test_symlinked_home_counts_each_worker_once
 test_release_frees_a_place
