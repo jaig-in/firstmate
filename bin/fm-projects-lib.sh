@@ -82,8 +82,8 @@ fm_projects_root() {
       echo "error: $file contains whitespace inside the path" >&2
       return 1
       ;;
-    *[![:print:]]*)
-      echo "error: $file contains a non-printable byte" >&2
+    *[[:cntrl:]]*)
+      echo "error: $file contains a control byte" >&2
       return 1
       ;;
   esac
@@ -354,6 +354,14 @@ fm_project_sync_candidate_pairs() {
   for proj in "$projects"/*; do
     [ -e "$proj" ] || continue
     [ -d "$proj" ] || continue
+    # One line per record: the tail of a broken one would read as a path
+    # relative to the caller's directory.
+    case "$proj" in
+      *$'\n'*)
+        echo "warning: skipping a project directory with a line break in its path: $proj" >&2
+        continue
+        ;;
+    esac
     printf '\t%s\n' "$proj"
   done
 }
@@ -381,6 +389,7 @@ fm_project_discover() {
   }
   for child in "$root"/*; do
     [ -d "$child" ] || continue
+    case "$child" in *$'\n'*) continue ;; esac
     top=$(fm_project_git -C "$child" rev-parse --show-toplevel 2>/dev/null) || continue
     [ "$top" = "$(CDPATH='' cd -- "$child" && pwd -P)" ] || continue
     basename "$child"

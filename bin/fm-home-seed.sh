@@ -1089,8 +1089,8 @@ seed_home() {
       return 1
     }
     case "$SEED_PROJECTS_ROOT" in
-      *[[:space:]]* | *[![:print:]]*)
-        echo "error: --projects-root resolves to a path with whitespace or a non-printable byte, which config/projects-root cannot hold: $SEED_PROJECTS_ROOT" >&2
+      *[[:space:]]* | *[[:cntrl:]]*)
+        echo "error: --projects-root resolves to a path with whitespace or a control byte, which config/projects-root cannot hold: $SEED_PROJECTS_ROOT" >&2
         return 1
         ;;
     esac

@@ -52,7 +52,8 @@ registry_mode() {
   [ -f "$DATA/projects.md" ] || { echo unrecorded; return 0; }
   # Whole-name row match, the same rule bin/fm-project-mode.sh applies, so a
   # spaced name or a name that prefixes a longer one reads its own row.
-  mode=$(awk -v n="$alias" '
+  mode=$(FM_REGISTRY_NAME="$alias" awk '
+    BEGIN { n = ENVIRON["FM_REGISTRY_NAME"] }
     {
       prefix = "- " n
       if (substr($0, 1, length(prefix)) != prefix) next

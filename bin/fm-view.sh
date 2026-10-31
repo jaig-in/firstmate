@@ -75,7 +75,13 @@ case "$POLL" in
 esac
 
 die() { echo "fm-view: $*" >&2; exit 1; }
-inlist() { case " $2 " in *" $1 "*) return 0 ;; esac; return 1; }
+# inlist <name> <word-list>: whole-word membership, so a name holding a space
+# never matches two adjacent words of the list.
+inlist() {
+  case "$1" in *' '*) return 1 ;; esac
+  case " $2 " in *" $1 "*) return 0 ;; esac
+  return 1
+}
 
 # path_within <path> <dir>: true when <path> is <dir> or lies under it.
 path_within() {
@@ -314,12 +320,24 @@ entry_kind() {
   fi
 }
 
+# list_entries <dir>: print every entry name of <dir>, one per line, dotted names
+# included. Globbed rather than read from ls, whose output a caller's
+# QUOTING_STYLE rewrites and whose lines a name with a newline would split. A
+# name that cannot be one field of an entry record is left out.
+list_entries() {
+  local e
+  for e in "$1"/* "$1"/.[!.]* "$1"/..?*; do
+    [ -e "$e" ] || [ -L "$e" ] || continue
+    case "${e##*/}" in *$'\t'* | *$'\n'*) continue ;; esac
+    printf '%s\n' "${e##*/}"
+  done
+}
+
 # desired_top: print "name<TAB>kind<TAB>source<TAB>mode" for the view root.
 desired_top() {
   local name kind mode
   while IFS= read -r name; do
     [ -n "$name" ] || continue
-    case "$name" in *$'\t'*) continue ;; esac
     inlist "$name" "AGENTS.md CLAUDE.md $HIDE" && continue
     if inlist "$name" "$FM_DIRS" && [ -e "$INSTALL_SRC/$name" ]; then
       if inlist "$name" "$MERGE_DIRS" && [ -d "$REALRW/$name" ] && [ ! -L "$REALRW/$name" ]; then
@@ -331,7 +349,7 @@ desired_top() {
     [ -n "$kind" ] || continue
     if inlist "$name" "$RW_ENTRIES"; then mode=rw; else mode=ro; fi
     printf '%s\t%s\t%s\t%s\n' "$name" "$kind" "$REALRW/$name" "$mode"
-  done < <(ls -A -- "$REALRW")
+  done < <(list_entries "$REALRW")
   for name in $FM_DIRS; do
     [ -e "$INSTALL_SRC/$name" ] || continue
     if inlist "$name" "$MERGE_DIRS" && [ -d "$REALRW/$name" ] && [ ! -L "$REALRW/$name" ]; then continue; fi
@@ -348,17 +366,15 @@ desired_merged() {
   local name=$1 e kind
   while IFS= read -r e; do
     [ -n "$e" ] || continue
-    case "$e" in *$'\t'*) continue ;; esac
     printf '%s\tfmlink\t%s\tro\n' "$e" "$INSTALL_SRC/$name/$e"
-  done < <(ls -A -- "$INSTALL_SRC/$name")
+  done < <(list_entries "$INSTALL_SRC/$name")
   while IFS= read -r e; do
     [ -n "$e" ] || continue
-    case "$e" in *$'\t'*) continue ;; esac
     { [ -e "$INSTALL_SRC/$name/$e" ] || [ -L "$INSTALL_SRC/$name/$e" ]; } && continue
     kind=$(entry_kind "$REALRW/$name/$e")
     [ -n "$kind" ] || continue
     printf '%s\t%s\t%s\tro\n' "$e" "$kind" "$REALRW/$name/$e"
-  done < <(ls -A -- "$REALRW/$name")
+  done < <(list_entries "$REALRW/$name")
 }
 
 # sync_level <view-dir> <state-file> <desired-fn> [fn-args...]: converge one

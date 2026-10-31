@@ -650,6 +650,73 @@ test_view_keeper_survives_bad_poll() {
   pass "keeper: an FM_VIEW_POLL value sleep cannot take keeps the default"
 }
 
+# The keeper lists the project itself, so a caller's QUOTING_STYLE, which
+# rewrites ls output even on a pipe, must not hide a name.
+test_view_ignores_caller_quoting_style() {
+  local base install proj out
+  skip_without_view "view quoting style" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+  printf 'spaced\n' > "$proj/spaced name.txt"
+
+  out=$(QUOTING_STYLE=shell-always view_run "$install" "$proj" '
+    [ -f "spaced name.txt" ] && echo "spaced=seen"
+    [ -f "src/app.js" ] && echo "plain=seen"
+  ') || fail "quoting-style view run failed"
+  assert_contains "$out" "spaced=seen" "a caller's QUOTING_STYLE hid a name holding a space"
+  assert_contains "$out" "plain=seen" "a caller's QUOTING_STYLE hid an ordinary directory"
+
+  pass "view: a caller's QUOTING_STYLE cannot hide a project entry"
+}
+
+test_view_name_spanning_two_listed_words() {
+  local base install proj out
+  skip_without_view "view two-word name" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+  printf 'listed\n' > "$proj/AGENTS.md CLAUDE.md"
+
+  out=$(view_run "$install" "$proj" '
+    [ -f "AGENTS.md CLAUDE.md" ] && echo "two_words=seen"
+  ') || fail "two-word view run failed"
+  assert_contains "$out" "two_words=seen" "a name spanning two listed words was hidden"
+
+  pass "view: a name holding a space never matches two adjacent list words"
+}
+
+# A newline splits an ls line, so the tail or head of such a name could read as
+# a second entry; the name is simply left out, and the real entry stays clean.
+test_view_line_break_name_forges_no_entry() {
+  local base install proj out
+  skip_without_view "view line-break name" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+  printf 'seed\n' > "$proj/seed"
+  printf 'odd\n' > "$proj/seed
+tail"
+
+  out=$(view_run "$install" "$proj" '
+    [ -f seed ] && echo "seed=seen"
+    [ ! -e "seed
+tail" ] && echo "odd=absent"
+    sleep 1.5
+  ' 2>&1) || fail "line-break view run failed: $out"
+  assert_contains "$out" "seed=seen" "the real entry beside a line-break name was lost"
+  assert_contains "$out" "odd=absent" "a line-break name was presented"
+  assert_not_contains "$out" "could not present" "a line-break name forged a second entry for its head"
+
+  pass "view: a name with a line break is left out and forges no other entry"
+}
+
 # A top-level file whose read-only remount fails is undone rather than left
 # writable at the launch path, and the keeper does not record it as
 # synchronized, so a later sync whose remount succeeds presents it read-only.
@@ -986,6 +1053,9 @@ test_view_git_shim_hostile_paths
 test_view_falsification
 test_view_keeper_refresh
 test_view_keeper_survives_bad_poll
+test_view_ignores_caller_quoting_style
+test_view_name_spanning_two_listed_words
+test_view_line_break_name_forges_no_entry
 test_view_failed_remount_retried
 test_view_project_symlink_boundary
 test_view_nested_mount_read_only

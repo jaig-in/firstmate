@@ -1274,6 +1274,79 @@ test_org_seed_relative_root_with_leading_dash() {
   pass "org seed: a relative --projects-root may start with a dash"
 }
 
+# --- record boundaries and registry names --------------------------------------
+
+test_discover_skips_line_break_names() {
+  local base org out
+  base=$(new_dir)
+  org="$base/org"
+  mkdir -p "$org/.firstmate/config" "$org/.firstmate/data"
+  printf '..\n' > "$org/.firstmate/config/projects-root"
+  fm_git_init_commit "$org/real"
+  fm_git_init_commit "$org/two
+lines"
+  out=$(FM_HOME="$org/.firstmate" "$ROOT/bin/fm-projects.sh" discover)
+  assert_equals real "$out" "a line break in a sibling's name forged a discovered project"
+  pass "discovery: a name with a line break cannot forge a second project"
+}
+
+# The tail of a broken record would read as a path relative to the cwd, so a
+# legacy whole-fleet refresh could fetch into an unrelated repository.
+test_legacy_refresh_skips_line_break_names() {
+  local base home cwd out
+  base=$(new_dir)
+  home="$base/home"
+  cwd="$base/cwd"
+  mkdir -p "$home/config" "$home/data" "$home/state" "$home/projects/a
+tail" "$cwd/tail"
+  fm_git_init_commit "$cwd/tail"
+  out=$(cd "$cwd" && FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" 2>/dev/null)
+  assert_not_contains "$out" "tail:" "a line break in a clone's name refreshed a directory under the cwd"
+  pass "legacy refresh: a clone with a line break in its name forges no relative path"
+}
+
+test_summary_reads_backslash_name_row() {
+  local home out
+  command -v jq >/dev/null 2>&1 || { printf 'ok - SKIP backslash registry name: no jq\n'; return 0; }
+  home=$(new_dir)
+  mkdir -p "$home/config" "$home/data" "$home/repo"
+  printf -- '- a\\tb [local-only] - name with a backslash (added 2026-10-30)\n' > "$home/data/projects.md"
+  jq -n --arg repo "$home/repo" '{"a\\tb": $repo}' > "$home/data/project-paths.json"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-projects.sh" summary)
+  assert_contains "$out" '[local-only]' "a backslash in a registered name lost its row's delivery mode"
+  pass "summary: a registered name reads its own row byte for byte"
+}
+
+# A multibyte path is ordinary text whatever the locale, and the writer and the
+# reader must agree on that.
+test_projects_root_non_ascii_c_locale() {
+  local base home root parent child out
+  base=$(new_dir)
+  home="$base/home"
+  root="$base/café"
+  mkdir -p "$home/config" "$root"
+  printf '%s\n' "$root" > "$home/config/projects-root"
+  out=$(LC_ALL=C FM_HOME="$home" "$ROOT/bin/fm-projects.sh" root 2>&1) \
+    || fail "the C locale refused a non-ASCII projects root: $out"
+  assert_equals "$(cd "$root" && pwd -P)" "$out" "a non-ASCII projects root resolved wrongly in the C locale"
+  printf '%s\001\n' "$root" > "$home/config/projects-root"
+  if LC_ALL=C FM_HOME="$home" "$ROOT/bin/fm-projects.sh" root >/dev/null 2>"$base/err"; then
+    fail "a control byte in config/projects-root was accepted"
+  fi
+  assert_grep "control byte" "$base/err" "the refusal did not name the control byte"
+  parent="$base/parent"
+  child="$base/child"
+  mkdir -p "$parent/data" "$parent/state" "$parent/config"
+  printf '%s\n' "$root" > "$parent/config/projects-root"
+  fm_git_init_commit "$root/alpha"
+  fm_git_add_origin "$root/alpha" "$base/remotes/alpha.git"
+  printf -- '- alpha [direct-PR] - alpha (added 2026-10-30)\n' > "$parent/data/projects.md"
+  scaffold_secondmate_charter "$parent" mate 'mate charter' alpha || fail "charter scaffold failed"
+  out=$(LC_ALL=C FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" alpha --projects-root "$root" 2>&1) \
+    || fail "the C locale refused a non-ASCII --projects-root: $out"
+  pass "projects root: only a control byte is refused, whatever the locale"
+}
+
 # --- an unreadable registry is a failure, never an empty one -------------------
 # An empty success reads as "this home registers nothing", so an org refresh
 # would skip every project without saying why.
@@ -2008,6 +2081,10 @@ test_project_lib_ignores_caller_git_env
 test_trust_check_runs_no_repository_command
 test_relative_path_ignores_cdpath
 test_org_seed_relative_root_with_leading_dash
+test_discover_skips_line_break_names
+test_legacy_refresh_skips_line_break_names
+test_summary_reads_backslash_name_row
+test_projects_root_non_ascii_c_locale
 test_spawn_refusal
 test_spawn_unborn_head_resolved_project
 test_org_seed
