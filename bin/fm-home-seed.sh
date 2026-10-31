@@ -810,7 +810,8 @@ REGISTRY_ROW_IS_AWK='
 registry_line_for_project() {
   local project=$1 line mode yolo manifest_path
   if [ -f "$DATA/projects.md" ]; then
-    line=$(awk -v n="$project" "$REGISTRY_ROW_IS_AWK"'
+    line=$(FM_REGISTRY_NAME="$project" awk "$REGISTRY_ROW_IS_AWK"'
+      BEGIN { n = ENVIRON["FM_REGISTRY_NAME"] }
       row_is(n) { print; exit }
     ' "$DATA/projects.md")
     if [ -n "$line" ]; then
@@ -909,8 +910,8 @@ sync_project_registry() {
   tmp="$sub_reg.tmp.$$"
   names=$(printf '%s\n' "$@" | awk '{ printf "%s%s", sep, $0; sep="\034" }')
   if [ -f "$sub_reg" ]; then
-    awk -v names="$names" "$REGISTRY_ROW_IS_AWK"'
-      BEGIN { k = split(names, a, "\034") }
+    FM_REGISTRY_NAMES="$names" awk "$REGISTRY_ROW_IS_AWK"'
+      BEGIN { k = split(ENVIRON["FM_REGISTRY_NAMES"], a, "\034") }
       { for (i = 1; i <= k; i++) if (row_is(a[i])) next; print }
     ' "$sub_reg" > "$tmp"
   else

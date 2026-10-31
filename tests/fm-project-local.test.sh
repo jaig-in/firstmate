@@ -1366,6 +1366,72 @@ test_quoted_registry_row_never_stops_a_walk() {
   pass "a quoted registry row never stops a walk, and a typed one is still refused"
 }
 
+# A backslash in a registered name reaches the row match byte for byte, so a
+# local-only project reads its own row and a refresh leaves it alone.
+test_backslash_local_only_row_stays_skipped() {
+  local base org home repo name before out
+  base=$(new_dir)
+  org="$base/org"
+  home="$org/.firstmate"
+  mkdir -p "$home/config" "$home/data"
+  printf '..\n' > "$home/config/projects-root"
+  printf -- '- d\\e [local-only] - backslashed\n- a\\tb [local-only] - escape-shaped\n' > "$home/data/projects.md"
+  for name in 'd\e' 'a\tb'; do
+    repo="$org/$name"
+    fm_git_init_commit "$repo"
+    fm_git_add_origin "$repo" "$base/$name.git"
+    git clone -q "$base/$name.git" "$base/$name.work"
+    git -C "$base/$name.work" -c user.name=t -c user.email=t@example.invalid \
+      commit -q --allow-empty -m ahead
+    git -C "$base/$name.work" push -q origin HEAD
+    assert_equals "local-only off" \
+      "$(FM_HOME="$home" "$ROOT/bin/fm-project-mode.sh" "$name" 2>/dev/null)" \
+      "$name did not read its own registry row"
+    before=$(git -C "$repo" rev-parse HEAD)
+    out=$(cd "$repo" && FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" . 2>&1) \
+      || fail "the path-form refresh of $name failed: $out"
+    assert_contains "$out" "$name: skipped: local-only project" "the path-form refresh did not skip $name"
+    assert_equals "$before" "$(git -C "$repo" rev-parse HEAD)" "the path-form refresh moved $name"
+  done
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" 2>&1) \
+    || fail "the whole-fleet refresh failed: $out"
+  assert_contains "$out" 'd\e: skipped: local-only project' "the whole-fleet refresh did not skip d\\e"
+  assert_contains "$out" 'a\tb: skipped: local-only project' "the whole-fleet refresh did not skip a\\tb"
+  pass "a backslash in a local-only name reads its own row and stays skipped"
+}
+
+# The same byte-for-byte match carries a backslashed row into a seeded child and
+# replaces that row on a reseed rather than leaving a second one beside it.
+test_org_seed_backslash_row() {
+  local base parent org child repo
+  command -v jq >/dev/null 2>&1 || { printf 'ok - SKIP backslash seed row: no jq\n'; return 0; }
+  base=$(new_dir)
+  parent="$base/parent"
+  org="$base/org"
+  child="$base/child"
+  mkdir -p "$parent/data" "$parent/state" "$parent/config" "$org"
+  repo="$base/outside/repo"
+  fm_git_init_commit "$repo"
+  fm_git_add_origin "$repo" "$base/repo.git"
+  repo=$(cd "$repo" && pwd -P)
+  printf -- '- a\\tb [direct-PR +yolo] - parent row\n' > "$parent/data/projects.md"
+  jq -n --arg repo "$repo" '{"a\\tb": $repo}' > "$parent/data/project-paths.json"
+  scaffold_secondmate_charter "$parent" mate 'mate charter' 'a\tb' \
+    || fail "charter scaffold failed"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" 'a\tb' \
+    --projects-root "$org" >/dev/null 2>"$base/err-seed" \
+    || fail "the seed failed: $(cat "$base/err-seed")"
+  assert_equals '- a\tb [direct-PR +yolo] - parent row' "$(cat "$child/data/projects.md")" \
+    "the child did not carry the parent's own row"
+  printf -- '- a\\tb [no-mistakes] - stale row\n' > "$child/data/projects.md"
+  FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" 'a\tb' \
+    --projects-root "$org" >/dev/null 2>"$base/err-reseed" \
+    || fail "the reseed failed: $(cat "$base/err-reseed")"
+  assert_equals '- a\tb [direct-PR +yolo] - parent row' "$(cat "$child/data/projects.md")" \
+    "the reseed left the child's stale row beside the parent's"
+  pass "org seed: a backslashed row keeps its bytes and replaces the child's"
+}
+
 # A multibyte path is ordinary text whatever the locale, and the writer and the
 # reader must agree on that.
 test_projects_root_non_ascii_c_locale() {
@@ -2158,6 +2224,7 @@ test_discover_skips_line_break_names
 test_legacy_refresh_skips_line_break_names
 test_summary_reads_backslash_name_row
 test_quoted_registry_row_never_stops_a_walk
+test_backslash_local_only_row_stays_skipped
 test_projects_root_non_ascii_c_locale
 test_init_interrupted_completes_on_rerun
 test_spawn_refusal
@@ -2167,6 +2234,7 @@ test_org_seed_path_registered
 test_org_seed_root_leaf_symlink
 test_org_seed_moved_alias
 test_org_seed_path_bytes
+test_org_seed_backslash_row
 test_org_seed_override_root
 test_registry_whole_names
 
