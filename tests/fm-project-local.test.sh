@@ -28,6 +28,8 @@
 #   - central resolver precedence: data/project-paths.json, then
 #     <projects-root>/<alias>, then $FM_HOME/projects/<alias>; projects/<name>
 #     prefers the legacy clone, except that FM_PROJECTS_OVERRIDE's root wins.
+#   - a data/projects.md that exists but cannot be read as a regular file is a
+#     named failure, never an empty registry.
 #   - data/project-paths.json refuses a control byte, an empty alias, or a
 #     second JSON document whole, with and without jq, so no decoded value can
 #     forge a record.
@@ -925,6 +927,45 @@ test_manifest_reader_without_jq() {
   pass "manifest reader: one-line, multi-line, and duplicate aliases agree with and without jq"
 }
 
+# --- an unreadable registry is a failure, never an empty one -------------------
+# An empty success reads as "this home registers nothing", so an org refresh
+# would skip every project without saying why.
+test_registry_read_failure() {
+  local base org home
+  base=$(new_dir)
+  org="$base/org"
+  home="$org/.firstmate"
+  mkdir -p "$home/config" "$home/data" "$home/state"
+  printf '..\n' > "$home/config/projects-root"
+  fm_git_init_commit "$org/app"
+  printf -- '- app [local-only] - app (added 2026-10-30)\n' > "$home/data/projects.md"
+
+  refuses() {  # <label>
+    if FM_HOME="$home" "$ROOT/bin/fm-projects.sh" aliases >/dev/null 2>"$base/err"; then
+      fail "$1: aliases reported success"
+    fi
+    assert_grep "projects.md" "$base/err" "$1: aliases did not name the registry"
+    if FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" >/dev/null 2>"$base/err"; then
+      fail "$1: a whole-fleet refresh reported success"
+    fi
+    assert_grep "projects.md" "$base/err" "$1: the refresh did not name the registry"
+  }
+
+  if [ "$(id -u)" -ne 0 ]; then
+    chmod 000 "$home/data/projects.md"
+    refuses "unreadable registry"
+    chmod 644 "$home/data/projects.md"
+  fi
+  rm -f "$home/data/projects.md"
+  mkdir "$home/data/projects.md"
+  refuses "directory at the registry path"
+  rmdir "$home/data/projects.md"
+  ln -s "$base/gone" "$home/data/projects.md"
+  refuses "dangling registry symlink"
+
+  pass "registry: an unreadable or non-regular data/projects.md fails rather than reading as empty"
+}
+
 # --- manifest record boundaries ----------------------------------------------
 # Entries travel as alias<TAB>path lines, so a decoded tab, newline, or other
 # control byte would forge a second record. Both readers refuse the whole
@@ -1601,6 +1642,7 @@ test_projects_root
 test_discovery_authority
 test_resolver_fails_closed
 test_manifest_reader_without_jq
+test_registry_read_failure
 test_manifest_record_boundaries
 test_manifest_alias_label
 test_project_name_path_forms

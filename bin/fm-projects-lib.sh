@@ -195,31 +195,36 @@ fm_project_manifest_lookup() {
 
 # fm_project_registered_aliases <data>: print every registered alias, one per
 # line, sorted and deduplicated: data/projects.md entries plus
-# data/project-paths.json keys.
+# data/project-paths.json keys. A registry that exists but cannot be read as a
+# regular file fails, because an empty success reads as "nothing is registered".
 fm_project_registered_aliases() {
-  local data=$1 manifest pairs=''
-  manifest=$(fm_project_manifest_path "$data")
-  if [ -f "$manifest" ]; then
-    pairs=$(fm_project_manifest_pairs "$data") || return 1
+  local data=$1 registry pairs names=''
+  registry=$data/projects.md
+  pairs=$(fm_project_manifest_pairs "$data") || return 1
+  if [ -e "$registry" ] || [ -L "$registry" ]; then
+    [ -f "$registry" ] && [ -r "$registry" ] || {
+      echo "error: $registry must be a readable regular file" >&2
+      return 1
+    }
+    # The whole name runs to " [" or " - ", whichever comes first, so a spaced
+    # name is one alias rather than its first word.
+    names=$(awk '
+      substr($0, 1, 2) == "- " {
+        rest = substr($0, 3)
+        cut = index(rest, " [")
+        dash = index(rest, " - ")
+        if (dash > 0 && (cut == 0 || dash < cut)) cut = dash
+        name = cut > 0 ? substr(rest, 1, cut - 1) : rest
+        if (name != "") print name
+      }
+    ' "$registry") || {
+      echo "error: could not read $registry" >&2
+      return 1
+    }
   fi
   {
-    if [ -f "$data/projects.md" ]; then
-      # The whole name runs to " [" or " - ", whichever comes first, so a
-      # spaced name is one alias rather than its first word.
-      awk '
-        substr($0, 1, 2) == "- " {
-          rest = substr($0, 3)
-          cut = index(rest, " [")
-          dash = index(rest, " - ")
-          if (dash > 0 && (cut == 0 || dash < cut)) cut = dash
-          name = cut > 0 ? substr(rest, 1, cut - 1) : rest
-          if (name != "") print name
-        }
-      ' "$data/projects.md"
-    fi
-    if [ -n "$pairs" ]; then
-      printf '%s\n' "$pairs" | cut -f1
-    fi
+    [ -z "$names" ] || printf '%s\n' "$names"
+    [ -z "$pairs" ] || printf '%s\n' "$pairs" | cut -f1
   } | sort -u
 }
 
