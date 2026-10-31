@@ -1181,6 +1181,99 @@ test_summary_unreadable_instructions() {
   pass "summary: an unreadable instruction file is named rather than reported absent"
 }
 
+# --- caller environment --------------------------------------------------------
+
+# Git exports GIT_DIR into every hook, so a launcher run from one must still
+# act on the repository it stands in.
+test_init_ignores_caller_git_env() {
+  local base here other
+  base=$(new_dir)
+  here="$base/here"
+  other="$base/other"
+  fm_git_init_commit "$here"
+  fm_git_init_commit "$other"
+  (cd "$here" && GIT_DIR="$other/.git" GIT_WORK_TREE="$other" "$ROOT/bin/firstmate" init) >/dev/null \
+    || fail "init failed under a caller-exported repository"
+  assert_present "$here/.firstmate/.fm-home" "init did not scaffold the repository it ran in"
+  assert_absent "$other/.firstmate" "a caller-exported GIT_WORK_TREE redirected init into another repository"
+  pass "init: a caller-exported git repository cannot redirect the scaffold"
+}
+
+test_project_lib_ignores_caller_git_env() {
+  local base org other out
+  base=$(new_dir)
+  org="$base/org"
+  other="$base/other"
+  mkdir -p "$org/.firstmate/config" "$org/.firstmate/data" "$org/plain"
+  printf '..\n' > "$org/.firstmate/config/projects-root"
+  fm_git_init_commit "$other"
+  fm_git_init_commit "$org/repo"
+  out=$(GIT_DIR="$other/.git" FM_HOME="$org/.firstmate" "$ROOT/bin/fm-projects.sh" discover)
+  assert_equals repo "$out" "a caller-exported GIT_DIR made a plain directory discoverable"
+  out=$(GIT_DIR="$other/.git" FM_HOME="$org/.firstmate" "$ROOT/bin/fm-projects.sh" resolve plain)
+  assert_equals plain "$out" "a caller-exported GIT_DIR made a plain directory a project"
+  pass "project library: a caller-exported GIT_DIR cannot make a directory a repository"
+}
+
+# Reading an untrusted home's marker bypasses git's ownership check, so it must
+# not run a command that repository's own config names.
+test_trust_check_runs_no_repository_command() {
+  local base repo fakebin ran
+  base=$(new_dir)
+  repo="$base/repo"
+  ran="$base/fsmonitor-ran"
+  fm_git_init_commit "$repo"
+  mkdir -p "$repo/.firstmate"
+  : > "$repo/.firstmate/.fm-home"
+  printf '#!/bin/sh\n: > "%s"\nexit 1\n' "$ran" > "$base/fsmonitor"
+  chmod +x "$base/fsmonitor"
+  git -C "$repo" config core.fsmonitor "$base/fsmonitor"
+  git -C "$repo" status >/dev/null 2>&1
+  rm -f "$ran"
+  git -C "$repo/.firstmate" ls-files --error-unmatch -- .fm-home >/dev/null 2>&1 || true
+  [ -e "$ran" ] || { printf 'ok - SKIP trust check command: this git ran no fsmonitor for ls-files\n'; return 0; }
+  rm -f "$ran"
+  fakebin=$(make_fake_harness "$base/fakebin")
+  (cd "$repo" && env -u FM_HOME FM_FAKE_HARNESS_OUT="$base/out" PATH="$fakebin:$PATH" \
+    "$ROOT/bin/firstmate" --mode install) >/dev/null 2>&1 || true
+  assert_absent "$ran" "the trust check ran a command from the repository's own config"
+  pass "trust check: reading the marker runs no command from the repository's config"
+}
+
+test_relative_path_ignores_cdpath() {
+  local base org home other out
+  base=$(new_dir)
+  org="$base/org"
+  home="$org/.firstmate"
+  other="$base/other"
+  mkdir -p "$home/config" "$home/data" "$home/state" "$other/app"
+  printf '..\n' > "$home/config/projects-root"
+  fm_git_init_commit "$org/app"
+  printf -- '- app [local-only] - app (added 2026-10-30)\n' > "$home/data/projects.md"
+  out=$(cd "$org" && CDPATH="$other" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" "$ROOT/bin/fm-fleet-sync.sh" app/ 2>&1) \
+    || fail "a caller's CDPATH redirected a relative project path: $out"
+  assert_contains "$out" "app:" "a relative project path lost its registered name under CDPATH"
+  pass "project library: a caller's CDPATH cannot redirect a relative path"
+}
+
+test_org_seed_relative_root_with_leading_dash() {
+  local base parent org child out
+  base=$(new_dir)
+  parent="$base/parent"
+  org="$base/-org"
+  child="$base/child"
+  mkdir -p "$parent/data" "$parent/state" "$parent/config" "$org"
+  printf '%s\n' "$org" > "$parent/config/projects-root"
+  fm_git_init_commit "$org/alpha"
+  fm_git_add_origin "$org/alpha" "$base/remotes/alpha.git"
+  printf -- '- alpha [direct-PR] - alpha (added 2026-10-30)\n' > "$parent/data/projects.md"
+  scaffold_secondmate_charter "$parent" mate 'mate charter' alpha || fail "charter scaffold failed"
+  out=$(cd "$base" && FM_HOME="$parent" "$ROOT/bin/fm-home-seed.sh" mate "$child" alpha --projects-root -org 2>&1) \
+    || fail "a relative --projects-root with a leading dash was refused: $out"
+  assert_grep "/-org" "$child/config/projects-root" "the child did not record the resolved root"
+  pass "org seed: a relative --projects-root may start with a dash"
+}
+
 # --- an unreadable registry is a failure, never an empty one -------------------
 # An empty success reads as "this home registers nothing", so an org refresh
 # would skip every project without saying why.
@@ -1910,6 +2003,11 @@ test_spawn_malformed_projects_root
 test_org_seed_manifest_symlink
 test_bless_marker_not_regular
 test_summary_unreadable_instructions
+test_init_ignores_caller_git_env
+test_project_lib_ignores_caller_git_env
+test_trust_check_runs_no_repository_command
+test_relative_path_ignores_cdpath
+test_org_seed_relative_root_with_leading_dash
 test_spawn_refusal
 test_spawn_unborn_head_resolved_project
 test_org_seed

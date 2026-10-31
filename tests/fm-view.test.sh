@@ -625,6 +625,31 @@ test_view_keeper_refresh() {
   pass "keeper: a top-level entry created outside the session appears inside it"
 }
 
+# FM_VIEW_POLL reaches sleep, whose refusal would end the keeper's loop without
+# a word, so a value sleep cannot take keeps the default instead.
+test_view_keeper_survives_bad_poll() {
+  local base install proj out
+  skip_without_view "view keeper bad poll" && return 0
+  base=$(new_dir)
+  install="$base/install"
+  make_install "$install"
+  proj="$base/demo"
+  make_project "$proj"
+
+  out=$( (cd "$proj" && FM_HOME="$proj/.firstmate" FM_VIEW_POLL=1.2.3 \
+    "$ROOT/bin/fm-view.sh" run --install "$install" --launch "$proj" -- bash -c '
+      touch "$FM_LAUNCH_REAL_RW/late.txt.sig"
+      for i in $(seq 1 40); do [ -e late.txt ] && break; sleep 0.2; done
+      [ -e late.txt ] && echo "late=seen"
+    ') &
+  for i in $(seq 1 50); do [ -e "$proj/late.txt.sig" ] && break; sleep 0.2; done
+  : > "$proj/late.txt"
+  wait) || fail "bad-poll view run failed"
+  assert_contains "$out" "late=seen" "a bad FM_VIEW_POLL stopped the keeper"
+
+  pass "keeper: an FM_VIEW_POLL value sleep cannot take keeps the default"
+}
+
 # A top-level file whose read-only remount fails is undone rather than left
 # writable at the launch path, and the keeper does not record it as
 # synchronized, so a later sync whose remount succeeds presents it read-only.
@@ -960,6 +985,7 @@ test_view_git_shim
 test_view_git_shim_hostile_paths
 test_view_falsification
 test_view_keeper_refresh
+test_view_keeper_survives_bad_poll
 test_view_failed_remount_retried
 test_view_project_symlink_boundary
 test_view_nested_mount_read_only

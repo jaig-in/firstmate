@@ -236,13 +236,27 @@ fm_project_registered_aliases() {
   } | sort -u
 }
 
+# fm_project_git <git-args...>: git with every repository-redirecting variable
+# the caller may export cleared - git's own local set (`git rev-parse
+# --local-env-vars`) plus GIT_CEILING_DIRECTORIES - so discovery starts from the
+# directory given. Git exports GIT_DIR into every hook, so an inherited value is
+# ordinary, and with it any directory would read as its own work-tree root.
+fm_project_git() {
+  env -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_CONFIG -u GIT_CONFIG_PARAMETERS \
+    -u GIT_CONFIG_COUNT -u GIT_OBJECT_DIRECTORY -u GIT_DIR -u GIT_WORK_TREE \
+    -u GIT_IMPLICIT_WORK_TREE -u GIT_GRAFT_FILE -u GIT_INDEX_FILE \
+    -u GIT_NO_REPLACE_OBJECTS -u GIT_REPLACE_REF_BASE -u GIT_PREFIX \
+    -u GIT_SHALLOW_FILE -u GIT_COMMON_DIR -u GIT_CEILING_DIRECTORIES \
+    git "$@"
+}
+
 # fm_project_is_git_root <dir>: true when <dir> is the root of its own git
 # work tree, not merely a directory nested inside one.
 fm_project_is_git_root() {
   local dir=$1 top
   [ -d "$dir" ] || return 1
-  top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || return 1
-  [ "$top" = "$(cd "$dir" && pwd -P)" ]
+  top=$(fm_project_git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || return 1
+  [ "$top" = "$(CDPATH='' cd -- "$dir" && pwd -P)" ]
 }
 
 # fm_project_resolve <home> <config> <data> <arg>: resolve a project argument
@@ -367,8 +381,8 @@ fm_project_discover() {
   }
   for child in "$root"/*; do
     [ -d "$child" ] || continue
-    top=$(git -C "$child" rev-parse --show-toplevel 2>/dev/null) || continue
-    [ "$top" = "$(cd "$child" && pwd -P)" ] || continue
+    top=$(fm_project_git -C "$child" rev-parse --show-toplevel 2>/dev/null) || continue
+    [ "$top" = "$(CDPATH='' cd -- "$child" && pwd -P)" ] || continue
     basename "$child"
   done
 }
@@ -377,13 +391,13 @@ fm_project_discover() {
 # registered alias whose resolved path is <path>, or nothing.
 fm_project_alias_for_path() {
   local home=$1 config=$2 data=$3 path=$4 alias resolved target aliases
-  target=$(cd "$path" 2>/dev/null && pwd -P) || target=$path
+  target=$(CDPATH='' cd -- "$path" 2>/dev/null && pwd -P) || target=$path
   aliases=$(fm_project_registered_aliases "$data") || return 1
   while IFS= read -r alias; do
     [ -n "$alias" ] || continue
     resolved=$(fm_project_resolve "$home" "$config" "$data" "$alias") || return 1
     [ "$resolved" != "$alias" ] || continue
-    resolved=$(cd "$resolved" 2>/dev/null && pwd -P) || continue
+    resolved=$(CDPATH='' cd -- "$resolved" 2>/dev/null && pwd -P) || continue
     if [ "$resolved" = "$target" ]; then
       printf '%s\n' "$alias"
       return 0

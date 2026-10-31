@@ -542,7 +542,7 @@ register_org_project() {
   require_registered_project "$project" || return 1
   src=$(seed_project_source "$project") || return 1
   [ -d "$src" ] || { echo "error: project $project not found at $src" >&2; return 1; }
-  top=$(git -C "$src" rev-parse --show-toplevel 2>/dev/null) || {
+  top=$(fm_project_git -C "$src" rev-parse --show-toplevel 2>/dev/null) || {
     echo "error: project $project at $src is not a git repo" >&2
     return 1
   }
@@ -1084,7 +1084,7 @@ seed_home() {
       echo "error: --projects-root is not a directory: $projects_root_arg" >&2
       return 1
     }
-    SEED_PROJECTS_ROOT=$(cd "$projects_root_arg" 2>/dev/null && pwd -P) || {
+    SEED_PROJECTS_ROOT=$(CDPATH='' cd -- "$projects_root_arg" 2>/dev/null && pwd -P) || {
       echo "error: --projects-root directory cannot be resolved: $projects_root_arg" >&2
       return 1
     }

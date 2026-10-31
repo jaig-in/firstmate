@@ -160,7 +160,8 @@ nearest_firstmate_home() {
 # call here would fail and the "not a repo" leg would read that home as
 # trusted. What decides is the marker's tracked state, never git ownership.
 # Git runs through trust_git, so a caller-exported alternate index, repository,
-# or ceiling cannot make the check read state other than the home's own.
+# or ceiling cannot make the check read state other than the home's own, and
+# the untrusted repository's config cannot run a command during the check.
 home_is_trusted() {
   local rc=0
   [ -f "$1/$HOME_MARKER" ] && [ ! -L "$1/$HOME_MARKER" ] || return 1
@@ -172,17 +173,12 @@ home_is_trusted() {
   ! trust_git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1
 }
 
-# trust_git <git-args...>: git with every repository-redirecting variable the
-# caller may export cleared - git's own local set (`git rev-parse
-# --local-env-vars`) plus GIT_CEILING_DIRECTORIES - so discovery starts from
-# the directory given and reads that repository's own index.
+# trust_git <git-args...>: fm_project_git for reading a repository this launch
+# does not trust yet. Bypassing git's ownership check also drops the protection
+# it gives against that repository's config, so core.fsmonitor, the one setting
+# that makes these reads run a command, is switched off.
 trust_git() {
-  env -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_CONFIG -u GIT_CONFIG_PARAMETERS \
-    -u GIT_CONFIG_COUNT -u GIT_OBJECT_DIRECTORY -u GIT_DIR -u GIT_WORK_TREE \
-    -u GIT_IMPLICIT_WORK_TREE -u GIT_GRAFT_FILE -u GIT_INDEX_FILE \
-    -u GIT_NO_REPLACE_OBJECTS -u GIT_REPLACE_REF_BASE -u GIT_PREFIX \
-    -u GIT_SHALLOW_FILE -u GIT_COMMON_DIR -u GIT_CEILING_DIRECTORIES \
-    git -c safe.directory='*' "$@"
+  fm_project_git -c safe.directory='*' -c core.fsmonitor=false "$@"
 }
 
 # require_trusted_home <home>: die when an ancestor-discovered home lacks the
@@ -199,7 +195,7 @@ require_trusted_home() {
 
 # repo_top <dir>: print the enclosing git worktree root, or nothing.
 repo_top() {
-  git -C "$1" rev-parse --show-toplevel 2>/dev/null
+  fm_project_git -C "$1" rev-parse --show-toplevel 2>/dev/null
 }
 
 # scaffold_home <dir> [--register-self]: create the .firstmate/ layout.
@@ -234,7 +230,7 @@ EOF
     local top name mode
     top=$(repo_top "$home") || die "internal: --register-self outside a repo"
     name=$(basename "$top")
-    if git -C "$top" remote get-url origin >/dev/null 2>&1; then
+    if fm_project_git -C "$top" remote get-url origin >/dev/null 2>&1; then
       mode="no-mistakes-prod-only"
     else
       mode="local-only"

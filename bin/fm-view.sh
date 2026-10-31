@@ -65,8 +65,14 @@ MERGE_DIRS="bin docs"
 HIDE="AGENTS.override.md CLAUDE.local.md .mcp.json opencode.json opencode.jsonc"
 RW_ENTRIES=".firstmate"
 INSTR_FILES="AGENTS.md AGENTS.override.md CLAUDE.md CLAUDE.local.md .claude/CLAUDE.md"
+# Anything sleep would refuse, or a zero that would spin, keeps the default: a
+# failed sleep would end the keeper's loop without a word.
 POLL=${FM_VIEW_POLL:-2}
-case "$POLL" in '' | *[!0-9.]*) POLL=2 ;; esac
+case "$POLL" in
+  *[!0-9.]* | *.*.*) POLL=2 ;;
+  *[1-9]*) ;;
+  *) POLL=2 ;;
+esac
 
 die() { echo "fm-view: $*" >&2; exit 1; }
 inlist() { case " $2 " in *" $1 "*) return 0 ;; esac; return 1; }

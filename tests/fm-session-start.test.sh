@@ -989,6 +989,34 @@ EOF
   pass "LAUNCH CONTEXT reports an unreadable registry instead of calling the repo unregistered"
 }
 
+# Git exports GIT_DIR into every hook, so a launch from one still primes the
+# repository it stands in.
+test_launch_context_ignores_caller_git_env() {
+  local rec root home fakebin proj other out repo_root
+  rec=$(new_world launch-git-env)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+
+  proj="${home%/home}/demo"
+  other="${home%/home}/other"
+  fm_git_init_commit "$proj"
+  fm_git_init_commit "$other"
+  repo_root=$(cd "$proj" && pwd -P)
+  mkdir -p "$proj/src"
+  printf -- '- demo [local-only] - demo project (added 2026-10-30)\n' > "$home/data/projects.md"
+  printf '{"demo": "%s"}\n' "$repo_root" > "$home/data/project-paths.json"
+
+  out=$(GIT_DIR="$other/.git" GIT_WORK_TREE="$other" \
+    run_session_start_launched_from "$home" "$root" "$fakebin:$BASE_PATH" "$repo_root/src")
+  assert_contains "$out" "Repo root: $repo_root" "a caller-exported repository replaced the launch repository"
+  assert_contains "$out" "Project alias: demo" "a caller-exported repository lost the registered alias"
+
+  pass "LAUNCH CONTEXT primes the launch repository whatever git variables the caller exports"
+}
+
 test_launch_context_unreadable_instructions_are_named() {
   local rec root home fakebin proj out repo_root
   if [ "$(id -u)" -eq 0 ]; then
@@ -3544,6 +3572,7 @@ test_launch_context_org_launch_summarizes_projects
 test_launch_context_view_lists_shadowed_entries_instead_of_excerpt
 test_launch_context_excerpt_caps_long_lines
 test_launch_context_unreadable_registry_is_not_reported_unregistered
+test_launch_context_ignores_caller_git_env
 test_launch_context_unreadable_instructions_are_named
 test_launch_context_non_repo_launch_omits_section_and_instructions
 test_launch_context_linked_worktree_resolves_registry_via_main_worktree

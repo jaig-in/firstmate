@@ -73,7 +73,7 @@ registry_mode() {
 # extension over at most the first 20000 tracked paths; "unknown" when no
 # tracked file has a recognized source extension.
 main_language() {
-  git -C "$1" ls-files 2>/dev/null | head -n 20000 | awk '
+  fm_project_git -C "$1" ls-files 2>/dev/null | head -n 20000 | awk '
     BEGIN {
       split("sh:Shell bash:Shell zsh:Shell py:Python ts:TypeScript tsx:TypeScript mts:TypeScript cts:TypeScript js:JavaScript jsx:JavaScript mjs:JavaScript cjs:JavaScript go:Go rs:Rust java:Java kt:Kotlin kts:Kotlin rb:Ruby php:PHP c:C h:C cc:C++ cpp:C++ cxx:C++ hpp:C++ hh:C++ cs:C# swift:Swift m:Objective-C mm:Objective-C scala:Scala dart:Dart ex:Elixir exs:Elixir erl:Erlang lua:Lua r:R jl:Julia hs:Haskell ml:OCaml clj:Clojure zig:Zig nim:Nim vue:Vue svelte:Svelte html:HTML css:CSS scss:CSS sql:SQL tf:Terraform nix:Nix ps1:PowerShell pl:Perl", pairs, " ")
       for (i in pairs) { split(pairs[i], kv, ":"); lang[kv[1]] = kv[2] }

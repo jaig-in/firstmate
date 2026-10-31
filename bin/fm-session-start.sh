@@ -493,7 +493,7 @@ print_launch_context() {
   [ -d "$FM_LAUNCH_DIR" ] || return 0
   launch_dir=$(CDPATH='' cd -- "$FM_LAUNCH_DIR" && pwd -P) || return 0
   install_root=$(CDPATH='' cd -- "$FM_ROOT" && pwd -P) || install_root=$FM_ROOT
-  if ! repo_root=$(git -C "$launch_dir" rev-parse --show-toplevel 2>/dev/null); then
+  if ! repo_root=$(fm_project_git -C "$launch_dir" rev-parse --show-toplevel 2>/dev/null); then
     [ -n "${FM_LAUNCH_ROOT:-}" ] && [ -d "$FM_LAUNCH_ROOT" ] || return 0
     org_root=$(CDPATH='' cd -- "$FM_LAUNCH_ROOT" && pwd -P) || return 0
     case "$launch_dir/" in "$org_root"/*) ;; *) return 0 ;; esac
@@ -510,7 +510,7 @@ print_launch_context() {
   [ "$repo_root" != "$install_root" ] || return 0
 
   main_root=$repo_root
-  common_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || common_dir=
+  common_dir=$(fm_project_git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || common_dir=
   case $common_dir in
     */.git)
       common_dir=$(CDPATH='' cd -- "${common_dir%/.git}" 2>/dev/null && pwd -P) && main_root=$common_dir
