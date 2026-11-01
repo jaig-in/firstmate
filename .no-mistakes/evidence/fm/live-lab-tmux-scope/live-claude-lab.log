@@ -1,0 +1,91 @@
+### decoy on default socket
+[decoy pid 3189103 alive; windows: firstmate:main ; typed-lab-text lines: 0]
+### LAB 1: up --harness claude --mate --worker
+lab: /tmp/ns/fmlab1 (tear down with: bin/fm-live-lab.sh down /tmp/ns/fmlab1)
+tree: 5d9b5dbfc4bd4371790e53543b4c328a915f8bb1 from /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVBN6P0NG3P41F6XVHYN9K
+scaffolded: /tmp/ns/fmlab1/home/data/lab8562cdc2b9be-mate/brief.md (secondmate charter)
+home=/tmp/ns/fmlab1/mate
+spawned lab8562cdc2b9be-mate harness=claude kind=secondmate mode=secondmate yolo=off window=firstmate:fm-lab8562cdc2b9be-mate worktree=/tmp/ns/fmlab1/mate
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: treehouse get did not enter an isolated worktree within 60s (last seen '/tmp/ns/fmlab1/home/projects/notes': it is the spawning project itself; spawning project '/tmp/ns/fmlab1/home/projects/notes'); inspect window firstmate:fm-lab85
+fm-live-lab: cannot launch the gated worker
+up exit=1
+[decoy pid 3189103 alive; windows: firstmate:main ; typed-lab-text lines: 0]
+lab socket: /tmp/fml.LOmD18/tmux-1000/default
+srw------- 1 jb jb 0 Nov  1 10:38 /tmp/fml.LOmD18/tmux-1000/default
+lab windows:
+  firstmate:lab dead=0 cmd=sh
+  firstmate:fm-lab8562cdc2b9be-mate dead=0 cmd=claude
+  firstmate:fm-lab8562cdc2b9be-worker dead=0 cmd=zsh
+### a lab process sees the same socket through TMUX_TMPDIR
+TMUX_TMPDIR form: lab fm-lab8562cdc2b9be-mate fm-lab8562cdc2b9be-worker 
+### check
+fail primary: window main is not running
+fail probe: no LABREADY-8562cdc2b9be reply in window main (model refused, turn still running, or a dialog is open)
+fail trust: /tmp/ns/fmlab1/home has no registered Claude workspace trust
+fail mirror: fm-host-mirror.sh check exited 1 
+fail host: no live supervision host (expected one)
+fail watcher: no live watcher with a fresh beacon holds the lab home
+ok mate: lab8562cdc2b9be-mate pid 3196979 in /tmp/ns/fmlab1/mate
+fail worker: the lab8562cdc2b9be-worker window is not running
+ok treehouse: ~/.treehouse unchanged
+check exit=1
+### say + pane
+fm-live-lab: no lab window named 'main'
+say exit=1
+fm-live-lab: no lab window named 'main'
+SAYECHO lines in lab pane: 0
+lab trust entries in overlaid ~/.claude.json: 1
+[decoy pid 3189103 alive; windows: firstmate:main ; typed-lab-text lines: 0]
+### down lab 1
+stopped: lab tmux server and lab processes
+removed: task temp /tmp/fm-lab8562cdc2b9be-mate+5ec3acfb6eb27f3014c4db61f93751abd65a38d65c4cd5738020b9fbf18e7e2e
+removed: task temp /tmp/fm-lab8562cdc2b9be-mate
+removed: 1 Claude project entries under /tmp/ns/fmlab1
+removed: /tmp/ns/fmlab1
+down exit=0
+[decoy pid 3189103 alive; windows: firstmate:main ; typed-lab-text lines: 0]
+ls: cannot access '/tmp/ns/fmlab1': No such file or directory
+ls: cannot access '/tmp/fml.LOmD18': No such file or directory
+(end of lab-1 survivor list)
+### LAB 2: primary only, then its tmux directory disappears under it
+lab: /tmp/ns/fmlab2 (tear down with: bin/fm-live-lab.sh down /tmp/ns/fmlab2)
+tree: 5d9b5dbfc4bd4371790e53543b4c328a915f8bb1 from /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVBN6P0NG3P41F6XVHYN9K
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+ok primary: claude pid 3480228 in /tmp/ns/fmlab2/home
+ok probe: the primary answered LABREADY-ed55ce25cfac
+ok trust: /tmp/ns/fmlab2/home is trusted in the Claude store
+ok mirror: verified writer, check passed, captain=1 main=1
+ok host: skipped (empty fleet arms no supervision)
+ok watcher: skipped (empty fleet)
+ok treehouse: ~/.treehouse unchanged
+ready: /tmp/ns/fmlab2
+up exit=0
+ls: cannot access '/tmp/fml.VWvvr4': No such file or directory
+### control: the TMUX_TMPDIR-only form now reaches the decoy
+  fell through to: firstmate:main
+--- pane /tmp/ns/fmlab2
+fm-live-lab: no lab window named 'main'
+exit=1
+--- say /tmp/ns/fmlab2 LAB-TYPED-TEXT
+fm-live-lab: no lab window named 'main'
+exit=1
+--- check /tmp/ns/fmlab2
+fail primary: window main is not running
+fail probe: no LABREADY-ed55ce25cfac reply in window main (model refused, turn still running, or a dialog is open)
+ok mirror: verified writer, check passed, captain=1 main=1
+exit=1
+[decoy pid 3189103 alive; windows: firstmate:main ; typed-lab-text lines: 0]
+--- down /tmp/ns/fmlab2
+stopped: lab tmux server and lab processes
+fm-lab-home: recorded tmux directory is missing or unsafe
+fm-live-lab: cannot remove the private tmux directory
+down exit=1
+[decoy pid 3189103 alive; windows: firstmate:main ; typed-lab-text lines: 0]
+default server still holds its session

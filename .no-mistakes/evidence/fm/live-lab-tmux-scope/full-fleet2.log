@@ -1,0 +1,94 @@
+neutral rc in force: PROMPT="%~ %% "
+treehouse binary filesystem: overlay
+before: v2.1.0 TREEHOUSE_ROOT strings=0
+Checking for updates...
+Updating v2.1.0 → v3.1.8...
+Successfully updated treehouse v2.1.0 → v3.1.8
+after: v3.1.8 TREEHOUSE_ROOT strings=3
+[decoy pid 1491136 alive; windows: firstmate:main ; lab-text lines: 0]
+### up --harness claude --mate --worker
+lab: /tmp/ns/fleet (tear down with: bin/fm-live-lab.sh down /tmp/ns/fleet)
+tree: 5d9b5dbfc4bd4371790e53543b4c328a915f8bb1 from /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVBN6P0NG3P41F6XVHYN9K
+scaffolded: /tmp/ns/fleet/home/data/labdc2e246e6e42-mate/brief.md (secondmate charter)
+home=/tmp/ns/fleet/mate
+spawned labdc2e246e6e42-mate harness=claude kind=secondmate mode=secondmate yolo=off window=firstmate:fm-labdc2e246e6e42-mate worktree=/tmp/ns/fleet/mate
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+spawned labdc2e246e6e42-worker harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labdc2e246e6e42-worker worktree=/tmp/ns/fleet/treehouse/.treehouse/notes-4f3af8/1/notes
+gate: /tmp/ns/fleet/home/data/labdc2e246e6e42-worker/gate (touch, then message the worker to resume)
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+ok primary: claude pid 1515293 in /tmp/ns/fleet/home
+ok probe: the primary answered LABREADY-dc2e246e6e42
+ok trust: /tmp/ns/fleet/home is trusted in the Claude store
+ok mirror: verified writer, check passed, captain=1 main=1
+ok host: supervision host pid 1551626
+ok watcher: live watcher with a fresh beacon
+ok mate: labdc2e246e6e42-mate pid 1500741 in /tmp/ns/fleet/mate
+ok worker: labdc2e246e6e42-worker parked on /tmp/ns/fleet/home/data/labdc2e246e6e42-worker/gate
+ok treehouse: ~/.treehouse unchanged
+ready: /tmp/ns/fleet
+up exit=0
+[decoy pid 1491136 alive; windows: firstmate:main ; lab-text lines: 0]
+lab socket: /tmp/fml.eOnq2Z/tmux-1000/default
+  firstmate:lab dead=0 cmd=zsh path=/tmp/ns/fleet
+  firstmate:fm-labdc2e246e6e42-mate dead=0 cmd=claude path=/tmp/ns/fleet/mate
+  firstmate:fm-labdc2e246e6e42-worker dead=0 cmd=claude path=/tmp/ns/fleet/treehouse/.treehouse/notes-4f3af8/1/notes
+  firstmate:main dead=0 cmd=claude path=/tmp/ns/fleet/home
+### a lab process reaches the same server through TMUX_TMPDIR
+TMUX_TMPDIR form: lab fm-labdc2e246e6e42-mate fm-labdc2e246e6e42-worker main 
+### check
+ok primary: claude pid 1515293 in /tmp/ns/fleet/home
+ok probe: the primary answered LABREADY-dc2e246e6e42
+ok trust: /tmp/ns/fleet/home is trusted in the Claude store
+ok mirror: verified writer, check passed, captain=1 main=1
+ok host: supervision host pid 1551626
+ok watcher: live watcher with a fresh beacon
+ok mate: labdc2e246e6e42-mate pid 1500741 in /tmp/ns/fleet/mate
+ok worker: labdc2e246e6e42-worker parked on /tmp/ns/fleet/home/data/labdc2e246e6e42-worker/gate
+ok treehouse: ~/.treehouse unchanged
+check exit=0
+### say to primary, read pane
+say exit=0
+waited 240s; reply lines: 0
+--- primary pane tail
+ ▐▛███▛█   Claude Code v2.1.316
+▝▜██████▀  Sonnet 5.5 with medium effort · Claude Ultra
+ ▝▝   ▝▝   /tmp/ns/fleet/home
+❯ Lab readiness probe from bin/fm-live-lab.sh. Run no tool or command for this message. Reply with only the word LABREADY, a hyphen, and then dc2e246e6e42, with no spac
+● LABREADY-dc2e246e6e42                                                                                                                                                 
+✻ Cogitated for 5s · done 11:18 AM                                                                                                                                     
+❯ /auto-mode-setup                                                                                                                                                      
+────────────────────────────────────────────────────────�
+  You already have auto-mode entries — add to them, or start fresh?                                                                                                     
+  ❯ 1. Add to them (keeps your existing entries)                                                                                                                        
+    2. Start fresh (replaces the environment section)
+    3. Cancel                      
+  Enter to continue · Esc to cancel
+### worker pane
+  ⎿  Allowed by auto mode
+● I'm in the isolated worktree on branch fm/labdc2e246e6e42-worker. I appended a paused status line naming the gate file /tmp/ns/fleet/home/data/labdc2e246e6e
+  arrives and the gate file exists. I haven't started count_notes() or its test.
+✻ Cooked for 11s · done 11:18 AM                        
+─────────────────────────────────────────────────────�
+❯ 
+─────────────────────────────────────────────────────�
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 2 agents                                                                                                      
+[decoy pid 1491136 alive; windows: firstmate:main ; lab-text lines: 0]
+### down
+stopped: lab tmux server and lab processes
+removed: task temp /tmp/fm-labdc2e246e6e42-mate+89c82e0b8686683ef8256aa3f36b4ead8c626c2d9bb379c1a9f02b190acca074
+removed: task temp /tmp/fm-labdc2e246e6e42-mate
+removed: task temp /tmp/fm-labdc2e246e6e42-worker+89c82e0b8686683ef8256aa3f36b4ead8c626c2d9bb379c1a9f02b190acca074
+removed: task temp /tmp/fm-labdc2e246e6e42-worker
+removed: 4 Claude project entries under /tmp/ns/fleet
+removed: /tmp/ns/fleet
+down exit=0
+[decoy pid 1491136 alive; windows: firstmate:main ; lab-text lines: 0]
+ls: cannot access '/tmp/ns/fleet': No such file or directory
+ls: cannot access '/tmp/fml.eOnq2Z': No such file or directory
+(end of survivor list)

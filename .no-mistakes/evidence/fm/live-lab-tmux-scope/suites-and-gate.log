@@ -1,0 +1,68 @@
+=== A. suite beside a live default server: the gate must skip, decoy must survive
+decoy pid 2587611 on /tmp/tmux-1000/default
+--- tests/fm-live-lab.test.sh
+skip: tmux isolation: a live tmux server answers on /tmp/tmux-1000/default; run under a private /tmp (unshare -Urm sh -c 'mount -t tmpfs tmpfs /tmp && exec bin/fm-test-run.sh <test>')
+exit=0
+--- tests/fm-live-lab.test.sh CI=true
+skip: tmux isolation: a live tmux server answers on /tmp/tmux-1000/default; run under a private /tmp (unshare -Urm sh -c 'mount -t tmpfs tmpfs /tmp && exec bin/fm-test-run.sh <test>')
+exit=0
+--- tests/fm-live-lab-up-mate.test.sh
+skip: tmux isolation: a live tmux server answers on /tmp/tmux-1000/default; run under a private /tmp (unshare -Urm sh -c 'mount -t tmpfs tmpfs /tmp && exec bin/fm-test-run.sh <test>')
+exit=0
+--- tests/fm-live-lab-up-mate.test.sh CI=true
+skip: tmux isolation: a live tmux server answers on /tmp/tmux-1000/default; run under a private /tmp (unshare -Urm sh -c 'mount -t tmpfs tmpfs /tmp && exec bin/fm-test-run.sh <test>')
+exit=0
+decoy alive with its session
+=== B. stopped server: gate gives up at its deadline
+skip: tmux isolation: the tmux server on /tmp/tmux-1000/default did not answer within 1s; run under a private /tmp (unshare -Urm sh -c 'mount -t tmpfs tmpfs /tmp && exec bin/fm-test-run.sh <test>')
+exit=0 elapsed=2s
+=== C. FAIL-BEFORE: base commit's fm-live-lab.sh down, tmux dir gone
+stopped: lab tmux server and lab processes
+removed: 0 Claude project entries under /tmp/ns/lab-base
+removed: /tmp/ns/lab-base
+BASE: decoy server KILLED by down
+=== D. HEAD: the same call, plus say/pane/check
+decoy pid 2588278 on /tmp/tmux-1000/default
+fm-live-lab: no lab window named 'main'
+pane exit=1
+fm-live-lab: no lab window named 'main'
+say exit=1
+typed-into-decoy lines: 0
+fail primary: window main is not running
+stopped: lab tmux server and lab processes
+removed: 0 Claude project entries under /tmp/ns/lab-head
+removed: /tmp/ns/lab-head
+down exit=0
+HEAD: decoy alive with its session
+decoy window: main
+=== E. namespace unavailable: isolation suite skips decoy cases
+ok - fm_tmux_isolation_gate runs isolated and skips beside a live server
+ok - fm_tmux_isolation_gate skips at its deadline when a tmux server does not answer
+ok - decoy cleanup is bounded, escalates to TERM and KILL, and reports a decoy it cannot stop
+skip: tmux isolation decoy: needs a private /tmp (unshare -Urm with a tmpfs mount on /tmp)
+exit=0
+=== F. owning suites, no live server on the private /tmp
+--- tests/fm-live-lab-isolation.test.sh
+FM_TEST_END 2026-11-01T15:30:12Z tests/fm-live-lab-isolation.test.sh exit=0 duration_ms=4385 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=4422
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=4385 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-live-lab-isolation.test.sh duration_ms=4385
+exit=0 elapsed=4s
+--- tests/fm-live-lab-up-mate.test.sh
+FM_TEST_END 2026-11-01T15:30:32Z tests/fm-live-lab-up-mate.test.sh exit=0 duration_ms=19255 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=19291
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=19255 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-live-lab-up-mate.test.sh duration_ms=19255
+exit=0 elapsed=20s
+--- tests/fm-gate-refuse.test.sh
+FM_TEST_END 2026-11-01T15:30:40Z tests/fm-gate-refuse.test.sh exit=0 duration_ms=8590 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=8640
+FM_TEST_SUMMARY_FAMILY family=session-bootstrap count=1 duration_ms=8590 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-gate-refuse.test.sh duration_ms=8590
+exit=0 elapsed=8s
+--- tests/fm-live-lab.test.sh
+FM_TEST_END 2026-11-01T15:30:57Z tests/fm-live-lab.test.sh exit=1 duration_ms=16825 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=16859
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=16825 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-live-lab.test.sh duration_ms=16825
+exit=1 elapsed=17s

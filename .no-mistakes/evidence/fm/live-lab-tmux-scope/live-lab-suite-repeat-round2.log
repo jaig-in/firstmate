@@ -1,0 +1,8 @@
+run 1 exit=0 elapsed=73s ok=30
+run 2 exit=0 elapsed=81s ok=30
+run 3 exit=1 elapsed=18s ok=16
+not ok - down must kill a TERM-resistant lab process
+run 4 exit=0 elapsed=81s ok=30
+run 5 exit=1 elapsed=18s ok=16
+not ok - down must kill a TERM-resistant lab process
+run 6 exit=0 elapsed=79s ok=30

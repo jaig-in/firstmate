@@ -1,0 +1,19 @@
+ok primary: claude pid 1903030 in /tmp/ns/saylab/home
+ok probe: the primary answered LABREADY-5d681552b2e3
+ok trust: /tmp/ns/saylab/home is trusted in the Claude store
+ok mirror: verified writer, check passed, captain=1 main=2
+ok host: supervision host pid 1944765
+ok watcher: live watcher with a fresh beacon
+ok mate: lab5d681552b2e3-mate pid 1900812 in /tmp/ns/saylab/mate
+ok treehouse: ~/.treehouse unchanged
+ready: /tmp/ns/saylab
+up exit=0
+say main exit=0
+main waited 120s; reply lines:
+say mate exit=0
+mate waited 10s; reply lines:
+18:● SAYECHO-77321m               
+decoy typed-text lines: 0; decoy alive: yes
+removed: 2 Claude project entries under /tmp/ns/saylab
+removed: /tmp/ns/saylab
+down exit=0

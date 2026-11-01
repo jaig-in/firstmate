@@ -1,0 +1,50 @@
+=================== BASE
+decoy pid 684820 on /tmp/tmux-1000/default
+tree: 05196e30ead54796dfbe986db61abe9d8df9e3d2 from /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVBN6P0NG3P41F6XVHYN9K
+ready: /tmp/ns/labb
+up exit=0
+marker present: yes
+ls: cannot access '/tmp/fml.F2j6UC': No such file or directory
+--- down
+stopped: lab tmux server and lab processes
+fm-lab-home: recorded tmux directory is missing or unsafe
+fm-live-lab: cannot remove the private tmux directory
+down exit=1
+BASE: decoy default server KILLED by down
+lab root still present: yes; trust entries left in overlaid store: 1
+--- retry down
+stopped: lab tmux server and lab processes
+fm-lab-home: recorded tmux directory is missing or unsafe
+fm-live-lab: cannot remove the private tmux directory
+retry exit=1
+--- operator recovery: recreate the recorded empty 0700 directory, retry
+stopped: lab tmux server and lab processes
+removed: 1 Claude project entries under /tmp/ns/labb
+removed: /tmp/ns/labb
+recovery exit=0
+ls: cannot access '/tmp/ns/labb': No such file or directory
+=================== HEAD
+decoy pid 724675 on /tmp/tmux-1000/default
+tree: 5d9b5dbfc4bd4371790e53543b4c328a915f8bb1 from /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVBN6P0NG3P41F6XVHYN9K
+ready: /tmp/ns/labh
+up exit=0
+marker present: yes
+ls: cannot access '/tmp/fml.mUTHhV': No such file or directory
+--- down
+stopped: lab tmux server and lab processes
+fm-lab-home: recorded tmux directory is missing or unsafe
+fm-live-lab: cannot remove the private tmux directory
+down exit=1
+HEAD: decoy default server SURVIVED
+lab root still present: yes; trust entries left in overlaid store: 1
+--- retry down
+stopped: lab tmux server and lab processes
+fm-lab-home: recorded tmux directory is missing or unsafe
+fm-live-lab: cannot remove the private tmux directory
+retry exit=1
+--- operator recovery: recreate the recorded empty 0700 directory, retry
+stopped: lab tmux server and lab processes
+removed: 1 Claude project entries under /tmp/ns/labh
+removed: /tmp/ns/labh
+recovery exit=0
+ls: cannot access '/tmp/ns/labh': No such file or directory

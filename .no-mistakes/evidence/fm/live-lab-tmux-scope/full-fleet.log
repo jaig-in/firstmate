@@ -1,0 +1,74 @@
+neutral rc in force: PROMPT="%~ %% "
+[decoy pid 684475 alive; windows: firstmate:main ; lab-text lines: 0]
+### up --harness claude --mate --worker
+lab: /tmp/ns/fleet (tear down with: bin/fm-live-lab.sh down /tmp/ns/fleet)
+tree: 5d9b5dbfc4bd4371790e53543b4c328a915f8bb1 from /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVBN6P0NG3P41F6XVHYN9K
+scaffolded: /tmp/ns/fleet/home/data/lab9cb3c41eae60-mate/brief.md (secondmate charter)
+home=/tmp/ns/fleet/mate
+spawned lab9cb3c41eae60-mate harness=claude kind=secondmate mode=secondmate yolo=off window=firstmate:fm-lab9cb3c41eae60-mate worktree=/tmp/ns/fleet/mate
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+spawned lab9cb3c41eae60-worker harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab9cb3c41eae60-worker worktree=/home/jb/.treehouse/notes-4f3af8/1/notes
+gate: /tmp/ns/fleet/home/data/lab9cb3c41eae60-worker/gate (touch, then message the worker to resume)
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+ok primary: claude pid 725214 in /tmp/ns/fleet/home
+ok probe: the primary answered LABREADY-9cb3c41eae60
+ok trust: /tmp/ns/fleet/home is trusted in the Claude store
+ok mirror: verified writer, check passed, captain=1 main=2
+ok host: supervision host pid 793156
+ok watcher: live watcher with a fresh beacon
+ok mate: lab9cb3c41eae60-mate pid 692527 in /tmp/ns/fleet/mate
+ok worker: lab9cb3c41eae60-worker parked on /tmp/ns/fleet/home/data/lab9cb3c41eae60-worker/gate
+fail treehouse: new ~/.treehouse entries: notes-4f3af8
+not ready after 420s; the lab is left up for inspection: bin/fm-live-lab.sh pane /tmp/ns/fleet, then bin/fm-live-lab.sh down /tmp/ns/fleet
+up exit=1
+[decoy pid 684475 alive; windows: firstmate:main ; lab-text lines: 0]
+lab socket: /tmp/fml.fPdKTF/tmux-1000/default
+  firstmate:lab dead=0 cmd=zsh path=/tmp/ns/fleet
+  firstmate:fm-lab9cb3c41eae60-mate dead=0 cmd=claude path=/tmp/ns/fleet/mate
+  firstmate:fm-lab9cb3c41eae60-worker dead=0 cmd=claude path=/home/jb/.treehouse/notes-4f3af8/1/notes
+  firstmate:main dead=0 cmd=claude path=/tmp/ns/fleet/home
+### a lab process reaches the same server through TMUX_TMPDIR
+TMUX_TMPDIR form: lab fm-lab9cb3c41eae60-mate fm-lab9cb3c41eae60-worker main 
+### check
+ok primary: claude pid 725214 in /tmp/ns/fleet/home
+ok probe: the primary answered LABREADY-9cb3c41eae60
+ok trust: /tmp/ns/fleet/home is trusted in the Claude store
+ok mirror: verified writer, check passed, captain=1 main=2
+ok host: supervision host pid 793156
+ok watcher: live watcher with a fresh beacon
+ok mate: lab9cb3c41eae60-mate pid 692527 in /tmp/ns/fleet/mate
+ok worker: lab9cb3c41eae60-worker parked on /tmp/ns/fleet/home/data/lab9cb3c41eae60-worker/gate
+fail treehouse: new ~/.treehouse entries: notes-4f3af8
+check exit=1
+### say to primary, read pane
+say exit=0
+### worker pane
+● I'm on branch fm/lab9cb3c41eae60-worker in the isolated worktree, and I've logged a paused status line. I haven't started count_notes() yet.
+  I'm waiting for two things: the gate file /tmp/ns/fleet/home/data/lab9cb3c41eae60-worker/gate has to exist, and Firstmate has to send a message telling me to 
+  first. If it's missing, I stay paused. If it's there, I'll add count_notes() and its test, run python3 -m unittest discover -s tests, commit, and report done.
+✻ Baked for 15s · done 11:07 AM                                                                                                                              
+─────────────────────────────────────────────────────�
+❯ 
+─────────────────────────────────────────────────────�
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 2 agents                                                                                                      
+[decoy pid 684475 alive; windows: firstmate:main ; lab-text lines: 0]
+### down
+stopped: lab tmux server and lab processes
+removed: task temp /tmp/fm-lab9cb3c41eae60-mate+89c82e0b8686683ef8256aa3f36b4ead8c626c2d9bb379c1a9f02b190acca074
+removed: task temp /tmp/fm-lab9cb3c41eae60-mate
+removed: task temp /tmp/fm-lab9cb3c41eae60-worker+89c82e0b8686683ef8256aa3f36b4ead8c626c2d9bb379c1a9f02b190acca074
+removed: task temp /tmp/fm-lab9cb3c41eae60-worker
+removed: 3 Claude project entries under /tmp/ns/fleet
+warning: ~/.treehouse gained entries during the lab; left as is: notes-4f3af8
+removed: /tmp/ns/fleet
+down exit=1
+[decoy pid 684475 alive; windows: firstmate:main ; lab-text lines: 0]
+ls: cannot access '/tmp/ns/fleet': No such file or directory
+ls: cannot access '/tmp/fml.fPdKTF': No such file or directory
+(end of survivor list)

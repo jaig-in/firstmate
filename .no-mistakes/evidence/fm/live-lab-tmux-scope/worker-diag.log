@@ -1,0 +1,31 @@
+lab: /tmp/ns/fmw1 (tear down with: bin/fm-live-lab.sh down /tmp/ns/fmw1)
+tree: 5d9b5dbfc4bd4371790e53543b4c328a915f8bb1 from /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVBN6P0NG3P41F6XVHYN9K
+error: treehouse get did not enter an isolated worktree within 60s (last seen '/tmp/ns/fmw1/home/projects/notes': it is the spawning project itself; spawning project '/tmp/ns/fmw1/home/projects/notes'); inspect window firstmate:fm-lab521cda9cdf60-worker
+fm-live-lab: cannot launch the gated worker
+up exit=1
+lab cmd=sh path=/tmp/ns/fmw1
+fm-lab521cda9cdf60-worker cmd=zsh path=/tmp/ns/fmw1/home/projects/notes
+--- worker pane
+treehouse get
+KeePass DB password:
+ssh-preload: no entry 'ssh/rsync.net_id_rsa' or wrong DB password -- aborting
+jb@jbaw1 /tmp/ns/fmw1/home/projects/notes
+ %
+--- env in pane
+--- status file
+total 4
+drwxrwxr-x  2 jb jb  60 Nov  1 11:05 .
+drwxrwxr-x 22 jb jb 680 Nov  1 11:04 ..
+-rw-------  1 jb jb  16 Nov  1 11:04 .fm-lab-tmux-dir
+--- direct treehouse get from the project
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/.treehouse/notes-4dac7c/1/notes. Run 'treehouse return ~/.treehouse/notes-4dac7c/1/notes' to release it.
+/home/jb/.treehouse/notes-4dac7c/1/notes
+rc=0
+/tmp/ns/fmw1/home/projects/notes          ae700a5 [main]
+/home/jb/.treehouse/notes-4dac7c/1/notes  ae700a5 (detached HEAD)
+removed: 0 Claude project entries under /tmp/ns/fmw1
+warning: ~/.treehouse gained entries during the lab; left as is: notes-4dac7c
+removed: /tmp/ns/fmw1
