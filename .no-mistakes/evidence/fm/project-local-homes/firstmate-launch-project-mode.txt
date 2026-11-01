@@ -1,0 +1,19 @@
+lab stamp rc=0
+=== firstmate init
+firstmate: existing home /tmp/fm-hcgate.IrXDAI/p3/.firstmate is now trusted; it carries no config beyond the scaffold
+.fm-home .fm-lab-home .gitignore .tasks.toml config data projects state 
+=== firstmate --harness claude (default project mode)
+stand-in harness: FM_VIEW=1 cwd=/tmp/fm-hcgate.IrXDAI/p3 FM_HOME=/tmp/fm-hcgate.IrXDAI/p3/.firstmate
+AGENTS.md first line in view: # Firstmate
+project rule composed: 1
+--- write to project tree: touch: cannot touch 'newfile': Read-only file system
+--- git status from view: []
+--- nested firstmate: firstmate: this launch is already inside a Firstmate view; run firstmate from a normal terminal outside this session
+--- FM_BACKEND=hc spawn:
+warning: /tmp/fm-hcgate.IrXDAI/p3/.firstmate/data/t3/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+error: backend hc cannot run or supervise tasks inside a Firstmate view, because any hc call can start an hc server here and show workers the view instead of the real project; launch with 'firstmate --mode install' from a normal terminal ou
+spawn rc=1
+launcher rc=0
+=== host side after session: status []  newfile: ls: cannot access 'newfile': No such fil
+hc core procs: 0  files under scratch XDG hc dirs: 0
+worktrees: 1  state metas: 0

@@ -1,0 +1,36 @@
+=== guarded: code root /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BNSAJWHRR2969W9V493G2R, core session fm-hcview-guarded, scratch XDG
+FM_VIEW=1 FM_VIEW_ROOT=/tmp/fm-hcgate.IrXDAI/proj cwd=/tmp/fm-hcgate.IrXDAI/proj
+fm_backend_hc_version_check                    rc=1 error: backend hc cannot run or supervise tasks inside a Firstmate view, because any hc call can start an hc s
+fm_backend_hc_hello fm-hcview-guarded          rc=1 
+fm_backend_hc_container_ensure                 rc=1 error: backend hc cannot run or supervise tasks inside a Firstmate view, because any hc call can start an hc s
+fm_backend_hc_cli fm-hcview-guarded get fm-hcview-guarded:t1 rc=1 error: backend hc cannot run or supervise tasks inside a Firstmate view, because any hc call can start an hc s
+fm_backend_hc_env_run fm-hcview-guarded ls     rc=1 error: backend hc cannot run or supervise tasks inside a Firstmate view, because any hc call can start an hc s
+fm_backend_hc_create_task fm-hcview-guarded fm-x /tmp rc=1 error: 'hc ls' failed for session 'fm-hcview-guarded'; cannot create fm-x
+fm_backend_agent_state hc fm-hcview-guarded:t1 rc=0 unreadable
+fm_backend_target_exists hc fm-hcview-guarded:t1 rc=1 
+fm_backend_capture hc fm-hcview-guarded:t1 5   rc=1 
+fm_backend_send_text_submit hc fm-hcview-guarded:t1 hello 1 0 0 rc=0 send-failed
+fm_backend_kill hc fm-hcview-guarded:t1        rc=1 error: hc terminal fm-hcview-guarded:t1 could not be read, so it was not closed
+--- hc core processes for fm-hcview-guarded: 0
+--- files under scratch XDG: 0
+=== mutation applied:
+94d93
+<   fm_view_refuse_self_starting_backend hc || return 1
+148d146
+<   fm_view_refuse_self_starting_backend hc || return 1
+=== unguarded: code root /tmp/fm-hcgate.IrXDAI/mut, core session fm-hcview-unguarded, scratch XDG
+FM_VIEW=1 FM_VIEW_ROOT=/tmp/fm-hcgate.IrXDAI/proj cwd=/tmp/fm-hcgate.IrXDAI/proj
+fm_backend_hc_version_check                    rc=0 
+fm_backend_hc_hello fm-hcview-unguarded        rc=0 1
+fm_backend_hc_container_ensure                 rc=0 fm-hcview-unguarded
+fm_backend_hc_cli fm-hcview-unguarded get fm-hcview-unguarded:t1 rc=3 {"error":{"hint":"see `hc ls --all`","kind":"not_found","message":"no terminal \"fm-hcview-unguarded:t1\""}}
+fm_backend_hc_env_run fm-hcview-unguarded ls   rc=0 {"hidden_finished":0,"terminals":[]}
+fm_backend_hc_create_task fm-hcview-unguarded fm-x /tmp rc=0 t1
+fm_backend_agent_state hc fm-hcview-unguarded:t1 rc=0 unreadable
+fm_backend_target_exists hc fm-hcview-unguarded:t1 rc=0 
+fm_backend_capture hc fm-hcview-unguarded:t1 5 rc=0 
+fm_backend_send_text_submit hc fm-hcview-unguarded:t1 hello 1 0 0 rc=0 unknown
+fm_backend_kill hc fm-hcview-unguarded:t1      rc=0 
+--- hc core processes for fm-hcview-unguarded: 2
+--- files under scratch XDG: 7
+control cores left: 0

@@ -1,0 +1,28 @@
+lab core session fm-hclab-viewtask-1367045-11294 ready (server pid 1367174)
+=== OUTSIDE a view (terminal fm-hclab-viewtask-1367045-11294:t1 running a stand-in named claude)
+endpoint state: alive
+126:endpoint: alive (backend=hc window=fm-hclab-viewtask-1367045-11294:t1)
+{"id":"fix-1","endpoint":{"target":"fm-hclab-viewtask-1367045-11294:t1","exists":true,"agent_alive":"not_checked","status":"unknown","observed_at":"2026-11-01T13:57:11Z","freshness":"fresh"}}
+=== INSIDE a real view (FM_VIEW=1)
+endpoint state: unreadable
+busy state: unknown
+126:endpoint: dead (backend=hc window=fm-hclab-viewtask-1367045-11294:t1)
+{"id":"fix-1","endpoint":{"target":"fm-hclab-viewtask-1367045-11294:t1","exists":false,"agent_alive":"not_checked","status":"absent","observed_at":"2026-11-01T13:57:17Z","freshness":"fresh"}}
+--- fm-control exit:
+error: task fix-1 runs on the hc backend, which has no recovery-grade agent-state classifier, so 'exit' cannot prove the agent actually stopped; refusing rather than reporting an unproven transition as done
+rc=1
+--- fm_backend_kill:
+error: hc terminal fm-hclab-viewtask-1367045-11294:t1 could not be read, so it was not closed
+rc=1
+--- fm-spawn --relaunch:
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: backend 'hc' has no recovery-grade agent-state classifier, so a relaunch cannot prove the previous agent exited; refusing rather than risking two agents in one endpoint
+rc=1
+--- firstmate --mode install:
+firstmate: this launch is already inside a Firstmate view; run firstmate from a normal terminal outside this session
+rc=1
+=== AFTER the view, OUTSIDE again
+endpoint state: alive
+{"address":"t1","state":"live","foreground":{"argv":["/tmp/fm-hcgate.IrXDAI/bin/claude/claude","600"],"cwd":"/tmp/fm-hcgate.IrXDAI/proj","name":"claude","pid":1367479}}
+1
+lab teardown rc=0

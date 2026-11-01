@@ -1,0 +1,96 @@
+ok - launcher: FM_HOME win, nested shadowing, global+install fallback, in-repo refusal
+ok - trust: unmarked home refused, marker blesses, adapter whitelist, relative FM_HOME canonicalized
+ok - launcher: a non-regular or unreadable harness or mode setting stops the launch
+ok - init: org scaffold, per-project registration, repo-root landing, outside-repo refusal
+ok - init: blesses cloned and pre-marker homes without modifying files, already-trusted re-run, unsafe homes refused
+ok - projects-root: override > config > legacy default; malformed fails loudly
+ok - discovery=authority: discover lists siblings, refresh touches registered only, resolver precedence
+ok - resolver failures fail closed: fleet refresh, registry lookup, spawn, manifest paths, discover, stale aliases, remote seed
+ok - manifest reader: one-line, multi-line, and duplicate aliases agree with and without jq
+ok - registry: an unreadable or non-regular data/projects.md fails rather than reading as empty
+ok - manifest reader: a control byte or empty alias is refused whole, before any record is returned
+ok - legacy home: a bare alias keeps its registry label and its local-only skip
+ok - project name: . .. and other path-shaped arguments take the registered alias or basename
+ok - resolver: an unresolved projects/<name> passes through unchanged
+ok - org refresh: . and .. resolve to their registered alias
+ok - manifest lookup: an alias jq can hold resolves, with its exact bytes
+ok - init: a repository name the registry cannot hold is refused before anything is written
+ok - manifest: anything but a readable regular file is refused rather than read as absent
+ok - spawn: a malformed config/projects-root stops a path spawn
+ok - org seed: a symlinked child manifest is refused like its sibling leaf files
+ok - init: a non-regular marker is reported as that, not as tracked by git
+ok - summary: an unreadable instruction file is named rather than reported absent
+ok - init: a caller-exported git repository cannot redirect the scaffold
+ok - project library: a caller-exported GIT_DIR cannot make a directory a repository
+ok - trust check: reading the marker runs no command from the repository's config
+ok - project library: a caller's CDPATH cannot redirect a relative path
+ok - org seed: a relative --projects-root may start with a dash
+ok - discovery: a name with a line break cannot forge a second project
+ok - legacy refresh: a clone with a line break in its name forges no relative path
+ok - summary: a registered name reads its own row byte for byte
+ok - a quoted registry row never stops a walk, and a typed one is still refused
+ok - a backslash in a local-only name reads its own row and stays skipped
+ok - projects root: only a control byte is refused, whatever the locale
+ok - init: an interrupted scaffold is completed by the next init
+ok - spawn: unregistered sibling refused by name and path, registered reaches the brief check
+ok - spawn: unborn HEAD refused on the resolved sibling and path-registered project, by name and path
+Note: switching to '24699152c12a8883234591b1b7769dd22d0c916b'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+Note: switching to '24699152c12a8883234591b1b7769dd22d0c916b'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+Note: switching to '24699152c12a8883234591b1b7769dd22d0c916b'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+ok - org seed: siblings registered not cloned, unregistered refused, registered path owns the source
+ok - org seed: a path-registered alias carries its path mapping, delivery mode, and alias into the child
+ok - org seed: a symlinked child config/projects-root is refused before it is written
+ok - org seed: a seeded alias the parent no longer maps loses its stale child mapping
+ok - org seed: copied and preserved mappings keep their exact bytes, and a jq-less seed refuses what its reader cannot hold
+ok - org seed: a backslashed row keeps its bytes and replaces the child's
+ok - org seed: the child's stored projects root is read without the parent's override
+ok - registry parsing: spaced and prefix names resolve to their own whole rows
+all project-local tests passed

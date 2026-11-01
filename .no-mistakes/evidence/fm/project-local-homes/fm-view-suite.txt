@@ -1,0 +1,27 @@
+ok - launch modes: fallback notice, explicit refusal, AppArmor-restricted reason, config default, install-mode auto-memory off, codex cap, no-project and self-checkout launches
+ok - project mode is the default on a capable host; claude auto-memory is off there; org launches root at the org
+ok - view: composed contract, merged bin/, Firstmate docs win, hidden .mcp.json, read-only project and surface, writable home and approved path
+ok - git shim: clean status, nothing staged, real top level from the view
+ok - git shim: hostile paths run nothing and git keeps working; a scrubbed environment is refused by name
+  mutation removed: mount --bind -- "$RUN/git-shim" "$GIT_REAL"
+  mutation removed: [ "$mode" = rw ] || ro_tree "$mp" || { umount -R -l -- "$mp"; return 1; }
+ok - falsification: the shim and the read-only binds are what keep git clean and the project read-only
+ok - keeper: a top-level entry created outside the session appears inside it
+ok - keeper: an FM_VIEW_POLL value sleep cannot take keeps the default
+ok - view: a caller's QUOTING_STYLE cannot hide a project entry
+ok - view: a name holding a space never matches two adjacent list words
+ok - view: a name with a line break is left out and forges no other entry
+ok - keeper: an edit behind a linked instruction file is recomposed
+ok - view: a relative runtime directory is made absolute before the session starts
+ok - probe: an unusable runtime directory is a named refusal
+ok - view: a start that fails leaves no runtime directory behind
+fm-view: could not present /tmp/fm-view-tests.BVsR08/case.83xNdy/demo/zq-remount.txt
+ok - keeper: a file whose read-only remount fails is undone and retried, never left writable
+ok - view: project links inside the launch tree are read-only; links outside it reach their real target
+ok - view: nested mounts inside read-only entries are read-only too
+ok - view: a nested mount named with an embedded tab or newline stays read-only and does not abort startup
+ok - probe: capability probes leave no scratch directory behind
+ok - worker placement: servers started inside a view are refused; outside a view the guard is inert
+ok - worker spawn: a spawn from inside a view writes the shared git exclude to the real project
+ok - cleanup: a hung-up session removes its runtime dir, and a leader-only hangup reaches the harness
+all view tests passed
