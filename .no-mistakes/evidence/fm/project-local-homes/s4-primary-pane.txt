@@ -1,0 +1,70 @@
+0
+/tmp/fmpl.lKDUeI/tmux/lab.sock,2866986,0
+ ▐▛███▛█   Claude Code v2.1.316
+▝▜██████▀  Haiku 5.5 · Claude Ultra
+ ▝▝   ▝▝   /tmp/fmpl.lKDUeI/w/labco
+▝▜██████▀  Haiku 5.5 · Claude Ultra
+ ▝▝   ▝▝   /tmp/fmpl.lKDUeI/w/labco
+
+
+❯ From your session-start context, quote verbatim the LAUNCH CONTEXT section and the ORG PROJECTS section. Then run in Bash: pwd; echo FM_HOME=$FM_HOME FM_VIEW=$FM_VIEW; head -1
+  AGENTS.md; touch store/x-from-primary; echo touch-rc=$?. Do nothing else.
+
+● I don't see a LAUNCH CONTEXT or ORG PROJECTS section in my session-start context. The SessionStart output I have covers chrome-devtools-axi, gh-axi, lavish-axi, and superpowers.
+  The Firstmate digest from bin/fm-session-start.sh isn't in it, so there is nothing to quote. I'll run the Bash command now.
+
+● Bash(pwd; echo FM_HOME=$FM_HOME FM_VIEW=$FM_VIEW; head -1 AGENTS.md; touch store/x-from-primary; echo touch-rc=$?)
+  ⎿  /tmp/fmpl.lKDUeI/w/labco
+     FM_HOME=/tmp/fmpl.lKDUeI/w/labco/.firstmate FM_VIEW=1
+     # Firstmate
+     … +2 lines (ctrl+o to expand)
+
+● LAUNCH CONTEXT and ORG PROJECTS: not found. Neither section appears in my session-start context, so I have no verbatim quote to give. The only SessionStart output I have is from
+  chrome-devtools-axi, gh-axi, lavish-axi, and superpowers. The Firstmate digest from bin/fm-session-start.sh is missing, so the launch context may not have reached this session.
+
+  The Bash results:
+
+  pwd: /tmp/fmpl.lKDUeI/w/labco
+  FM_HOME=/tmp/fmpl.lKDUeI/w/labco/.firstmate FM_VIEW=1
+  head -1 AGENTS.md: # Firstmate
+  touch: cannot touch 'store/x-from-primary': Read-only file system
+  touch-rc=1
+
+  The write failed as expected. The launch directory is read-only in this session, which enforces hard rule 1.
+
+✻ Brewed for 4s · done 10:34 AM
+
+❯ Run bin/fm-session-start.sh with Bash, saving its full output to .firstmate/state/digest.txt (use: bin/fm-session-start.sh > .firstmate/state/digest.txt 2>&1; echo rc=$?).
+  Report only the rc. Do nothing else.
+
+● Bash(bin/fm-session-start.sh > .firstmate/state/digest.txt 2>&1; echo rc=$?)
+  ⎿  rc=0
+
+● rc=0
+
+✻ Cooked for 7s · done 10:35 AM
+
+❯ Run this one Bash command and then stop, with no other action: bash .firstmate/state/spawn-drive.sh; echo drive-rc=$?
+
+● Bash(bash .firstmate/state/spawn-drive.sh; echo drive-rc=$?)
+  ⎿  drive-rc=0
+
+● drive-rc=0
+
+✻ Crunched for 9s · done 10:35 AM
+
+❯ Run this one Bash command and then stop, with no other action: bash .firstmate/state/drive2.sh; echo drive-rc=$?
+
+● Bash(bash .firstmate/state/drive2.sh; echo drive-rc=$?)
+  ⎿  drive-rc=0
+
+● drive-rc=0
+
+✻ Crunched for 5s · done 10:36 AM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 2 agents
+
+

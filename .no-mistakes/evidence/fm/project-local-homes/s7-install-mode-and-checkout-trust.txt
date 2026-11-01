@@ -1,0 +1,36 @@
+## install mode from project repo
+$ firstmate --mode install --model haiku --dangerously-skip-permissions -p Run: pwd; echo FM_LAUNCH_MODE=$FM_LAUNCH_MODE FM_VIEW=[$FM_VIEW] FM_LAUNCH_NOTICE=[$FM_LAUNCH_NOTICE]. Print the output only.
+/home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E
+FM_LAUNCH_MODE=install FM_VIEW=[] FM_LAUNCH_NOTICE=[]
+[rc=0]
+## launch inside an unblessed Firstmate-shaped clone: notice, runs the install, not the clone
+$ firstmate --model haiku --dangerously-skip-permissions -p Run: pwd; echo FM_LAUNCH_MODE=$FM_LAUNCH_MODE FM_VIEW=[$FM_VIEW] FM_LAUNCH_NOTICE=[$FM_LAUNCH_NOTICE]. Print the output only.
+firstmate: notice: /tmp/fmpl.lKDUeI/w/fm-clone is an untrusted Firstmate checkout; running the install at /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E instead (run 'firstmate init' in /tmp/fmpl.lKDUeI/w/fm-clone to trust it as Firstmate's code root)
+/home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E
+FM_LAUNCH_MODE=install FM_VIEW=[] FM_LAUNCH_NOTICE=[/tmp/fmpl.lKDUeI/w/fm-clone is an untrusted Firstmate checkout; running the install at /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E instead (run 'firstmate init' in /tmp/fmpl.lKDUeI/w/fm-clone to trust it as Firstmate's code root)]
+[rc=0]
+## committed .fm-home at clone top level does not bless it
+$ firstmate init
+firstmate: /tmp/fmpl.lKDUeI/w/fm-clone/.fm-home is tracked by git, so it proves nothing on this machine.
+  Untrack it ('git rm --cached /tmp/fmpl.lKDUeI/w/fm-clone/.fm-home'), then run 'firstmate init' again.
+[rc=1]
+## init blesses the clone; launch runs it as its own root
+$ firstmate init
+firstmate: Firstmate checkout /tmp/fmpl.lKDUeI/w/fm-clone is now trusted; launches there run its AGENTS.md and bin/ as Firstmate's code root
+firstmate: /tmp/fmpl.lKDUeI/w/fm-clone/.firstmate is already trusted
+[rc=0]
+$ firstmate --model haiku --dangerously-skip-permissions -p Run: pwd; echo FM_LAUNCH_MODE=$FM_LAUNCH_MODE FM_VIEW=[$FM_VIEW] FM_LAUNCH_NOTICE=[$FM_LAUNCH_NOTICE]. Print the output only.
+firstmate: /tmp/fmpl.lKDUeI/w/fm-clone is a Firstmate checkout; running it as its own install root
+/tmp/fmpl.lKDUeI/w/fm-clone
+FM_LAUNCH_MODE=install FM_VIEW=[] FM_LAUNCH_NOTICE=[]
+[rc=0]
+## explicit project mode with no project refused
+$ firstmate --mode project
+firstmate: project mode unavailable: /tmp/fmpl.lKDUeI/plain is inside no git repository and no org home
+[rc=1]
+## view keeper presents a new top-level entry created outside the session
+$ fm-view.sh run --install /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E --launch /tmp/fmpl.lKDUeI/w/myapp -- bash -c ls late.txt 2>&1; sleep 6; cat late.txt
+ls: cannot access 'late.txt': No such file or directory
+fresh
+[rc=0]
+DONE

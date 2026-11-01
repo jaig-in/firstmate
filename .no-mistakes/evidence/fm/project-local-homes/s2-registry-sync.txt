@@ -1,0 +1,45 @@
+## resolver
+$ fm-projects.sh aliases
+api
+b"c
+d\e
+shared-lib
+webapp
+[rc=0]
+$ fm-projects.sh resolve shared-lib
+/tmp/fmpl.lKDUeI/w/oss/shared-lib
+[rc=0]
+$ fm-project-mode.sh d\e
+local-only off
+[rc=0]
+## unregistered refused by name and path; clone unchanged
+$ fm-fleet-sync.sh infra
+error: /tmp/fmpl.lKDUeI/w/acme/infra is not a registered project of this home; register it in /tmp/fmpl.lKDUeI/w/acme/.firstmate/data/projects.md (or data/project-paths.json) before refreshing
+[rc=1]
+$ fm-fleet-sync.sh /tmp/fmpl.lKDUeI/w/acme/infra
+error: /tmp/fmpl.lKDUeI/w/acme/infra is not a registered project of this home; register it in /tmp/fmpl.lKDUeI/w/acme/.firstmate/data/projects.md (or data/project-paths.json) before refreshing
+[rc=1]
+$ fm-fleet-sync.sh .
+error: . is not a registered project of this home; register it in /tmp/fmpl.lKDUeI/w/acme/.firstmate/data/projects.md (or data/project-paths.json) before refreshing
+[rc=1]
+infra HEAD before=03c22a5af31e1c51ad0c01f2315c370b9e77c412 after=03c22a5af31e1c51ad0c01f2315c370b9e77c412
+## path form keeps registered posture (local-only stays skipped)
+$ fm-fleet-sync.sh .
+api: skipped: local-only project
+[rc=0]
+$ fm-fleet-sync.sh /tmp/fmpl.lKDUeI/w/acme/api
+api: skipped: local-only project
+[rc=0]
+## whole-fleet refresh
+$ fm-fleet-sync.sh
+b"c: skipped: registered project resolves to no directory
+api: skipped: local-only project
+d\e: skipped: local-only project
+shared-lib: synced 03c22a5..7baaaf0
+webapp: synced 03c22a5..f8b1db6
+[rc=0]
+webapp: HEAD subject=origin ahead webapp behind=0
+api: HEAD subject=init behind=0
+infra: HEAD subject=init behind=0
+d\e: HEAD subject=init behind=0
+shared-lib (outside org): HEAD subject=origin ahead shared-lib

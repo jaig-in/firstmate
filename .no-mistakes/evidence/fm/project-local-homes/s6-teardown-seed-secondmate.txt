@@ -1,0 +1,77 @@
+## teardown from inside the view
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: local-only worktree /tmp/fmpl.lKDUeI/trees/.treehouse/store-cb9a33/1/store has work not yet merged into master and not on any remote.
+commits not yet on master:
+64a7c84 Add HELLO.txt
+Merge the branch into local master first (bin/fm-merge-local.sh after the captain approves), or push to a fork/remote, or get the captain's explicit OK to discard, then --force.
+[rc=1]
+t-store.busy-gen
+t-store.busy-state
+t-store.git-hooks
+t-store.inbox
+t-store.meta
+t-store.status
+t-store.turn-ended
+## seed refusals
+error: project stray is not registered in /tmp/fmpl.lKDUeI/w/labco/.firstmate/data/projects.md or project-paths.json; register it before seeding
+[unregistered rc=1]
+error: project store is local-only; secondmate routes support only no-mistakes and direct-PR projects
+[local-only rc=1]
+## seed org child
+scaffolded: /tmp/fmpl.lKDUeI/w/labco/.firstmate/data/labdocs/brief.md (secondmate charter)
+home=/tmp/fmpl.lKDUeI/mates/labdocs
+[seed rc=0]
+/tmp/fmpl.lKDUeI/w/labco
+- docs-site [direct-PR] - docs (added 2026-11-01)
+.agents
+.claude
+.codex
+.cursor
+.fm-secondmate-home
+.fm-secondmate-parent
+.git
+.gitattributes
+.github
+.gitignore
+.greptile
+.grok
+.no-mistakes.yaml
+.omp
+.opencode
+.pi
+.tasks.toml
+AGENTS.md
+CLAUDE.md
+CONTRIBUTING.md
+GROK_BOT.md
+LICENSE
+README.md
+VISION.md
+assets
+bin
+config
+data
+docs
+skills
+state
+tests
+## child resolves project in place, no clone
+/tmp/fmpl.lKDUeI/w/labco/docs-site
+ls: cannot access '/tmp/fmpl.lKDUeI/mates/labdocs/projects': No such file or directory
+## launch secondmate from view
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: secondmate labdocs sync skipped before launch: primary default-branch commit cannot be resolved
+spawned labdocs harness=claude kind=secondmate mode=secondmate yolo=off window=primary:fm-labdocs worktree=/tmp/fmpl.lKDUeI/mates/labdocs
+[spawn rc=0]
+window=primary:fm-labdocs
+harness=claude
+kind=secondmate
+home=/tmp/fmpl.lKDUeI/mates/labdocs
+projects=docs-site
+DRIVE2-DONE

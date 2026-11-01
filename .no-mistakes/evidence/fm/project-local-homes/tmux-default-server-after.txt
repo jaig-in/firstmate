@@ -1,0 +1,12 @@
+   4597 Thu Oct 29 22:38:42 2026 tmux new -s kb1
+   4599 Thu Oct 29 22:38:42 2026 tmux new -s kb1
+   7371 Thu Oct 29 22:44:36 2026 tmux new -s bizup
+  15880 Thu Oct 29 22:52:36 2026 tmux new -s a10i-ops
+  17964 Thu Oct 29 22:53:16 2026 tmux new -s tayyar-agency
+  20075 Thu Oct 29 22:54:00 2026 tmux new -s dm-radha-ivf
+  22003 Thu Oct 29 22:54:27 2026 tmux new -s dm-als
+  33809 Thu Oct 29 23:28:40 2026 tmux new -s vaakapp2
+ 133193 Fri Oct 30 03:49:31 2026 tmux new -s firstmate
+ 722234 Sat Oct 31 13:07:02 2026 tmux new -s pdfredact
+3635638 Fri Oct 30 19:22:41 2026 tmux new -s vriddhi
+/tmp/tmux-1000/default 14831 2026-10-29 17:57:59.329280101 -0400

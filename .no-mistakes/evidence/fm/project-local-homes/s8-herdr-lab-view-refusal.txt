@@ -1,0 +1,10 @@
+session=fm-lab-plview-3153697-2016
+fm-herdr-lab: fleet-state tripwire requires exactly one running default session
+prepare rc=1
+error: no herdr server is running outside this Firstmate view, and one started from inside it would show workers the view instead of the real project; start the herdr server from a terminal outside this session (or launch firstmate from inside herdr), then spawn again
+server_ensure rc=1
+view rc=0
+--- session running after refusal?
+0
+fm-herdr-lab: missing fleet-state tripwire for 'fm-lab-plview-3153697-2016'; refusing destructive calls
+teardown rc=1

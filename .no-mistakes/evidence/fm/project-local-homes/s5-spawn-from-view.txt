@@ -1,0 +1,43 @@
+TMUX=/tmp/fmpl.lKDUeI/tmux/lab.sock,2866986,0 FM_VIEW=1
+## unregistered sibling refused
+error: /tmp/fmpl.lKDUeI/w/labco/stray is not a registered project of this home; register it in /tmp/fmpl.lKDUeI/w/labco/.firstmate/data/projects.md (or data/project-paths.json) before spawning
+[rc=1]
+## mode mismatch: registry local-only, brief none yet / path outside refused
+error: /tmp is not a registered project of this home; register it in /tmp/fmpl.lKDUeI/w/labco/.firstmate/data/projects.md (or data/project-paths.json) before spawning
+[rc=1]
+## quoted alias refused at resolution
+error: project alias contains a byte the manifest cannot hold: proj\name
+[rc=1]
+## brief + spawn by registered name
+scaffolded: /tmp/fmpl.lKDUeI/w/labco/.firstmate/data/t-store/brief.md (ship, mode=local-only; replace {TASK} and {FIRSTMATE_SPEC})
+[rc=0]
+spawned t-store harness=claude kind=ship mode=local-only yolo=off window=primary:fm-t-store worktree=/tmp/fmpl.lKDUeI/trees/.treehouse/store-cb9a33/1/store
+[spawn rc=0]
+digest.txt
+home-summary.json
+operational-inbox
+spawn-drive.log
+spawn-drive.sh
+t-store.busy-gen
+t-store.busy-state
+t-store.git-hooks
+t-store.inbox
+t-store.meta
+terminal-outcomes
+window=primary:fm-t-store
+endpoint_task_id=t-store
+worktree=/tmp/fmpl.lKDUeI/trees/.treehouse/store-cb9a33/1/store
+project=/tmp/fmpl.lKDUeI/w/labco/store
+project_name=store
+harness=claude
+approval_mode=bypass
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/t-store
+tasktmp=/tmp/fm-t-store
+model=haiku
+effort=default
+busy_gen=g1793547345.2969672.17886
+spawn_gen=s1793547346.2962647.10875
+DRIVE-DONE

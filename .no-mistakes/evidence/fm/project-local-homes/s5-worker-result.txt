@@ -1,0 +1,13 @@
+fm/t-store
+64a7c84 Add HELLO.txt
+038f6d5 treehouse
+74248cc init
+hello
+--- real project tree:
+## master
+AGENTS.md
+treehouse.toml
++ fm/t-store
+* master
+  remotes/origin/HEAD -> origin/master
+  remotes/origin/master

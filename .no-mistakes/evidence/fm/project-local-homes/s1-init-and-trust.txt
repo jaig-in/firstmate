@@ -1,0 +1,84 @@
+## no home yet: launch refuses to guess
+$ env -u FM_HOME /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/firstmate
+firstmate: no .firstmate/ home found above /tmp/fmpl.lKDUeI/w/myapp.
+  Run 'firstmate init' at a repo root for a per-project home,
+       'firstmate init --org' at an org root, or 'firstmate --global' for the global home.
+[rc=1]
+## init
+$ env -u FM_HOME /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/firstmate init
+firstmate: created /tmp/fmpl.lKDUeI/w/myapp/.firstmate
+firstmate: projects root is /tmp/fmpl.lKDUeI/w/myapp (config/projects-root=..)
+firstmate: registered myapp in /tmp/fmpl.lKDUeI/w/myapp/.firstmate/data/projects.md
+firstmate: run `firstmate` from anywhere under /tmp/fmpl.lKDUeI/w/myapp to launch against this home
+[rc=0]
+$ cat .firstmate/data/projects.md
+- myapp [local-only] - this repository (added 2026-11-01)
+[rc=0]
+$ git status --short
+[rc=0]
+$ ls -A .firstmate
+.fm-home
+.gitignore
+.tasks.toml
+config
+data
+state
+[rc=0]
+## idempotent
+$ env -u FM_HOME /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/firstmate init
+firstmate: /tmp/fmpl.lKDUeI/w/myapp/.firstmate is already trusted
+[rc=0]
+## origin repo mode
+$ env -u FM_HOME /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/firstmate init
+firstmate: created /tmp/fmpl.lKDUeI/w/withorigin/.firstmate
+firstmate: projects root is /tmp/fmpl.lKDUeI/w/withorigin (config/projects-root=..)
+firstmate: registered withorigin in /tmp/fmpl.lKDUeI/w/withorigin/.firstmate/data/projects.md
+firstmate: run `firstmate` from anywhere under /tmp/fmpl.lKDUeI/w/withorigin to launch against this home
+[rc=0]
+$ cat .firstmate/data/projects.md
+- withorigin [no-mistakes-prod-only] - this repository (added 2026-11-01)
+[rc=0]
+## org init
+$ env -u FM_HOME /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/firstmate init --org
+firstmate: created /tmp/fmpl.lKDUeI/w/acme/.firstmate
+firstmate: projects root is /tmp/fmpl.lKDUeI/w/acme (config/projects-root=..)
+firstmate: discoverable sibling repos: api infra webapp
+firstmate: discovery is not authority - register each project in /tmp/fmpl.lKDUeI/w/acme/.firstmate/data/projects.md before firstmate may refresh, spawn, seed, or land it
+firstmate: run `firstmate` from anywhere under /tmp/fmpl.lKDUeI/w/acme to launch against this home
+[rc=0]
+$ git -C webapp status --short
+[rc=0]
+## adversarial: committed .firstmate with tracked marker, hostile primary-harness
+$ env -u FM_HOME /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/firstmate
+firstmate: untrusted home: /tmp/fmpl.lKDUeI/w/hostile/.firstmate has no local (untracked) .fm-home marker.
+  A .firstmate/ directory can carry committed config (harness, backlog
+  backend), so the launcher refuses to honor one it did not create; a
+  .fm-home committed to git does not count.
+  Bless it by running 'firstmate init' there (it writes the marker and reports the config the home will honour).
+[rc=1]
+## committed home with no marker
+$ env -u FM_HOME /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/firstmate
+firstmate: untrusted home: /tmp/fmpl.lKDUeI/w/hostile/.firstmate has no local (untracked) .fm-home marker.
+  A .firstmate/ directory can carry committed config (harness, backlog
+  backend), so the launcher refuses to honor one it did not create; a
+  .fm-home committed to git does not count.
+  Bless it by running 'firstmate init' there (it writes the marker and reports the config the home will honour).
+[rc=1]
+## bless, then harness is still restricted
+$ env -u FM_HOME /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/firstmate init
+firstmate: existing home /tmp/fmpl.lKDUeI/w/hostile/.firstmate is now trusted; it will honour its config: config/primary-harness
+[rc=0]
+$ env -u FM_HOME /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/firstmate
+firstmate: harness is not primary-capable: /bin/false (primary-capable: claude codex opencode pi pi-signed grok cursor omp)
+[rc=1]
+## symlinked .firstmate is refused by init
+$ env -u FM_HOME /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/firstmate init
+firstmate: /tmp/fmpl.lKDUeI/w/sym/.firstmate exists but is not a plain directory (symlink or non-directory); refusing to bless it
+[rc=1]
+## bad harness
+$ env -u FM_HOME /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/firstmate --harness /bin/sh
+firstmate: harness is not primary-capable: /bin/sh (primary-capable: claude codex opencode pi pi-signed grok cursor omp)
+[rc=1]
+$ env -u FM_HOME /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/firstmate --mode weird
+firstmate: launch mode must be project or install, not: weird
+[rc=1]

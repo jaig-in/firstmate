@@ -1,0 +1,160 @@
+FM_TEST_BEGIN 2026-11-01T15:38:33Z tests/fm-fleet-sync.test.sh family=session-bootstrap expected_gate_skip=none
+ok - detached clean ancestor is re-attached and fast-forwarded (recovered)
+ok - detached HEAD with unique commits is reported STUCK and left untouched
+ok - detached clean ancestor with diverged local default is reported STUCK and left untouched
+ok - dirty working tree is reported STUCK and left untouched
+ok - non-default named branch is reported STUCK and left untouched
+ok - diverged default branch is reported STUCK and left untouched
+ok - on-default clean behind clone still fast-forwards
+ok - already-current clone is reported unchanged
+ok - no-origin clone is skipped (benign), not flagged STUCK
+ok - local-only clone is skipped (benign), not flagged STUCK
+ok - a clone whose registry entry the parser refuses is skipped, never synced on the default posture
+ok - single-project form accepts a bare project name
+ok - single-project bare name resolution is not cwd-sensitive
+ok - single-project form accepts a projects/<name> relative name
+ok - single-project projects/<name> resolution is not cwd-sensitive
+ok - single-project form leaves a genuinely bad name unresolved
+ok - single-project form keeps a registered project's posture when named by path
+ok - single-project form keeps the legacy label for a path with no alias
+ok - single-project form stops a path refresh on an unreadable registry
+ok - whole-fleet form processes every clone under projects/
+ok - bootstrap relays recovered: and STUCK: fleet-sync outcomes
+ok - orphaned provably-stale packed-refs.lock is cleared and the clone syncs
+ok - a live packed-refs.lock is never removed and the sync fails loudly
+ok - a live process holding the clone worktree dir blocks lock removal (clone-dir liveness)
+ok - a transient packed-refs.lock that self-clears is retried without a force-remove
+ok - a non-packed-refs.lock fetch failure keeps today's behavior (no retry)
+ok - a non-repo directory under projects/ never fast-forwards the enclosing repo
+ok - the single-project form also refuses a directory that is not its own clone root
+ok - the clone-root guard accepts a symlinked clone directory
+ok - the clone-root guard accepts a root named by a different spelling of the same directory
+FM_TEST_END 2026-11-01T15:39:15Z tests/fm-fleet-sync.test.sh exit=0 duration_ms=42233 gate_skip=false
+FM_TEST_BEGIN 2026-11-01T15:39:15Z tests/fm-capacity.test.sh family=standalone expected_gate_skip=none
+ok - absent config/lane-capacity reports counts and no target
+ok - the Constrained line is printed only when config/lane-capacity exists
+ok - a target yields open lanes, full, and never a negative count
+ok - cpu, memory, and disk pressure close every lane and are named
+ok - unavailable probes print unknown and do not constrain
+ok - a malformed target is reported, not guessed
+ok - keyed config lines parse, and unknown, repeated, or malformed lines are refused
+ok - a fresh beat replaces probes, and its warn level closes lanes with its reason
+ok - late beats count, and stale, missing, malformed, or foreign beats fall back to probes
+ok - several pressure files: worst level wins, first supplies memory, every disk counts
+ok - a beat with missing fields keeps its fields aligned and limits fall back to probes
+ok - the lane footprint memory rule applies only with min-avail-gb
+ok - limits close lanes with named reasons, and --admit exits 0, 75, or 1
+ok - publish is opt-in, private, throttled, records boots, and publishes an invalid config as invalid
+ok - captain presence and quota runway publish derived words only, unknown when unreadable
+ok - the watcher publishes lane facts only for an opted-in home
+ok - the projects list follows the home's projects root and registry
+ok - real host probes produce a well-formed report
+# all fm-capacity tests passed
+FM_TEST_END 2026-11-01T15:39:21Z tests/fm-capacity.test.sh exit=0 duration_ms=5392 gate_skip=false
+FM_TEST_BEGIN 2026-11-01T15:39:21Z tests/fm-project-local.test.sh family=unclassified expected_gate_skip=none
+ok - launcher: FM_HOME win, nested shadowing, global+install fallback, in-repo refusal
+ok - trust: unmarked home refused, marker blesses, adapter whitelist, relative FM_HOME canonicalized
+ok - launcher: a non-regular or unreadable harness or mode setting stops the launch
+ok - init: org scaffold, per-project registration, repo-root landing, outside-repo refusal
+ok - init: blesses cloned and pre-marker homes without modifying files, already-trusted re-run, unsafe homes refused
+ok - projects-root: override > config > legacy default; malformed fails loudly
+ok - discovery=authority: discover lists siblings, refresh touches registered only, resolver precedence
+ok - resolver failures fail closed: fleet refresh, registry lookup, spawn, manifest paths, discover, stale aliases, remote seed
+ok - manifest reader: one-line, multi-line, and duplicate aliases agree with and without jq
+ok - registry: an unreadable or non-regular data/projects.md fails rather than reading as empty
+ok - manifest reader: a control byte or empty alias is refused whole, before any record is returned
+ok - legacy home: a bare alias keeps its registry label and its local-only skip
+ok - project name: . .. and other path-shaped arguments take the registered alias or basename
+ok - resolver: an unresolved projects/<name> passes through unchanged
+ok - org refresh: . and .. resolve to their registered alias
+ok - manifest lookup: an alias jq can hold resolves, with its exact bytes
+ok - init: a repository name the registry cannot hold is refused before anything is written
+ok - manifest: anything but a readable regular file is refused rather than read as absent
+ok - spawn: a malformed config/projects-root stops a path spawn
+ok - org seed: a symlinked child manifest is refused like its sibling leaf files
+ok - init: a non-regular marker is reported as that, not as tracked by git
+ok - summary: an unreadable instruction file is named rather than reported absent
+ok - init: a caller-exported git repository cannot redirect the scaffold
+ok - project library: a caller-exported GIT_DIR cannot make a directory a repository
+ok - trust check: reading the marker runs no command from the repository's config
+ok - project library: a caller's CDPATH cannot redirect a relative path
+ok - org seed: a relative --projects-root may start with a dash
+ok - discovery: a name with a line break cannot forge a second project
+ok - legacy refresh: a clone with a line break in its name forges no relative path
+ok - summary: a registered name reads its own row byte for byte
+ok - a quoted registry row never stops a walk, and a typed one is still refused
+ok - a backslash in a local-only name reads its own row and stays skipped
+ok - projects root: only a control byte is refused, whatever the locale
+ok - init: an interrupted scaffold is completed by the next init
+ok - spawn: unregistered sibling refused by name and path, registered reaches the brief check
+ok - spawn: unborn HEAD refused on the resolved sibling and path-registered project, by name and path
+ok - org seed: siblings registered not cloned, unregistered refused, registered path owns the source
+ok - org seed: a path-registered alias carries its path mapping, delivery mode, and alias into the child
+ok - org seed: a symlinked child config/projects-root is refused before it is written
+ok - org seed: a seeded alias the parent no longer maps loses its stale child mapping
+ok - org seed: copied and preserved mappings keep their exact bytes, and a jq-less seed refuses what its reader cannot hold
+ok - org seed: a backslashed row keeps its bytes and replaces the child's
+ok - org seed: the child's stored projects root is read without the parent's override
+ok - registry parsing: spaced and prefix names resolve to their own whole rows
+all project-local tests passed
+FM_TEST_END 2026-11-01T15:40:02Z tests/fm-project-local.test.sh exit=0 duration_ms=41660 gate_skip=false
+FM_TEST_BEGIN 2026-11-01T15:40:02Z tests/fm-view.test.sh family=unclassified expected_gate_skip=none
+ok - launch modes: fallback notice, explicit refusal, AppArmor-restricted reason, config default, install-mode auto-memory off, codex cap, no-project and self-checkout launches
+ok - project mode is the default on a capable host; claude auto-memory is off there; org launches root at the org
+ok - view: composed contract, merged bin/, Firstmate docs win, hidden .mcp.json, read-only project and surface, writable home and approved path
+ok - git shim: clean status, nothing staged, real top level from the view
+ok - git shim: hostile paths run nothing and git keeps working; a scrubbed environment is refused by name
+  mutation removed: mount --bind -- "$RUN/git-shim" "$GIT_REAL"
+  mutation removed: [ "$mode" = rw ] || ro_tree "$mp" || { umount -R -l -- "$mp"; return 1; }
+ok - falsification: the shim and the read-only binds are what keep git clean and the project read-only
+ok - keeper: a top-level entry created outside the session appears inside it
+ok - keeper: an FM_VIEW_POLL value sleep cannot take keeps the default
+ok - view: a caller's QUOTING_STYLE cannot hide a project entry
+ok - view: a name holding a space never matches two adjacent list words
+ok - view: a name with a line break is left out and forges no other entry
+ok - keeper: an edit behind a linked instruction file is recomposed
+ok - view: a relative runtime directory is made absolute before the session starts
+ok - probe: an unusable runtime directory is a named refusal
+ok - view: a start that fails leaves no runtime directory behind
+fm-view: could not present /tmp/fm-view-tests.v7HKOH/case.mIEMRe/demo/zq-remount.txt
+ok - keeper: a file whose read-only remount fails is undone and retried, never left writable
+ok - view: project links inside the launch tree are read-only; links outside it reach their real target
+ok - view: nested mounts inside read-only entries are read-only too
+ok - view: a nested mount named with an embedded tab or newline stays read-only and does not abort startup
+ok - probe: capability probes leave no scratch directory behind
+ok - worker placement: servers started inside a view are refused; outside a view the guard is inert
+ok - worker spawn: a spawn from inside a view writes the shared git exclude to the real project
+ok - cleanup: a hung-up session removes its runtime dir, and a leader-only hangup reaches the harness
+all view tests passed
+FM_TEST_END 2026-11-01T15:40:53Z tests/fm-view.test.sh exit=0 duration_ms=50598 gate_skip=false
+FM_TEST_BEGIN 2026-11-01T15:40:53Z tests/fm-backend-hc.test.sh family=hc expected_gate_skip=optional-binary
+1..17
+ok - hc: explicit-only, spawn-capable, with its tool set
+ok - hc: the bootstrap tool check resolves hc exactly as the adapter does
+ok - hc: create_task starts an independent labeled terminal and refuses a duplicate
+ok - hc: a view refuses every hc call before reaching hc; outside a view the calls are unchanged
+ok - hc: fm-control interrupt delivers the harness's interrupt key
+ok - hc: another task's, another home's, or an unlabeled terminal gets no input and no close
+ok - hc: an empty session never falls through to the ambient core
+ok - hc: an inherited HC_SOCKET never overrides the session pin
+ok - hc: agent_state maps foreground, finished, not_found and core errors onto the shared vocabulary
+ok - hc: agent_state reads a shell wrapper's process group before calling it dead
+ok - hc: kill ends and removes the terminal and refuses when it survives
+ok - hc: teardown's expected label refuses another task's terminal and closes the matching one
+ok - hc: capture, visible capture, and current path read the recorded terminal
+ok - hc: endpoint validation requires window to equal hc_session:hc_terminal
+ok - hc: container_ensure refuses a misnamed, old, or wrong-generation binary
+ok - hc: send_text_submit proves the turn through send --wait and never forces a blocked terminal
+ok - hc: send text is -- delimited, and FM_HC_BIN/FM_HC_SOCKET pin the call
+FM_TEST_COMPLETE
+FM_TEST_END 2026-11-01T15:40:56Z tests/fm-backend-hc.test.sh exit=0 duration_ms=2780 gate_skip=false
+FM_TEST_SUMMARY total=5 failed=0 skipped_gate=0 duration_ms=142859
+FM_TEST_SUMMARY_FAMILY family=hc count=1 duration_ms=2780 failed=0
+FM_TEST_SUMMARY_FAMILY family=session-bootstrap count=1 duration_ms=42233 failed=0
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=5392 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=92258 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-view.test.sh duration_ms=50598
+FM_TEST_SLOWEST rank=2 script=tests/fm-fleet-sync.test.sh duration_ms=42233
+FM_TEST_SLOWEST rank=3 script=tests/fm-project-local.test.sh duration_ms=41660
+FM_TEST_SLOWEST rank=4 script=tests/fm-capacity.test.sh duration_ms=5392
+FM_TEST_SLOWEST rank=5 script=tests/fm-backend-hc.test.sh duration_ms=2780

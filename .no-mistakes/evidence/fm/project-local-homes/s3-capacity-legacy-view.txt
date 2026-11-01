@@ -1,0 +1,71 @@
+## capacity names projects; an unreadable projects root reports null, not an empty list
+{"projects":["api","d\\e","shared-lib","webapp"]}
+error: /tmp/fmpl.lKDUeI/w/acme/.firstmate/config/projects-root must be a regular file
+{"projects":null}
+$ fm-fleet-sync.sh webapp
+error: /tmp/fmpl.lKDUeI/w/acme/.firstmate/config/projects-root must be a regular file
+[rc=1]
+## legacy home, no config/projects-root
+$ fm-projects.sh resolve foo
+/tmp/fmpl.lKDUeI/leg/projects/foo
+[rc=0]
+$ fm-fleet-sync.sh .
+foo: skipped: local-only project
+[rc=0]
+## view inside project repo myapp
+$ fm-view.sh run --install /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E --launch /tmp/fmpl.lKDUeI/w/myapp -- bash /tmp/fmpl.lKDUeI/inview.sh /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin
+cwd=/tmp/fmpl.lKDUeI/w/myapp FM_VIEW=1 FM_VIEW_ROOT=/tmp/fmpl.lKDUeI/w/myapp
+--- composed AGENTS.md: firstmate first, then project
+# Firstmate
+1
+--- CLAUDE.md
+<!-- Points Claude at AGENTS.md via import; edit AGENTS.md, not this file. -->
+@AGENTS.md
+--- firstmate tools present: 
+bin/firstmate
+bin/fm-spawn.sh
+--- project's own bin merged: 
+hi
+--- .mcp.json hidden:
+ls: cannot access '.mcp.json': No such file or directory
+--- real one readable under FM_LAUNCH_REAL:
+{"mcpServers":{}}
+--- writes refused
+touch: cannot touch 'new-file': Read-only file system
+touch new-file rc=1
+/tmp/fmpl.lKDUeI/inview.sh: line 10: file.txt: Read-only file system
+append file.txt rc=1
+/tmp/fmpl.lKDUeI/inview.sh: line 11: AGENTS.md: Read-only file system
+append AGENTS.md rc=1
+/tmp/fmpl.lKDUeI/inview.sh: line 12: /run/user/1000/firstmate-view.2803537/ro/file.txt: Read-only file system
+append through FM_LAUNCH_REAL rc=1
+--- home writable
+touch home rc=0
+--- git sees real tree
+5a00561 files
+.mcp.json AGENTS.md bin/own-tool file.txt 
+--- nested launch refused
+firstmate: this launch is already inside a Firstmate view; run firstmate from a normal terminal outside this session
+nested rc=1
+--- hc refused inside the view
+/home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/backends/hc.sh: line 54: /fm-backend-hometag-lib.sh: No such file or directory
+/home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/backends/hc.sh: line 56: /fm-composer-lib.sh: No such file or directory
+/home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/backends/hc.sh: line 58: /fm-agent-process-lib.sh: No such file or directory
+/home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/backends/hc.sh: line 60: /fm-view-lib.sh: No such file or directory
+/home/jb/.no-mistakes/worktrees/9a303e19c024/01M6BVH5QNDK7M5A5Y73HMD71E/bin/backends/hc.sh: line 148: fm_view_refuse_self_starting_backend: command not found
+hc rc=1
+[rc=0]
+## host side after the session
+$ git status --short
+[rc=0]
+$ ls .firstmate/state
+from-view
+[rc=0]
+$ cat file.txt
+data
+[rc=0]
+porcelain lines before=0 after=0
+## host sees real files, not composed
+$ head -1 AGENTS.md
+# myapp rules
+[rc=0]
