@@ -1,0 +1,5 @@
+ok - fm_tmux_isolation_gate runs isolated and skips beside a live server
+ok - fm_tmux_isolation_gate skips at its deadline when a tmux server does not answer
+ok - decoy cleanup is bounded, escalates to TERM and KILL, and reports a decoy it cannot stop
+ok - a checkout under /tmp skips the decoy cases instead of losing its script to the mount
+ok - a lab aimed at a missing tmux directory never reaches the default tmux server

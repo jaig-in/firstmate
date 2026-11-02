@@ -1,0 +1,67 @@
+== private /tmp contents before: []
+error creating /tmp/tmux-0/default (No such file or directory)
+error connecting to /tmp/tmux-0/default (No such file or directory)
+== decoy default server pid= socket=/tmp/tmux-0/default
+
+######## Scenario A: up/check/down with decoy default server
+lab: /tmp/fmlab-A (tear down with: bin/fm-live-lab.sh down /tmp/fmlab-A)
+tree: 7a31116c0ed8d2b4bd5dd78f2396f1e55c930e39 from /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6F8ZRDD6K88QXTS88XP49ZN
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+ok primary: claude pid 1733490 in /tmp/fmlab-A/home
+ok probe: the primary answered LABREADY-788b57a40cbe
+ok trust: /tmp/fmlab-A/home is trusted in the Claude store
+ok mirror: verified writer, check passed, captain=1 main=1
+ok host: skipped (empty fleet arms no supervision)
+ok watcher: skipped (empty fleet)
+ok treehouse: ~/.treehouse unchanged
+ready: /tmp/fmlab-A
+up exit=0
+lab tmux_dir=/tmp/fml.T9bnAY
+total 0
+drwx------ 2 root root 60 Nov  2 18:23 .
+drwx------ 3 root root 60 Nov  2 18:23 ..
+srw------- 1 root root  0 Nov  2 18:23 default
+0: lab* (1 panes) [220x60] [layout af1d,220x60,0,0,0] @0 (active)
+1: main (1 panes) [220x60] [layout af1e,220x60,0,0,1] @1
+decoy GONE (after up A)
+stopped: lab tmux server and lab processes
+removed: 1 Claude project entries under /tmp/fmlab-A
+removed: /tmp/fmlab-A
+down exit=0
+decoy GONE (after down A)
+lab A root removed
+lab A socket gone
+
+######## Scenario B: lab tmux directory removed before down
+lab: /tmp/fmlab-B (tear down with: bin/fm-live-lab.sh down /tmp/fmlab-B)
+tree: 7a31116c0ed8d2b4bd5dd78f2396f1e55c930e39 from /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6F8ZRDD6K88QXTS88XP49ZN
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+ok primary: claude pid 1755036 in /tmp/fmlab-B/home
+ok probe: the primary answered LABREADY-f122cad0c930
+ok trust: /tmp/fmlab-B/home is trusted in the Claude store
+ok mirror: verified writer, check passed, captain=1 main=1
+ok host: skipped (empty fleet arms no supervision)
+ok watcher: skipped (empty fleet)
+ok treehouse: ~/.treehouse unchanged
+ready: /tmp/fmlab-B
+up exit=0
+lab tmux_dir=/tmp/fml.prdwcb
+lab server pid=1753747
+decoy GONE (after up B)
+removed lab tmux dir /tmp/fml.prdwcb
+stopped: lab tmux server and lab processes
+fm-lab-home: recorded tmux directory is missing or unsafe
+fm-live-lab: cannot remove the private tmux directory
+down#1 exit=1
+decoy GONE (after down#1 B (tmux dir missing))
+lab server stopped
+stopped: lab tmux server and lab processes
+removed: 1 Claude project entries under /tmp/fmlab-B
+removed: /tmp/fmlab-B
+down#2 exit=0
+decoy GONE (after down#2 B)
+lab B root removed
+
+== final: stopping decoy on its explicit socket
+error connecting to /tmp/tmux-0/default (No such file or directory)
+no lab tmux/claude processes left

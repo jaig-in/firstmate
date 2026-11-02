@@ -1,0 +1,12 @@
+Post-run (host view)
+- After scenario B down#2 reported "stopped: lab tmux server and lab processes" and exit 0,
+  these lab processes were still alive: tmux server pid 1780583 (lstart 18:24:24),
+  its zsh 1780584, and the lab claude primary 1781020. I stopped them with TERM on those pids.
+- ~/.claude.json projects with 'fmlab' in the key, after the run (read-only check):
+  ['/tmp/fmlab.RiVmz1/home', '/tmp/fmlab-B/home']
+  '/tmp/fmlab-B/home' is from this run. down#2 had removed it ("removed: 1 Claude project entries");
+  the likely cause is the leaked claude 1781020 writing its project entry back when it was
+  stopped. '/tmp/fmlab.RiVmz1/home' was already there from an earlier run.
+  The lab root no longer exists, so fm-live-lab.sh down refuses to run again. I left both
+  entries for the operator to remove, rather than editing the user-level Claude store from the gate.
+- Host /tmp has no lab directories. Lab /tmp was a private tmpfs, now gone.
