@@ -1,0 +1,5 @@
+After round "missing-dir", the lab tmux server pid 2898625 and Claude primary pid 2901020 were still alive although down printed "stopped".
+ps lstart for pid 2898625, sampled 2s apart: 17:31:37, 17:31:37, 17:31:40 (WSL2 /proc/stat btime drift).
+down identifies lab processes by (pid, lstart). Here the lstart drifted, so live_pids lost track of the pid and down never killed it.
+This is the mechanism of the earlier declined finding T1. It is not introduced by this change. With the socket present (round "normal"), kill-server on the explicit -S socket stopped everything.
+Cleanup: both pids were stopped by a targeted kill after the run. The decoy default server was never touched by the lab.

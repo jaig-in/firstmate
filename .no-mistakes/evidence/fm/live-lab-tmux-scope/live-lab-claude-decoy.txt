@@ -1,0 +1,119 @@
+
+=== namespace /tmp is private: 0 entries before decoy; uid=0 ===
+decoy server pid=2865143 on /tmp/tmux-0/default
+
+=== ROUND normal: up --harness claude ===
+lab: /tmp/fmlab.avmVP0 (tear down with: bin/fm-live-lab.sh down /tmp/fmlab.avmVP0)
+tree: 7a31116c0ed8d2b4bd5dd78f2396f1e55c930e39 from /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6F62PM1FCHH2AZTBYBHHW8Q
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+ok primary: claude pid 2870117 in /tmp/fmlab.avmVP0/home
+ok probe: the primary answered LABREADY-d303dc4bb2a2
+ok trust: /tmp/fmlab.avmVP0/home is trusted in the Claude store
+ok host: skipped (empty fleet arms no supervision)
+ok watcher: skipped (empty fleet)
+ok treehouse: ~/.treehouse unchanged
+ready: /tmp/fmlab.avmVP0
+up exit=0
+lab tmux_dir=/tmp/fml.gAeDaV socket=/tmp/fml.gAeDaV/tmux-0/default
+lab server pid=2868004 (decoy pid=2865143)
+
+=== check ===
+ok primary: claude pid 2870117 in /tmp/fmlab.avmVP0/home
+ok probe: the primary answered LABREADY-d303dc4bb2a2
+ok trust: /tmp/fmlab.avmVP0/home is trusted in the Claude store
+ok host: skipped (empty fleet arms no supervision)
+ok watcher: skipped (empty fleet)
+ok treehouse: ~/.treehouse unchanged
+check exit=0
+
+=== pane main (tail) ===
+ ▝▝   ▝▝   /tmp/fmlab.avmVP0/home
+❯ Lab readiness probe from bin/fm-live-lab.sh. Run no tool or command for this message. Reply with only the word LABREADY, a hyphen, and then d303dc4bb2a2, with no spaces.                                                 
+● LABREADY-d303dc4bb2a2                                                                                                                                                                                                     
+✻ Brewed for 2s · done 5:31 PM                                                                                                                                                                                              
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯                                                                                                                                                                                                                         
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 2 agents                                                                   tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and reattach for focus tracking
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Teach auto mode about your environment?
+  Auto mode works better when it knows your environment. Takes about a minute.
+  ❯ 1. Yes
+    2. Not now
+    3. Don't show again
+  Enter to confirm · Esc to cancel
+DECOY ALIVE pid=2865143 session=decoy
+
+=== down ===
+stopped: lab tmux server and lab processes
+removed: 1 Claude project entries under /tmp/fmlab.avmVP0
+removed: /tmp/fmlab.avmVP0
+down exit=0
+lab server pid 2868004 gone
+lab root removed
+DECOY ALIVE pid=2865143 session=decoy
+
+=== ROUND missing-dir: up --harness claude ===
+lab: /tmp/fmlab.RiVmz1 (tear down with: bin/fm-live-lab.sh down /tmp/fmlab.RiVmz1)
+tree: 7a31116c0ed8d2b4bd5dd78f2396f1e55c930e39 from /home/jb/.no-mistakes/worktrees/9a303e19c024/01M6F62PM1FCHH2AZTBYBHHW8Q
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+ok primary: claude pid 2901020 in /tmp/fmlab.RiVmz1/home
+ok probe: the primary answered LABREADY-cfc54e37dd28
+ok trust: /tmp/fmlab.RiVmz1/home is trusted in the Claude store
+ok host: skipped (empty fleet arms no supervision)
+ok watcher: skipped (empty fleet)
+ok treehouse: ~/.treehouse unchanged
+ready: /tmp/fmlab.RiVmz1
+up exit=0
+lab tmux_dir=/tmp/fml.OAIVCE socket=/tmp/fml.OAIVCE/tmux-0/default
+lab server pid=2898625 (decoy pid=2865143)
+
+=== check ===
+ok primary: claude pid 2901020 in /tmp/fmlab.RiVmz1/home
+ok probe: the primary answered LABREADY-cfc54e37dd28
+ok trust: /tmp/fmlab.RiVmz1/home is trusted in the Claude store
+ok host: skipped (empty fleet arms no supervision)
+ok watcher: skipped (empty fleet)
+ok treehouse: ~/.treehouse unchanged
+check exit=0
+
+=== pane main (tail) ===
+ ▝▝   ▝▝   /tmp/fmlab.RiVmz1/home
+❯ Lab readiness probe from bin/fm-live-lab.sh. Run no tool or command for this message. Reply with only the word LABREADY, a hyphen, and then cfc54e37dd28, with no spaces.                                                 
+● LABREADY-cfc54e37dd28                                                                                                                                                                                                     
+✻ Crunched for 2s · done 5:31 PM                                                                                                                                                                                            
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯                                                                                                                                                                                                                         
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 2 agents                                                                   tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and reattach for focus tracking
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Teach auto mode about your environment?
+  Auto mode works better when it knows your environment. Takes about a minute.
+  ❯ 1. Yes
+    2. Not now
+    3. Don't show again
+  Enter to confirm · Esc to cancel
+DECOY ALIVE pid=2865143 session=decoy
+
+=== ADVERSARIAL: remove the lab's private tmux directory while the lab runs ===
+ls: cannot access '/tmp/fml.OAIVCE': No such file or directory
+TMUX_TMPDIR-only form would now reach: decoy
+
+=== pane/say/check against the missing dir ===
+pane exit=1 decoy-text-seen=0
+decoy pane has LAB-TYPED-TEXT: 0
+
+=== down ===
+stopped: lab tmux server and lab processes
+fm-lab-home: recorded tmux directory is missing or unsafe
+fm-live-lab: cannot remove the private tmux directory
+down exit=1
+(known pre-existing teardown refusal for a missing dir; recreate and retry)
+stopped: lab tmux server and lab processes
+removed: 1 Claude project entries under /tmp/fmlab.RiVmz1
+removed: /tmp/fmlab.RiVmz1
+down retry exit=0
+LAB SERVER STILL ALIVE (FAIL)
+lab root removed
+DECOY ALIVE pid=2865143 session=decoy
+decoy stopped by its explicit socket
